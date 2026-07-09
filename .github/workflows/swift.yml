@@ -16,7 +16,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: swift build -v
-    - name: Run tests
-      run: swift test -v
+    - name: Build ChessKit
+      run: cd ChessKit && swift build -v
+    - name: Run ChessKit tests
+      run: cd ChessKit && swift test -v
+    - name: Build chess-server
+      run: cd chess-server && swift build -v
+    - name: Run chess-server tests
+      run: cd chess-server && swift test -v
