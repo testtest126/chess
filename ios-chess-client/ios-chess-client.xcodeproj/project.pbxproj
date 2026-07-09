@@ -6,6 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		59582F232FFFE70000E604F1 /* ChessKit in Frameworks */ = {isa = PBXBuildFile; productRef = 59582F212FFFE70000E604F1 /* ChessKit */; };
+		59582F242FFFE70000E604F1 /* ChessProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 59582F222FFFE70000E604F1 /* ChessProtocol */; };
+		59582F262FFFE70000E604F1 /* ChessOnline in Frameworks */ = {isa = PBXBuildFile; productRef = 59582F252FFFE70000E604F1 /* ChessOnline */; };
+		59582F2A2FFFE70000E604F1 /* ChessKit in Frameworks */ = {isa = PBXBuildFile; productRef = 59582F272FFFE70000E604F1 /* ChessKit */; };
+		59582F2B2FFFE70000E604F1 /* ChessProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 59582F282FFFE70000E604F1 /* ChessProtocol */; };
+		59582F2C2FFFE70000E604F1 /* ChessOnline in Frameworks */ = {isa = PBXBuildFile; productRef = 59582F292FFFE70000E604F1 /* ChessOnline */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		59582F012FFFE6D300E604F1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +61,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				59582F232FFFE70000E604F1 /* ChessKit in Frameworks */,
+				59582F242FFFE70000E604F1 /* ChessProtocol in Frameworks */,
+				59582F262FFFE70000E604F1 /* ChessOnline in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -66,6 +78,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				59582F2A2FFFE70000E604F1 /* ChessKit in Frameworks */,
+				59582F2B2FFFE70000E604F1 /* ChessProtocol in Frameworks */,
+				59582F2C2FFFE70000E604F1 /* ChessOnline in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +127,9 @@
 			);
 			name = "ios-chess-client";
 			packageProductDependencies = (
+				59582F212FFFE70000E604F1 /* ChessKit */,
+				59582F222FFFE70000E604F1 /* ChessProtocol */,
+				59582F252FFFE70000E604F1 /* ChessOnline */,
 			);
 			productName = "ios-chess-client";
 			productReference = 59582EF12FFFE6D200E604F1 /* ios-chess-client.app */;
@@ -158,6 +176,9 @@
 			);
 			name = "ios-chess-clientUITests";
 			packageProductDependencies = (
+				59582F272FFFE70000E604F1 /* ChessKit */,
+				59582F282FFFE70000E604F1 /* ChessProtocol */,
+				59582F292FFFE70000E604F1 /* ChessOnline */,
 			);
 			productName = "ios-chess-clientUITests";
 			productReference = 59582F0A2FFFE6D300E604F1 /* ios-chess-clientUITests.xctest */;
@@ -195,6 +216,9 @@
 			);
 			mainGroup = 59582EE82FFFE6D200E604F1;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				59582F202FFFE70000E604F1 /* XCLocalSwiftPackageReference "../ChessKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 59582EF22FFFE6D200E604F1 /* Products */;
 			projectDirPath = "";
@@ -322,7 +346,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -380,7 +404,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -462,7 +486,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5E5UZ78K96;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "private.ios-chess-clientTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -484,7 +508,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5E5UZ78K96;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "private.ios-chess-clientTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -578,6 +602,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		59582F202FFFE70000E604F1 /* XCLocalSwiftPackageReference "../ChessKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ChessKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		59582F212FFFE70000E604F1 /* ChessKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChessKit;
+		};
+		59582F222FFFE70000E604F1 /* ChessProtocol */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChessProtocol;
+		};
+		59582F252FFFE70000E604F1 /* ChessOnline */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChessOnline;
+		};
+		59582F272FFFE70000E604F1 /* ChessKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChessKit;
+		};
+		59582F282FFFE70000E604F1 /* ChessProtocol */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChessProtocol;
+		};
+		59582F292FFFE70000E604F1 /* ChessOnline */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChessOnline;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 59582EE92FFFE6D200E604F1 /* Project object */;
 }
