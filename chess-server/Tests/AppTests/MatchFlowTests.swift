@@ -65,20 +65,20 @@ final class MatchFlowTests: XCTestCase {
         let whiteStart: ServerMessage.GameStart
     }
 
-    /// Registers two players, queues both, and sorts out who got which color
-    /// (assignment is random).
-    func startMatch() async throws -> Match {
+    /// Registers two players, queues both for the same control, and sorts out
+    /// who got which color (assignment is random).
+    func startMatch(timeControl: TimeControl = .default) async throws -> Match {
         let a = try await register()
         let b = try await register()
 
         let socketA = try await TestSocket.connect(port: port, token: a.accessToken, on: app.eventLoopGroup)
-        try await socketA.send(.joinQueue)
+        try await socketA.send(.joinQueue(timeControl: timeControl))
         guard case .queued = try await socketA.next() else {
             throw TestSocketError.unexpectedMessage
         }
 
         let socketB = try await TestSocket.connect(port: port, token: b.accessToken, on: app.eventLoopGroup)
-        try await socketB.send(.joinQueue)
+        try await socketB.send(.joinQueue(timeControl: timeControl))
 
         guard case .gameStart(let startA) = try await socketA.next(),
               case .gameStart(let startB) = try await socketB.next()
@@ -100,9 +100,10 @@ final class MatchFlowTests: XCTestCase {
     func testFullMatchOverWebSockets() async throws {
         let match = try await startMatch()
 
-        // Fresh game ships full clocks and the opponent's rating.
+        // Fresh game ships full clocks, the control, and the opponent's rating.
         let clock = try XCTUnwrap(match.whiteStart.clock)
         XCTAssertEqual(clock.whiteSeconds, ClockConfig.standard.initialSeconds, accuracy: 1)
+        XCTAssertEqual(match.whiteStart.timeControl, .default)
         XCTAssertEqual(match.whiteStart.opponentRating, User.initialRating)
 
         // Moving out of turn is rejected.
@@ -224,6 +225,93 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testMatchmakingIsolatesTimeControls() async throws {
+        // Four players, two controls, interleaved joins: bullet players pair
+        // only with each other, rapid players only with each other, and each
+        // game starts with its own control's clock.
+        let a = try await register()
+        let b = try await register()
+        let c = try await register()
+        let d = try await register()
+
+        let bulletA = try await TestSocket.connect(port: port, token: a.accessToken, on: app.eventLoopGroup)
+        try await bulletA.send(.joinQueue(timeControl: .bullet))
+        guard case .queued = try await bulletA.next() else {
+            throw TestSocketError.unexpectedMessage
+        }
+
+        // A rapid player does NOT match the waiting bullet player.
+        let rapidB = try await TestSocket.connect(port: port, token: b.accessToken, on: app.eventLoopGroup)
+        try await rapidB.send(.joinQueue(timeControl: .rapid))
+        guard case .queued = try await rapidB.next() else {
+            return XCTFail("rapid player must not pair with the queued bullet player")
+        }
+
+        // A second bullet player pairs with the first, at bullet clocks...
+        let bulletC = try await TestSocket.connect(port: port, token: c.accessToken, on: app.eventLoopGroup)
+        try await bulletC.send(.joinQueue(timeControl: .bullet))
+        guard case .gameStart(let startA) = try await bulletA.next(),
+              case .gameStart(let startC) = try await bulletC.next()
+        else {
+            return XCTFail("expected the two bullet players to be paired")
+        }
+        XCTAssertEqual(startA.gameID, startC.gameID)
+        XCTAssertEqual(startA.timeControl, .bullet)
+        XCTAssertEqual(startC.timeControl, .bullet)
+        let bulletClock = try XCTUnwrap(startA.clock)
+        XCTAssertEqual(bulletClock.whiteSeconds, TimeControl.bullet.initialSeconds, accuracy: 1)
+        XCTAssertEqual(bulletClock.blackSeconds, TimeControl.bullet.initialSeconds, accuracy: 1)
+
+        // ...and a second rapid player with the waiting rapid one.
+        let rapidD = try await TestSocket.connect(port: port, token: d.accessToken, on: app.eventLoopGroup)
+        try await rapidD.send(.joinQueue(timeControl: .rapid))
+        guard case .gameStart(let startB) = try await rapidB.next(),
+              case .gameStart(let startD) = try await rapidD.next()
+        else {
+            return XCTFail("expected the two rapid players to be paired")
+        }
+        XCTAssertEqual(startB.gameID, startD.gameID)
+        XCTAssertNotEqual(startB.gameID, startA.gameID)
+        XCTAssertEqual(startB.timeControl, .rapid)
+        let rapidClock = try XCTUnwrap(startD.clock)
+        XCTAssertEqual(rapidClock.whiteSeconds, TimeControl.rapid.initialSeconds, accuracy: 1)
+        XCTAssertEqual(rapidClock.blackSeconds, TimeControl.rapid.initialSeconds, accuracy: 1)
+
+        for socket in [bulletA, rapidB, bulletC, rapidD] {
+            try await socket.close()
+        }
+    }
+
+    func testRematchKeepsTimeControl() async throws {
+        let match = try await startMatch(timeControl: .bullet)
+        XCTAssertEqual(match.whiteStart.timeControl, .bullet)
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+        try await match.black.send(.requestRematch)
+
+        guard case .gameStart(let startA) = try await match.white.next(),
+              case .gameStart(let startB) = try await match.black.next()
+        else {
+            return XCTFail("expected rematch game start")
+        }
+        // The rematch is played at the original control, with fresh clocks.
+        XCTAssertEqual(startA.timeControl, .bullet)
+        XCTAssertEqual(startB.timeControl, .bullet)
+        let clock = try XCTUnwrap(startA.clock)
+        XCTAssertEqual(clock.whiteSeconds, TimeControl.bullet.initialSeconds, accuracy: 1)
+        XCTAssertEqual(clock.blackSeconds, TimeControl.bullet.initialSeconds, accuracy: 1)
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testLeaderboardRanksPlayersWithGames() async throws {
         let match = try await startMatch()
 
@@ -292,6 +380,29 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testDeclineRematchNotifiesRequester() async throws {
+        let match = try await startMatch()
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+
+        // Explicit decline (the client's decline button): the requester gets
+        // rematch_declined, distinct from the opponent-left withdrawal.
+        try await match.black.send(.declineRematch)
+        guard case .rematchDeclined = try await match.white.next() else {
+            return XCTFail("expected explicit decline notice")
+        }
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testRematchUnavailableWhenOpponentQueuesElsewhere() async throws {
         let match = try await startMatch()
 
@@ -305,7 +416,7 @@ final class MatchFlowTests: XCTestCase {
         }
 
         // The opponent moves on to a new opponent instead.
-        try await match.black.send(.joinQueue)
+        try await match.black.send(.joinQueue(timeControl: .default))
         guard case .rematchUnavailable = try await match.white.next() else {
             return XCTFail("expected rematch withdrawal notice")
         }
@@ -319,7 +430,7 @@ final class MatchFlowTests: XCTestCase {
             let socket = try await TestSocket.connect(port: port, token: "garbage", on: app.eventLoopGroup)
             // Server may accept the upgrade then close immediately; sending
             // should fail or the connection should already be closed.
-            try await socket.send(.joinQueue)
+            try await socket.send(.joinQueue(timeControl: .default))
             let closed = try await socket.waitForClose(timeoutSeconds: 5)
             XCTAssertTrue(closed, "socket with bad token should be closed")
         } catch {

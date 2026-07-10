@@ -1,5 +1,6 @@
 @testable import App
 import XCTVapor
+import JWT
 import ChessOnline
 
 final class AuthTests: XCTestCase {
@@ -90,5 +91,178 @@ final class AuthTests: XCTestCase {
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
+    }
+
+    // MARK: - Sign in with Apple
+    //
+    // Genuine Apple signatures can't be minted offline, so these tests stub
+    // the verifier (the seam the live JWKS implementation plugs into) and
+    // exercise everything downstream of it: configuration gating, rejection
+    // mapping, and the account-resolution policy.
+
+    /// Configures SIWA with a stub verifier that accepts `validTokens` and
+    /// maps them to Apple subjects; everything else is rejected.
+    private func configureApple(validTokens: [String: String]) {
+        app.jwt.apple.applicationIdentifier = "com.test.matemate"
+        app.appleTokenVerifier = AppleTokenVerifier { token, _ in
+            guard let subject = validTokens[token] else {
+                throw Abort(.unauthorized)
+            }
+            return subject
+        }
+    }
+
+    private func signInWithApple(
+        token: String, displayName: String? = nil, bearer: String? = nil
+    ) async throws -> (HTTPStatus, AuthResponse?) {
+        var status: HTTPStatus = .internalServerError
+        var response: AuthResponse?
+        try await app.test(.POST, "auth/apple", beforeRequest: { req in
+            if let bearer {
+                req.headers.bearerAuthorization = .init(token: bearer)
+            }
+            try req.content.encode(AppleSignInRequest(identityToken: token, displayName: displayName), as: .json)
+        }, afterResponse: { res async in
+            status = res.status
+            response = try? res.content.decode(AuthResponse.self)
+        })
+        return (status, response)
+    }
+
+    func testAppleSignInRequiresConfiguration() async throws {
+        // No SIWA_APP_ID configured: refuse outright rather than mis-verify.
+        let (status, _) = try await signInWithApple(token: "anything")
+        XCTAssertEqual(status, .serviceUnavailable)
+    }
+
+    func testAppleSignInRejectsInvalidToken() async throws {
+        configureApple(validTokens: [:])
+        let (status, _) = try await signInWithApple(token: "forged-or-garbage")
+        XCTAssertEqual(status, .unauthorized)
+    }
+
+    func testAppleSignInCreatesAccountWhenNoGuestIsCalling() async throws {
+        configureApple(validTokens: ["token-a": "apple-subject-1"])
+
+        let (status, response) = try await signInWithApple(token: "token-a", displayName: "John Doe")
+        XCTAssertEqual(status, .ok)
+        let auth = try XCTUnwrap(response)
+        XCTAssertEqual(auth.displayName, "John Doe")
+        XCTAssertEqual(auth.appleLinked, true)
+        XCTAssertFalse(auth.accessToken.isEmpty)
+        XCTAssertFalse(auth.refreshToken.isEmpty)
+    }
+
+    func testAppleSignInLinksCallingGuestAccount() async throws {
+        configureApple(validTokens: ["token-b": "apple-subject-2"])
+
+        // An existing guest signs in with Apple: same account, now linked —
+        // rating and history must survive (this is the recovery credential).
+        let guest = try await register()
+        let (status, response) = try await signInWithApple(token: "token-b", bearer: guest.accessToken)
+        XCTAssertEqual(status, .ok)
+        let auth = try XCTUnwrap(response)
+        XCTAssertEqual(auth.userID, guest.userID, "linking must keep the guest's identity")
+        XCTAssertEqual(auth.displayName, guest.displayName)
+        XCTAssertEqual(auth.appleLinked, true)
+    }
+
+    func testAppleSignInRecoveryBeatsLinking() async throws {
+        configureApple(validTokens: ["token-c": "apple-subject-3"])
+
+        // Device 1: guest links the Apple ID.
+        let original = try await register()
+        _ = try await signInWithApple(token: "token-c", bearer: original.accessToken)
+
+        // Device 2: a different fresh guest signs in with the same Apple ID.
+        // Recovery wins — they get the original account back, not a link of
+        // the new guest.
+        let otherGuest = try await register()
+        let (status, response) = try await signInWithApple(token: "token-c", bearer: otherGuest.accessToken)
+        XCTAssertEqual(status, .ok)
+        XCTAssertEqual(try XCTUnwrap(response).userID, original.userID)
+    }
+
+    func testAppleSignInSecondTimeReturnsSameAccount() async throws {
+        configureApple(validTokens: ["token-d": "apple-subject-4"])
+
+        let (_, first) = try await signInWithApple(token: "token-d", displayName: "Jane Doe")
+        let (_, second) = try await signInWithApple(token: "token-d", displayName: "Different Name")
+        XCTAssertEqual(try XCTUnwrap(first).userID, try XCTUnwrap(second).userID)
+        // Original name preserved: Apple only sends the name on first auth.
+        XCTAssertEqual(try XCTUnwrap(second).displayName, "Jane Doe")
+    }
+
+    func testLiveVerifierRejectsStructurallyInvalidToken() async throws {
+        // The live verifier (Apple JWKS) fails on malformed input before any
+        // network activity — the one live path safely testable offline.
+        app.jwt.apple.applicationIdentifier = "com.test.matemate"
+        let (status, _) = try await signInWithApple(token: "not-even-a-jwt")
+        XCTAssertEqual(status, .unauthorized)
+    }
+
+    func testAppleSignInRefusesToRelinkToDifferentAppleID() async throws {
+        // Takeover guard: a valid bearer must not be able to rebind an
+        // already-linked account to a different Apple ID (which would lock
+        // the real owner's Apple sign-in out of recovery).
+        configureApple(validTokens: ["token-x": "apple-subject-x", "token-y": "apple-subject-y"])
+
+        let guest = try await register()
+        let (linkStatus, _) = try await signInWithApple(token: "token-x", bearer: guest.accessToken)
+        XCTAssertEqual(linkStatus, .ok)
+
+        let (rebindStatus, _) = try await signInWithApple(token: "token-y", bearer: guest.accessToken)
+        XCTAssertEqual(rebindStatus, .conflict)
+
+        // The original binding is intact: subject X still recovers the account.
+        let (recoverStatus, recovered) = try await signInWithApple(token: "token-x")
+        XCTAssertEqual(recoverStatus, .ok)
+        XCTAssertEqual(try XCTUnwrap(recovered).userID, guest.userID)
+
+        // Re-presenting the already-linked subject with the bearer stays fine.
+        let (idempotentStatus, _) = try await signInWithApple(token: "token-x", bearer: guest.accessToken)
+        XCTAssertEqual(idempotentStatus, .ok)
+    }
+
+    func testAppleSignInRejectsInvalidBearerInsteadOfCreatingAccount() async throws {
+        // A presented-but-invalid bearer must 401, not silently demote the
+        // request to "anonymous" — that would bind the guest's Apple ID to a
+        // fresh empty account and strand their history.
+        configureApple(validTokens: ["token-z": "apple-subject-z"])
+
+        let (status, _) = try await signInWithApple(token: "token-z", bearer: "expired-or-garbage-bearer")
+        XCTAssertEqual(status, .unauthorized)
+
+        // Nothing was created or linked: the subject still recovers nothing
+        // (fresh sign-in without a bearer creates the account only now).
+        let (freshStatus, fresh) = try await signInWithApple(token: "token-z")
+        XCTAssertEqual(freshStatus, .ok)
+        XCTAssertEqual(try XCTUnwrap(fresh).appleLinked, true)
+    }
+
+    func testLiveVerifierRejectsTokenSignedWithOwnServerKey() async throws {
+        // Regression test for the incident that motivated this rework: a
+        // WELL-FORMED JWT signed with the server's own HMAC key — accepted by
+        // the original implementation — must be rejected by the live Apple
+        // verifier (kid mismatch / unreachable JWKS both reject, so this is
+        // deterministic offline).
+        app.jwt.apple.applicationIdentifier = "com.test.matemate"
+
+        struct ForgedAppleClaims: JWTPayload {
+            var sub: SubjectClaim
+            var exp: ExpirationClaim
+            var iss: IssuerClaim
+            var aud: AudienceClaim
+            func verify(using algorithm: some JWTAlgorithm) async throws {}
+        }
+        let forged = try await app.jwt.keys.sign(ForgedAppleClaims(
+            sub: .init(value: "attacker-chosen-subject"),
+            exp: .init(value: Date().addingTimeInterval(3600)),
+            iss: .init(value: "https://appleid.apple.com"),
+            aud: .init(value: "com.test.matemate")
+        ))
+
+        let (status, _) = try await signInWithApple(token: forged)
+        XCTAssertEqual(status, .unauthorized, "a token signed with our own key must never authenticate as Apple")
     }
 }

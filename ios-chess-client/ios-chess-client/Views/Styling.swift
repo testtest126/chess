@@ -1,8 +1,20 @@
 import SwiftUI
+import ChessOnline
 
 // App-wide styling helpers. The app targets iOS 17, so Liquid Glass button
 // styles (iOS 26) are adopted behind availability checks and degrade to the
 // standard bordered styles on older systems.
+
+extension TimeControl {
+    /// The lobby picker's UserDefaults key (stores the rawValue).
+    static let storageKey = "preferred_time_control"
+
+    /// Speed name shown in pickers and titles ("Bullet", "Blitz", "Rapid").
+    var label: String { rawValue.capitalized }
+
+    /// Name plus conventional notation, e.g. "Blitz 5+3".
+    var displayName: String { "\(label) \(shortLabel)" }
+}
 
 extension View {
     /// Primary call-to-action style: Liquid Glass on iOS 26+, prominent

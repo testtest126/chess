@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import ChessKit
+import ChessOnline
+import AuthenticationServices
 
 /// Root screen: start a new game against the engine, or revisit past games.
 struct HomeView: View {
@@ -9,6 +11,7 @@ struct HomeView: View {
 
     @State private var colorChoice: ColorChoice = .white
     @State private var difficulty: Difficulty = .casual
+    @AppStorage(TimeControl.storageKey) private var timeControlRaw = TimeControl.default.rawValue
     @State private var activeSession: GameSession?
     @State private var onlineSession: OnlineGameSession?
     @State private var reviewTarget: SavedGame?
@@ -16,6 +19,8 @@ struct HomeView: View {
     @State private var showRenameDialog = false
     @State private var nameInput = ""
     @State private var renameError: String?
+    @State private var signInError: String?
+    @State private var isSigningInWithApple = false
     @AppStorage(BoardTheme.storageKey) private var boardThemeRaw = BoardTheme.classic.rawValue
 
     enum ColorChoice: String, CaseIterable, Identifiable {
@@ -41,9 +46,49 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let opponent = ActiveGameStore.shared.opponentName {
+                    Section {
+                        Button {
+                            onlineSession = OnlineGameSession()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.tint)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Game in progress")
+                                        .fontWeight(.semibold)
+                                    Text("Tap to resume vs \(opponent)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 Section("Play Online") {
+                    // Bare speed names: three notated segments ("Blitz 5+3")
+                    // truncate on narrow phones. The notation shows up on the
+                    // matchmaking screen and the in-game title instead.
+                    Picker("Time control", selection: $timeControlRaw) {
+                        ForEach(TimeControl.allCases, id: \.rawValue) { control in
+                            Text(control.label).tag(control.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    // Guest-first: online play never requires signing in.
                     Button {
-                        onlineSession = OnlineGameSession()
+                        onlineSession = OnlineGameSession(
+                            timeControl: TimeControl(rawValue: timeControlRaw) ?? .default
+                        )
                     } label: {
                         Label("Play Online", systemImage: "globe")
                             .frame(maxWidth: .infinity)
@@ -52,6 +97,7 @@ struct HomeView: View {
                     .primaryActionButtonStyle()
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
+                    .disabled(isSigningInWithApple)
 
                     if let name = AccountStore.shared.displayName {
                         let rating = AccountStore.shared.rating.map { " · Elo \($0)" } ?? ""
@@ -70,6 +116,46 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .listRowBackground(Color.clear)
+                    }
+
+                    // Optional: link (guests keep rating/history) or recover
+                    // an account from another device. Hidden once linked.
+                    if AccountStore.shared.appleLinked {
+                        Label("Account recoverable with Apple", systemImage: "checkmark.shield")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
+                    } else {
+                        SignInWithAppleButton { request in
+                            request.requestedScopes = [.fullName]
+                        } onCompletion: { result in
+                            handleAppleSignInResult(result)
+                        }
+                        .frame(height: 40)
+                        .disabled(isSigningInWithApple)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 2, trailing: 16))
+                        .listRowBackground(Color.clear)
+
+                        if isSigningInWithApple {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                    .scaleEffect(0.9)
+                                Text("Signing in…")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
+                        } else {
+                            Text(AccountStore.shared.displayName == nil
+                                 ? "Recovers your account if you've played before."
+                                 : "Keeps your rating safe if you lose this device.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity)
+                                .listRowBackground(Color.clear)
+                        }
                     }
                 }
 
@@ -176,6 +262,14 @@ struct HomeView: View {
         } message: {
             Text(renameError ?? "")
         }
+        .alert("Sign in with Apple Failed", isPresented: Binding(
+            get: { signInError != nil },
+            set: { if !$0 { signInError = nil } }
+        )) {
+            Button("OK") { signInError = nil }
+        } message: {
+            Text(signInError ?? "")
+        }
         .fullScreenCover(item: $activeSession) { session in
             GameView(session: session)
         }
@@ -189,6 +283,41 @@ struct HomeView: View {
                 title: saved.date.formatted(date: .abbreviated, time: .omitted)
             )
         }
+    }
+
+    private func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
+        isSigningInWithApple = true
+        Task {
+            do {
+                switch result {
+                case .success(let authorization):
+                    guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                        signInError = "Unexpected credential type"
+                        return
+                    }
+                    try await AccountStore.shared.signInWithApple(
+                        credential,
+                        displayName: credential.fullName.flatMap(formatFullName)
+                    )
+                case .failure(let error):
+                    if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
+                        signInError = "Sign in with Apple failed: \(error.localizedDescription)"
+                    }
+                }
+            } catch AccountError.server(let status) {
+                signInError = "Server error (\(status))"
+            } catch {
+                signInError = "Couldn't sign in. Try again later."
+            }
+            isSigningInWithApple = false
+        }
+    }
+
+    private func formatFullName(_ name: PersonNameComponents) -> String? {
+        let formatter = PersonNameComponentsFormatter()
+        formatter.style = .default
+        let formatted = formatter.string(from: name)
+        return formatted.isEmpty ? nil : formatted
     }
 }
 
