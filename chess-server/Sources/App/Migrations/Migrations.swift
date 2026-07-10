@@ -71,6 +71,20 @@ struct AddUserAppleID: AsyncMigration {
     }
 }
 
+struct AddGameRecordTimeControl: AsyncMigration {
+    func prepare(on database: Database) async throws {
+        try await database.schema(GameRecord.schema)
+            .field("time_control", .string)
+            .update()
+    }
+
+    func revert(on database: Database) async throws {
+        try await database.schema(GameRecord.schema)
+            .deleteField("time_control")
+            .update()
+    }
+}
+
 struct CreateGameRecord: AsyncMigration {
     func prepare(on database: Database) async throws {
         try await database.schema(GameRecord.schema)

@@ -148,11 +148,16 @@ final class MatchFlowTests: XCTestCase {
         XCTAssertEqual(whiteUser.rating, 1184)
         XCTAssertEqual(blackUser.rating, 1216)
 
-        // The finished game was persisted for both players.
+        // The finished game was persisted for both players, including the
+        // control it was played at (clients render Bullet/Blitz/Rapid tags
+        // and derive their own color from the participant IDs).
         let whiteGames = try await myGames(token: match.whiteAuth.accessToken)
         XCTAssertEqual(whiteGames.count, 1)
         XCTAssertEqual(whiteGames[0].result, "0-1")
         XCTAssertEqual(whiteGames[0].uciMoves, "f2f3 e7e5 g2g4 d8h4")
+        XCTAssertEqual(whiteGames[0].timeControl, .default)
+        XCTAssertEqual(whiteGames[0].whiteID, match.whiteAuth.userID)
+        XCTAssertEqual(whiteGames[0].blackID, match.blackAuth.userID)
         let blackGames = try await myGames(token: match.blackAuth.accessToken)
         XCTAssertEqual(blackGames.count, 1)
 

@@ -146,12 +146,16 @@ public struct GameRecordDTO: Codable, Sendable, Equatable, Identifiable {
     /// Space-separated UCI moves.
     public var uciMoves: String
     public var finishedAt: Date
+    /// The control the game was played at (nil for records that predate
+    /// selectable time controls).
+    public var timeControl: TimeControl?
 
     public init(
         id: UUID, whiteID: UUID, blackID: UUID,
         whiteName: String, blackName: String,
         result: String, endReason: String,
-        uciMoves: String, finishedAt: Date
+        uciMoves: String, finishedAt: Date,
+        timeControl: TimeControl? = nil
     ) {
         self.id = id
         self.whiteID = whiteID
@@ -162,5 +166,6 @@ public struct GameRecordDTO: Codable, Sendable, Equatable, Identifiable {
         self.endReason = endReason
         self.uciMoves = uciMoves
         self.finishedAt = finishedAt
+        self.timeControl = timeControl
     }
 }

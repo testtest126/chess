@@ -524,7 +524,8 @@ actor GameCoordinator {
             blackName: game.black.name,
             result: game.game.result.rawValue,
             endReason: game.game.endReason?.rawValue ?? "",
-            uciMoves: game.game.uciMoves.joined(separator: " ")
+            uciMoves: game.game.uciMoves.joined(separator: " "),
+            timeControl: game.timeControl.rawValue
         )
         do {
             try await record.save(on: app.db)
