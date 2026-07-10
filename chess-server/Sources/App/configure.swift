@@ -49,6 +49,21 @@ public func configure(_ app: Application) async throws {
         app.jwt.apple.applicationIdentifier = appleAppID
     }
 
+    // MARK: Auth abuse protection (#32)
+    // Per-IP fixed-window throttle on /auth/*. Effectively off under test so
+    // the suite's rapid registrations pass; rate-limit tests install a tight
+    // limiter themselves.
+    let defaultLimit = app.environment == .testing ? Int.max : 10
+    app.authRateLimiter = FixedWindowRateLimiter(
+        limit: Environment.get("AUTH_RATE_LIMIT").flatMap(Int.init) ?? defaultLimit,
+        window: Environment.get("AUTH_RATE_LIMIT_WINDOW").flatMap(Double.init) ?? 60
+    )
+    // Reap abandoned guest accounts. Not under test: tests drive
+    // GuestAccountCleanup.run directly.
+    if app.environment != .testing {
+        app.lifecycle.use(GuestCleanupScheduler())
+    }
+
     // MARK: Realtime coordinator
     app.gameCoordinator = GameCoordinator(app: app)
 
