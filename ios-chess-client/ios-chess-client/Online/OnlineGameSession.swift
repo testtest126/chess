@@ -41,6 +41,7 @@ final class OnlineGameSession: Identifiable {
     // Rematch state (valid while phase is .finished).
     private(set) var rematchRequested = false
     private(set) var rematchOfferedByOpponent = false
+    private(set) var rematchDeclined = false
     private(set) var rematchUnavailable = false
 
     private let account: AccountStore
@@ -108,6 +109,14 @@ final class OnlineGameSession: Identifiable {
         Task { try? await client.send(.requestRematch) }
     }
 
+    /// Decline the opponent's rematch offer.
+    func declineRematch() {
+        guard let client, rematchOfferedByOpponent, !rematchDeclined else { return }
+        rematchDeclined = true
+        rematchOfferedByOpponent = false
+        Task { try? await client.send(.declineRematch) }
+    }
+
     /// Remaining seconds for `color` as displayed at `date` (the active side
     /// ticks down between server updates), or nil before the game starts.
     func remainingSeconds(for color: PieceColor, at date: Date) -> Double? {
@@ -172,6 +181,9 @@ final class OnlineGameSession: Identifiable {
         switch message {
         case .queued:
             phase = .queued
+            // Queued means the server has no game for us: drop any stale
+            // resume hint (e.g. a game that ended while the app was closed).
+            ActiveGameStore.shared.clear()
 
         case .gameStart(let start):
             playerColor = start.yourColor == "black" ? .black : .white
@@ -190,8 +202,11 @@ final class OnlineGameSession: Identifiable {
             ratingDelta = nil
             rematchRequested = false
             rematchOfferedByOpponent = false
+            rematchDeclined = false
             rematchUnavailable = false
             phase = .playing
+            // A live game exists: let the home screen offer to resume it.
+            ActiveGameStore.shared.begin(opponent: start.opponentName)
 
         case .movePlayed(let uci, let newClock):
             if let move = Move(uci: uci) {
@@ -222,6 +237,8 @@ final class OnlineGameSession: Identifiable {
             // The socket stays open: the rematch handshake happens on it, and
             // a fresh game_start flips the session back to .playing.
             phase = .finished(result: gameResult, reason: endReason)
+            // The game is over: nothing to resume from the home screen.
+            ActiveGameStore.shared.clear()
 
         case .drawOffered:
             incomingDrawOffer = true
@@ -234,6 +251,9 @@ final class OnlineGameSession: Identifiable {
 
         case .rematchOffered:
             rematchOfferedByOpponent = true
+
+        case .rematchDeclined:
+            rematchRequested = false
 
         case .rematchUnavailable:
             rematchUnavailable = true

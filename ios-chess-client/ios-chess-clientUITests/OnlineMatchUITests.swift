@@ -75,6 +75,28 @@ final class OnlineMatchUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 10), "our move should be accepted and echoed")
         }
 
+        // Kill the app mid-game and relaunch: the home screen must offer to
+        // resume (the server keeps the game alive through the disconnect
+        // grace period), and resuming must land back in the same game with
+        // the earlier moves intact.
+        app.terminate()
+        app.launch()
+        let resumeRow = app.staticTexts["Game in progress"]
+        XCTAssertTrue(resumeRow.waitForExistence(timeout: 10), "home screen should offer to resume after relaunch")
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", bot.displayName)).firstMatch.exists,
+            "resume row should name the opponent"
+        )
+        resumeRow.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["square_e2"].waitForExistence(timeout: 15),
+            "resuming should reconnect to the live game"
+        )
+        XCTAssertTrue(
+            app.staticTexts["e4"].waitForExistence(timeout: 10),
+            "the resumed game should replay the earlier moves"
+        )
+
         // Resign and confirm.
         app.buttons["Resign"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))

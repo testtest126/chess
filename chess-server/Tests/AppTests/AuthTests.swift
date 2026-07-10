@@ -1,5 +1,6 @@
 @testable import App
 import XCTVapor
+import JWT
 import ChessOnline
 
 final class AuthTests: XCTestCase {
@@ -198,5 +199,70 @@ final class AuthTests: XCTestCase {
         app.jwt.apple.applicationIdentifier = "com.test.matemate"
         let (status, _) = try await signInWithApple(token: "not-even-a-jwt")
         XCTAssertEqual(status, .unauthorized)
+    }
+
+    func testAppleSignInRefusesToRelinkToDifferentAppleID() async throws {
+        // Takeover guard: a valid bearer must not be able to rebind an
+        // already-linked account to a different Apple ID (which would lock
+        // the real owner's Apple sign-in out of recovery).
+        configureApple(validTokens: ["token-x": "apple-subject-x", "token-y": "apple-subject-y"])
+
+        let guest = try await register()
+        let (linkStatus, _) = try await signInWithApple(token: "token-x", bearer: guest.accessToken)
+        XCTAssertEqual(linkStatus, .ok)
+
+        let (rebindStatus, _) = try await signInWithApple(token: "token-y", bearer: guest.accessToken)
+        XCTAssertEqual(rebindStatus, .conflict)
+
+        // The original binding is intact: subject X still recovers the account.
+        let (recoverStatus, recovered) = try await signInWithApple(token: "token-x")
+        XCTAssertEqual(recoverStatus, .ok)
+        XCTAssertEqual(try XCTUnwrap(recovered).userID, guest.userID)
+
+        // Re-presenting the already-linked subject with the bearer stays fine.
+        let (idempotentStatus, _) = try await signInWithApple(token: "token-x", bearer: guest.accessToken)
+        XCTAssertEqual(idempotentStatus, .ok)
+    }
+
+    func testAppleSignInRejectsInvalidBearerInsteadOfCreatingAccount() async throws {
+        // A presented-but-invalid bearer must 401, not silently demote the
+        // request to "anonymous" — that would bind the guest's Apple ID to a
+        // fresh empty account and strand their history.
+        configureApple(validTokens: ["token-z": "apple-subject-z"])
+
+        let (status, _) = try await signInWithApple(token: "token-z", bearer: "expired-or-garbage-bearer")
+        XCTAssertEqual(status, .unauthorized)
+
+        // Nothing was created or linked: the subject still recovers nothing
+        // (fresh sign-in without a bearer creates the account only now).
+        let (freshStatus, fresh) = try await signInWithApple(token: "token-z")
+        XCTAssertEqual(freshStatus, .ok)
+        XCTAssertEqual(try XCTUnwrap(fresh).appleLinked, true)
+    }
+
+    func testLiveVerifierRejectsTokenSignedWithOwnServerKey() async throws {
+        // Regression test for the incident that motivated this rework: a
+        // WELL-FORMED JWT signed with the server's own HMAC key — accepted by
+        // the original implementation — must be rejected by the live Apple
+        // verifier (kid mismatch / unreachable JWKS both reject, so this is
+        // deterministic offline).
+        app.jwt.apple.applicationIdentifier = "com.test.matemate"
+
+        struct ForgedAppleClaims: JWTPayload {
+            var sub: SubjectClaim
+            var exp: ExpirationClaim
+            var iss: IssuerClaim
+            var aud: AudienceClaim
+            func verify(using algorithm: some JWTAlgorithm) async throws {}
+        }
+        let forged = try await app.jwt.keys.sign(ForgedAppleClaims(
+            sub: .init(value: "attacker-chosen-subject"),
+            exp: .init(value: Date().addingTimeInterval(3600)),
+            iss: .init(value: "https://appleid.apple.com"),
+            aud: .init(value: "com.test.matemate")
+        ))
+
+        let (status, _) = try await signInWithApple(token: forged)
+        XCTAssertEqual(status, .unauthorized, "a token signed with our own key must never authenticate as Apple")
     }
 }

@@ -75,6 +75,8 @@ public enum ClientMessage: Sendable, Equatable {
     /// After a game ends: ask to play the same opponent again (colors
     /// swapped). The rematch starts when both players have asked.
     case requestRematch
+    /// Decline the opponent's pending rematch offer.
+    case declineRematch
 }
 
 extension ClientMessage: Codable {
@@ -87,6 +89,7 @@ extension ClientMessage: Codable {
         case acceptDraw = "accept_draw"
         case declineDraw = "decline_draw"
         case requestRematch = "request_rematch"
+        case declineRematch = "decline_rematch"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -108,6 +111,7 @@ extension ClientMessage: Codable {
         case .acceptDraw: self = .acceptDraw
         case .declineDraw: self = .declineDraw
         case .requestRematch: self = .requestRematch
+        case .declineRematch: self = .declineRematch
         }
     }
 
@@ -132,6 +136,8 @@ extension ClientMessage: Codable {
             try container.encode(Kind.declineDraw, forKey: .type)
         case .requestRematch:
             try container.encode(Kind.requestRematch, forKey: .type)
+        case .declineRematch:
+            try container.encode(Kind.declineRematch, forKey: .type)
         }
     }
 }
@@ -157,6 +163,8 @@ public enum ServerMessage: Sendable, Equatable {
     case drawDeclined
     /// The opponent asked for a rematch of the game that just ended.
     case rematchOffered
+    /// The opponent explicitly declined your rematch request.
+    case rematchDeclined
     /// A rematch can no longer happen (the opponent left or queued anew).
     case rematchUnavailable
     /// The opponent's connection state changed. Disconnected opponents forfeit
@@ -220,6 +228,7 @@ extension ServerMessage: Codable {
         case drawOffered = "draw_offered"
         case drawDeclined = "draw_declined"
         case rematchOffered = "rematch_offered"
+        case rematchDeclined = "rematch_declined"
         case rematchUnavailable = "rematch_unavailable"
         case opponentStatus = "opponent_status"
         case error
@@ -264,6 +273,8 @@ extension ServerMessage: Codable {
             self = .drawDeclined
         case .rematchOffered:
             self = .rematchOffered
+        case .rematchDeclined:
+            self = .rematchDeclined
         case .rematchUnavailable:
             self = .rematchUnavailable
         case .opponentStatus:
@@ -303,6 +314,8 @@ extension ServerMessage: Codable {
             try container.encode(Kind.drawDeclined, forKey: .type)
         case .rematchOffered:
             try container.encode(Kind.rematchOffered, forKey: .type)
+        case .rematchDeclined:
+            try container.encode(Kind.rematchDeclined, forKey: .type)
         case .rematchUnavailable:
             try container.encode(Kind.rematchUnavailable, forKey: .type)
         case .opponentStatus(let connected):
