@@ -128,6 +128,20 @@ final class AccountStore {
         return try JSONDecoder().decode([LeaderboardEntry].self, from: data)
     }
 
+    /// A player's public profile (name, rating, lifetime record).
+    func fetchProfile(of playerID: UUID) async throws -> PlayerProfileDTO {
+        let token = try await validAccessToken()
+        var request = URLRequest(url: ServerConfig.httpBase.appending(path: "players/\(playerID.uuidString)"))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AccountError.server(status: (response as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(PlayerProfileDTO.self, from: data)
+    }
+
     private func register() async throws -> AuthResponse {
         try await post("auth/register", body: RegisterRequest())
     }
