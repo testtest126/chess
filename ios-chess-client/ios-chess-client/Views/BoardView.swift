@@ -14,6 +14,9 @@ struct BoardView: View {
 
     @State private var selectedSquare: Int?
     @State private var promotionMoves: [Move] = []
+    @AppStorage(BoardTheme.storageKey) private var themeRaw = BoardTheme.classic.rawValue
+
+    private var theme: BoardTheme { BoardTheme(rawValue: themeRaw) ?? .classic }
 
     // Drag-to-move state.
     @State private var draggedFrom: Int?
@@ -135,7 +138,7 @@ struct BoardView: View {
 
         ZStack {
             Rectangle()
-                .fill(isLight ? Self.lightColor : Self.darkColor)
+                .fill(isLight ? theme.lightSquare : theme.darkSquare)
 
             if let last = lastMove, sq == last.from || sq == last.to {
                 Rectangle().fill(Self.lastMoveTint)
@@ -186,7 +189,7 @@ struct BoardView: View {
 
     @ViewBuilder
     private func coordinateLabels(sq: Int, size: CGFloat, row: Int, col: Int, isLight: Bool) -> some View {
-        let labelColor = isLight ? Self.darkColor : Self.lightColor
+        let labelColor = isLight ? theme.darkSquare : theme.lightSquare
         if col == 0 {
             Text("\(Sq.rank(sq) + 1)")
                 .font(.system(size: size * 0.22, weight: .semibold))
@@ -273,10 +276,8 @@ struct BoardView: View {
         }
     }
 
-    // MARK: - Palette
+    // MARK: - Palette (square colors live in BoardTheme)
 
-    static let lightColor = Color(red: 0.94, green: 0.85, blue: 0.71)
-    static let darkColor = Color(red: 0.71, green: 0.53, blue: 0.39)
     static let selectionTint = Color.yellow.opacity(0.45)
     static let lastMoveTint = Color.yellow.opacity(0.30)
     static let hintMoveTint = Color.blue.opacity(0.35)

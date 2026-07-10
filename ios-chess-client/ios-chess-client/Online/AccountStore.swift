@@ -85,6 +85,28 @@ final class AccountStore {
 
     // MARK: - Requests
 
+    /// Renames the account (server validates 3-24 chars). Throws
+    /// `AccountError.server(status: 400)` when the name is rejected.
+    func rename(to newName: String) async throws {
+        let token = try await validAccessToken()
+        var request = URLRequest(url: ServerConfig.httpBase.appending(path: "me"))
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["displayName": newName])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw AccountError.invalidResponse
+        }
+        guard http.statusCode == 200 else {
+            throw AccountError.server(status: http.statusCode)
+        }
+        let user = try JSONDecoder().decode(UserDTO.self, from: data)
+        displayName = user.displayName
+        UserDefaults.standard.set(user.displayName, forKey: Self.displayNameKey)
+    }
+
     /// Top players by rating (requires an account; registers one if needed).
     func fetchLeaderboard() async throws -> [LeaderboardEntry] {
         let token = try await validAccessToken()

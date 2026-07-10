@@ -13,6 +13,10 @@ struct HomeView: View {
     @State private var onlineSession: OnlineGameSession?
     @State private var reviewTarget: SavedGame?
     @State private var showLeaderboard = false
+    @State private var showRenameDialog = false
+    @State private var nameInput = ""
+    @State private var renameError: String?
+    @AppStorage(BoardTheme.storageKey) private var boardThemeRaw = BoardTheme.classic.rawValue
 
     enum ColorChoice: String, CaseIterable, Identifiable {
         case white, black, random
@@ -45,11 +49,21 @@ struct HomeView: View {
 
                     if let name = AccountStore.shared.displayName {
                         let rating = AccountStore.shared.rating.map { " · Elo \($0)" } ?? ""
-                        Text("Playing as \(name)\(rating)")
+                        Button {
+                            nameInput = name
+                            showRenameDialog = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("Playing as \(name)\(rating)")
+                                Image(systemName: "pencil")
+                                    .font(.caption2)
+                            }
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
-                            .listRowBackground(Color.clear)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(Color.clear)
                     }
                 }
 
@@ -80,6 +94,19 @@ struct HomeView: View {
                     .primaryActionButtonStyle()
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
+                }
+
+                Section("Appearance") {
+                    Picker("Board theme", selection: $boardThemeRaw) {
+                        ForEach(BoardTheme.allCases) { theme in
+                            HStack {
+                                themeSwatch(theme)
+                                Text(theme.label)
+                            }
+                            .tag(theme.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 Section("Past Games") {
@@ -114,6 +141,33 @@ struct HomeView: View {
         .sheet(isPresented: $showLeaderboard) {
             LeaderboardView()
         }
+        .alert("Change Display Name", isPresented: $showRenameDialog) {
+            TextField("Display name", text: $nameInput)
+                .textInputAutocapitalization(.never)
+            Button("Save") {
+                let requested = nameInput
+                Task {
+                    do {
+                        try await AccountStore.shared.rename(to: requested)
+                    } catch AccountError.server(let status) where status == 400 {
+                        renameError = "Names must be 3-24 letters, digits, spaces, _ or -."
+                    } catch {
+                        renameError = "Couldn't reach the server. Try again later."
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Shown to your online opponents and on the leaderboard.")
+        }
+        .alert("Rename Failed", isPresented: Binding(
+            get: { renameError != nil },
+            set: { if !$0 { renameError = nil } }
+        )) {
+            Button("OK") { renameError = nil }
+        } message: {
+            Text(renameError ?? "")
+        }
         .fullScreenCover(item: $activeSession) { session in
             GameView(session: session)
         }
@@ -127,6 +181,18 @@ struct HomeView: View {
                 title: saved.date.formatted(date: .abbreviated, time: .omitted)
             )
         }
+    }
+}
+
+extension HomeView {
+    /// Two-square miniature showing a theme's colors.
+    fileprivate func themeSwatch(_ theme: BoardTheme) -> some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(theme.lightSquare)
+            Rectangle().fill(theme.darkSquare)
+        }
+        .frame(width: 24, height: 12)
+        .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 }
 

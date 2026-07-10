@@ -155,6 +155,9 @@ final class OnlineGameSession: Identifiable {
             phase = .playing
 
         case .movePlayed(let uci, let newClock):
+            if let move = Move(uci: uci) {
+                SoundPlayer.playMove(move, on: board)
+            }
             try? game.play(uci: uci)
             if let newClock {
                 clock = newClock
@@ -176,6 +179,7 @@ final class OnlineGameSession: Identifiable {
             if let delta = ratingDelta {
                 account.applyRatingDelta(delta)
             }
+            SoundPlayer.play(.gameEnd)
             phase = .finished(result: gameResult, reason: endReason)
             isTerminal = true
             client?.close()
