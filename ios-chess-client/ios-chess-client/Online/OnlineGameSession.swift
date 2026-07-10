@@ -21,7 +21,7 @@ final class OnlineGameSession: Identifiable {
     private(set) var phase: Phase = .connecting
     private(set) var game = Game()
     private(set) var playerColor: PieceColor = .white
-    private(set) var opponentName = "Opponent"
+    private(set) var opponentName = String(localized: "Opponent", comment: "Fallback name shown until the opponent's real name arrives")
     private(set) var opponentRating: Int?
     private(set) var opponentConnected = true
 
@@ -152,7 +152,8 @@ final class OnlineGameSession: Identifiable {
             // The socket dropped mid-session. Retry a few times, then give up.
             attempts += 1
             if attempts > 5 {
-                phase = .failed("Connection to the server was lost.")
+                phase = .failed(String(localized: "Connection to the server was lost.",
+                                       comment: "Shown when the game's WebSocket drops"))
                 isTerminal = true
                 return
             }

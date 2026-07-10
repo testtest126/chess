@@ -8,8 +8,8 @@ enum AccountError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .server(let status): return "Server error (\(status))"
-        case .invalidResponse: return "Unexpected server response"
+        case .server(let status): return String(localized: "Server error (\(status))", comment: "Account error; parameter is the HTTP status code")
+        case .invalidResponse: return String(localized: "Unexpected server response", comment: "Account error")
         }
     }
 }

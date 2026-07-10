@@ -21,7 +21,13 @@ struct HomeView: View {
     enum ColorChoice: String, CaseIterable, Identifiable {
         case white, black, random
         var id: String { rawValue }
-        var label: String { rawValue.capitalized }
+        var label: String {
+            switch self {
+            case .white: return PieceColor.white.localizedName
+            case .black: return PieceColor.black.localizedName
+            case .random: return String(localized: "Random", comment: "Play as a randomly assigned side")
+            }
+        }
 
         var resolved: PieceColor {
             switch self {
@@ -150,9 +156,11 @@ struct HomeView: View {
                     do {
                         try await AccountStore.shared.rename(to: requested)
                     } catch AccountError.server(let status) where status == 400 {
-                        renameError = "Names must be 3-24 letters, digits, spaces, _ or -."
+                        renameError = String(localized: "Names must be 3-24 letters, digits, spaces, _ or -.",
+                                             comment: "Rename validation error")
                     } catch {
-                        renameError = "Couldn't reach the server. Try again later."
+                        renameError = String(localized: "Couldn't reach the server. Try again later.",
+                                             comment: "Rename network error")
                     }
                 }
             }
@@ -204,7 +212,7 @@ struct SavedGameRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(saved.playerOutcome) \(saved.endReasonDescription)")
                     .font(.headline)
-                Text("As \(saved.playerColor.rawValue.capitalized) vs \(saved.opponentDescription) · \((saved.moveCount + 1) / 2) moves")
+                Text("As \(saved.playerColor.localizedName) vs \(saved.opponentDescription) · ^[\((saved.moveCount + 1) / 2) move](inflect: true)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
