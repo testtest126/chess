@@ -68,4 +68,20 @@ public extension ChessEngine {
     func bestMove(in board: Board) -> Move? {
         search(board, limit: .default).bestMove
     }
+
+    /// A ``GameReview`` evaluator backed by this engine's search.
+    ///
+    /// Converts the engine's side-to-move score to the White perspective
+    /// GameReview expects and passes the best move through for "best was"
+    /// callouts. Deterministic whenever the engine and limit are (fixed depth,
+    /// no node/time cap, no opening book).
+    func reviewEvaluator(limit: SearchLimit) -> GameReview.Evaluator {
+        { board in
+            let result = search(board, limit: limit)
+            let whiteScore = board.sideToMove == .white
+                ? result.scoreCentipawns
+                : -result.scoreCentipawns
+            return GameReview.PositionAssessment(score: whiteScore, bestMove: result.bestMove)
+        }
+    }
 }

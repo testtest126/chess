@@ -58,13 +58,7 @@ struct ReviewView: View {
                     let limit = SearchLimit(depth: 3, maxNodes: 50_000, moveTime: 0.15)
                     let review = GameReview(
                         analyzing: game,
-                        evaluator: { board in
-                            let result = engine.search(board, limit: limit)
-                            let whiteScore = board.sideToMove == .white
-                                ? result.scoreCentipawns
-                                : -result.scoreCentipawns
-                            return GameReview.PositionAssessment(score: whiteScore, bestMove: result.bestMove)
-                        },
+                        evaluator: engine.reviewEvaluator(limit: limit),
                         progress: onProgress
                     )
                     return (game, review)
