@@ -28,6 +28,7 @@ struct GameView: View {
                     board: session.board,
                     orientation: bottomColor,
                     lastMove: session.lastMove,
+                    hintMove: session.hintMove,
                     onMove: { session.playPlayerMove($0) }
                 )
                 .padding(.horizontal, 8)
@@ -100,6 +101,18 @@ struct GameView: View {
             if isEngine && session.isEngineThinking {
                 ProgressView()
                     .controlSize(.small)
+            }
+            if !isEngine {
+                Button("Hint", systemImage: session.isFindingHint ? "lightbulb.fill" : "lightbulb") {
+                    session.requestHint()
+                }
+                .labelStyle(.iconOnly)
+                .disabled(!session.isPlayerTurn || session.isFindingHint)
+                Button("Take Back", systemImage: "arrow.uturn.backward") {
+                    session.takeBack()
+                }
+                .labelStyle(.iconOnly)
+                .disabled(!session.canTakeBack)
             }
             Spacer()
             CapturedPiecesView(board: session.board, capturer: color)

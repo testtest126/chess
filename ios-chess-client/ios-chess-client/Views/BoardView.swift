@@ -7,6 +7,8 @@ struct BoardView: View {
     let board: Board
     var orientation: PieceColor = .white
     var lastMove: Move?
+    /// Engine suggestion to spotlight (from/to squares).
+    var hintMove: Move?
     /// Non-nil enables interaction; called with a fully-formed legal move.
     var onMove: ((Move) -> Void)?
 
@@ -72,6 +74,9 @@ struct BoardView: View {
 
             if let last = lastMove, sq == last.from || sq == last.to {
                 Rectangle().fill(Self.lastMoveTint)
+            }
+            if let hint = hintMove, sq == hint.from || sq == hint.to {
+                Rectangle().fill(Self.hintMoveTint)
             }
             if sq == selectedSquare {
                 Rectangle().fill(Self.selectionTint)
@@ -199,6 +204,7 @@ struct BoardView: View {
     static let darkColor = Color(red: 0.71, green: 0.53, blue: 0.39)
     static let selectionTint = Color.yellow.opacity(0.45)
     static let lastMoveTint = Color.yellow.opacity(0.30)
+    static let hintMoveTint = Color.blue.opacity(0.35)
     static let hintColor = Color.black.opacity(0.22)
 }
 

@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import ChessKit
+import ChessProtocol
 
 /// Post-game analysis: accuracy summary, eval graph, and move-by-move playback.
 /// Rebuilds the game from UCI moves so it works for both fresh and saved games.
@@ -13,6 +14,7 @@ struct ReviewView: View {
 
     @State private var game: Game?
     @State private var review: GameReview?
+    @State private var analysisProgress = 0.0
     /// Index into `game.positions`: 0 is the initial position.
     @State private var ply = 0
 
@@ -22,8 +24,17 @@ struct ReviewView: View {
                 if let game, let review {
                     content(game: game, review: review)
                 } else {
-                    ProgressView("Analyzing…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 12) {
+                        ProgressView(value: analysisProgress) {
+                            Text("Analyzing with engine…")
+                        }
+                        .progressViewStyle(.linear)
+                        .frame(maxWidth: 260)
+                        Text("\(Int(analysisProgress * 100))%")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle(title)
@@ -35,10 +46,27 @@ struct ReviewView: View {
             }
             .task {
                 let moves = self.moves
+                let onProgress: @Sendable (Double) -> Void = { fraction in
+                    Task { @MainActor in analysisProgress = fraction }
+                }
                 let (loadedGame, loadedReview) = await Task.detached(priority: .userInitiated) {
                     () -> (Game?, GameReview?) in
                     guard let game = try? Game.from(uciMoves: moves) else { return (nil, nil) }
-                    return (game, GameReview(analyzing: game))
+                    // Engine-backed evaluation: bounded per position so even
+                    // long games finish in seconds.
+                    let engine = NegamaxEngine()
+                    let limit = SearchLimit(depth: 3, maxNodes: 50_000, moveTime: 0.15)
+                    let review = GameReview(
+                        analyzing: game,
+                        evaluator: { board in
+                            let result = engine.search(board, limit: limit)
+                            return board.sideToMove == .white
+                                ? result.scoreCentipawns
+                                : -result.scoreCentipawns
+                        },
+                        progress: onProgress
+                    )
+                    return (game, review)
                 }.value
                 self.game = loadedGame
                 self.review = loadedReview
