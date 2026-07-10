@@ -6,6 +6,9 @@ import ChessOnline
 // standard bordered styles on older systems.
 
 extension TimeControl {
+    /// The lobby picker's UserDefaults key (stores the rawValue).
+    static let storageKey = "preferred_time_control"
+
     /// Speed name shown in pickers and titles ("Bullet", "Blitz", "Rapid").
     var label: String { rawValue.capitalized }
 

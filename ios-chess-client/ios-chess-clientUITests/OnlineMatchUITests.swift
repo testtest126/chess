@@ -38,8 +38,9 @@ final class OnlineMatchUITests: XCTestCase {
         app.launch()
 
         // Choose bullet in the lobby picker: this covers the picker → session
-        // → join_queue wiring, not just the protocol default.
-        app.buttons["Bullet 1+0"].tap()
+        // → join_queue wiring, not just the protocol default. Segments show
+        // bare speed names; the notation lives in the in-game title.
+        app.buttons["Bullet"].tap()
         app.buttons["Play Online"].tap()
 
         // Match forms as soon as the app joins the queue.

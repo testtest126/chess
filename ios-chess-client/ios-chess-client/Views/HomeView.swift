@@ -10,7 +10,7 @@ struct HomeView: View {
 
     @State private var colorChoice: ColorChoice = .white
     @State private var difficulty: Difficulty = .casual
-    @State private var timeControl: TimeControl = .default
+    @AppStorage(TimeControl.storageKey) private var timeControlRaw = TimeControl.default.rawValue
     @State private var activeSession: GameSession?
     @State private var onlineSession: OnlineGameSession?
     @State private var reviewTarget: SavedGame?
@@ -38,15 +38,20 @@ struct HomeView: View {
         NavigationStack {
             List {
                 Section("Play Online") {
-                    Picker("Time control", selection: $timeControl) {
-                        ForEach(TimeControl.allCases, id: \.self) { control in
-                            Text(control.displayName).tag(control)
+                    // Bare speed names: three notated segments ("Blitz 5+3")
+                    // truncate on narrow phones. The notation shows up on the
+                    // matchmaking screen and the in-game title instead.
+                    Picker("Time control", selection: $timeControlRaw) {
+                        ForEach(TimeControl.allCases, id: \.rawValue) { control in
+                            Text(control.label).tag(control.rawValue)
                         }
                     }
                     .pickerStyle(.segmented)
 
                     Button {
-                        onlineSession = OnlineGameSession(timeControl: timeControl)
+                        onlineSession = OnlineGameSession(
+                            timeControl: TimeControl(rawValue: timeControlRaw) ?? .default
+                        )
                     } label: {
                         Label("Play Online", systemImage: "globe")
                             .frame(maxWidth: .infinity)
