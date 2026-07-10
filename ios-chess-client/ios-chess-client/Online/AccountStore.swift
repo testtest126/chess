@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import ChessOnline
+import AuthenticationServices
 
 enum AccountError: LocalizedError {
     case server(status: Int)
@@ -125,6 +126,23 @@ final class AccountStore {
 
     private func refresh(with token: String) async throws -> AuthResponse {
         try await post("auth/refresh", body: RefreshRequest(refreshToken: token))
+    }
+
+    /// Signs in with an Apple identity credential from AuthenticationServices.
+    /// If the credential's user ID is new, creates a fresh account; if it
+    /// exists, returns that account. The displayName is only used during
+    /// account creation.
+    func signInWithApple(_ credential: ASAuthorizationAppleIDCredential, displayName: String? = nil) async throws {
+        guard let tokenData = credential.identityToken else {
+            throw AccountError.invalidResponse
+        }
+        guard let token = String(data: tokenData, encoding: .utf8) else {
+            throw AccountError.invalidResponse
+        }
+        _ = try await adopt(post("auth/apple", body: AppleSignInRequest(
+            identityToken: token,
+            displayName: displayName
+        )))
     }
 
     private func post<Body: Encodable>(_ path: String, body: Body) async throws -> AuthResponse {

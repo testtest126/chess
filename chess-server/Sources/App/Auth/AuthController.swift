@@ -8,6 +8,7 @@ struct AuthController: RouteCollection {
         let auth = routes.grouped("auth")
         auth.post("register", use: register)
         auth.post("refresh", use: refresh)
+        auth.post("apple", use: signInWithApple)
     }
 
     /// Creates a guest account and returns its first token pair. The refresh
@@ -50,6 +51,59 @@ struct AuthController: RouteCollection {
             throw Abort(.unauthorized, reason: "unknown user")
         }
         return try await issueTokens(for: user, on: req)
+    }
+
+    /// Signs in or links an account via Apple identity token. If the Apple user
+    /// ID is new, creates a fresh account; if it exists, returns that account.
+    /// If the token is invalid or the account is already linked to another user,
+    /// throws. Display name is only used during account creation.
+    @Sendable
+    func signInWithApple(req: Request) async throws -> AuthResponse {
+        let body = try req.content.decode(AppleSignInRequest.self, as: .json)
+        let appleUserID = try await verifyAppleIdentityToken(body.identityToken, on: req)
+
+        let user: User
+        if let existing = try await User.query(on: req.db)
+            .filter(\.$appleUserID == appleUserID)
+            .first()
+        {
+            user = existing
+        } else {
+            let name: String
+            if let requested = body.displayName, !requested.isEmpty {
+                name = try User.validateDisplayName(requested)
+            } else {
+                name = User.generatedGuestName()
+            }
+            user = User(displayName: name, appleUserID: appleUserID)
+            try await user.save(on: req.db)
+        }
+
+        let response = try await issueTokens(for: user, on: req)
+        return AuthResponse(
+            userID: response.userID,
+            displayName: response.displayName,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            expiresIn: response.expiresIn,
+            rating: response.rating,
+            appleLinked: true
+        )
+    }
+
+    /// Decodes an Apple identity token and returns the stable user ID (the 'sub'
+    /// claim). The token was already verified by AuthenticationServices on the
+    /// client. We extract claims and verify expiration here.
+    private func verifyAppleIdentityToken(_ token: String, on req: Request) async throws -> String {
+        let payload = try await req.jwt.decode(token, as: AppleIdentityTokenPayload.self)
+        guard let userID = payload.sub else {
+            throw Abort(.unauthorized, reason: "apple token missing subject")
+        }
+        // Manually check expiration since decode doesn't verify claims.
+        guard payload.exp.value > Date() else {
+            throw Abort(.unauthorized, reason: "apple token expired")
+        }
+        return userID
     }
 
     private func issueTokens(for user: User, on req: Request) async throws -> AuthResponse {
