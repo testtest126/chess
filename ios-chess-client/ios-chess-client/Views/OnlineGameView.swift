@@ -279,34 +279,47 @@ struct OnlineGameView: View {
     }
 
     /// Rematch states: available → waiting for opponent → (game restarts),
-    /// or unavailable once the opponent leaves.
+    /// declined, unavailable (opponent left), or declined by opponent.
     @ViewBuilder
     private var rematchButton: some View {
         if session.rematchUnavailable {
             Label("Opponent left", systemImage: "person.slash")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        } else if session.rematchDeclined {
+            Label("You declined the rematch", systemImage: "hand.raised")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         } else if session.rematchRequested {
             Label("Waiting for opponent…", systemImage: "hourglass")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        } else if session.rematchOfferedByOpponent {
+            VStack(spacing: 8) {
+                Button {
+                    session.requestRematch()
+                } label: {
+                    Label("Accept Rematch", systemImage: "checkmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .primaryActionButtonStyle()
+
+                Button {
+                    session.declineRematch()
+                } label: {
+                    Label("Decline", systemImage: "xmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .secondaryActionButtonStyle()
+            }
         } else {
             Button {
                 session.requestRematch()
             } label: {
-                Label(
-                    session.rematchOfferedByOpponent ? "Accept Rematch" : "Rematch",
-                    systemImage: "arrow.2.squarepath"
-                )
-                .frame(maxWidth: .infinity)
+                Label("Rematch", systemImage: "arrow.2.squarepath")
+                    .frame(maxWidth: .infinity)
             }
             .primaryActionButtonStyle()
-            .overlay(alignment: .topTrailing) {
-                if session.rematchOfferedByOpponent {
-                    Circle().fill(.red).frame(width: 10, height: 10)
-                        .offset(x: 4, y: -4)
-                }
-            }
         }
     }
 
