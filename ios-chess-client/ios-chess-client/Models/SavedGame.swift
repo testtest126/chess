@@ -42,8 +42,11 @@ final class SavedGame {
     /// "Engine (Club)" for local games, the opponent's name for online ones.
     var opponentDescription: String {
         if let opponentName { return opponentName }
-        if let difficulty { return "Engine (\(difficulty.label))" }
-        return "Opponent"
+        if let difficulty {
+            return String(localized: "Engine (\(difficulty.label))",
+                          comment: "Opponent in a local game; parameter is the difficulty name")
+        }
+        return String(localized: "Opponent", comment: "Fallback name shown until the opponent's real name arrives")
     }
     var result: Game.Result { Game.Result(rawValue: resultRaw) ?? .ongoing }
     var endReason: Game.EndReason? { endReasonRaw.flatMap(Game.EndReason.init(rawValue:)) }
@@ -52,24 +55,30 @@ final class SavedGame {
     /// "Won", "Lost", or "Draw" from the player's perspective.
     var playerOutcome: String {
         switch result {
-        case .draw: return "Draw"
-        case .whiteWins: return playerColor == .white ? "Won" : "Lost"
-        case .blackWins: return playerColor == .black ? "Won" : "Lost"
-        case .ongoing: return "Unfinished"
+        case .draw: return String(localized: "Draw", comment: "Draw game result")
+        case .whiteWins:
+            return playerColor == .white
+                ? String(localized: "Won", comment: "Game outcome in the history list")
+                : String(localized: "Lost", comment: "Game outcome in the history list")
+        case .blackWins:
+            return playerColor == .black
+                ? String(localized: "Won", comment: "Game outcome in the history list")
+                : String(localized: "Lost", comment: "Game outcome in the history list")
+        case .ongoing: return String(localized: "Unfinished", comment: "Game outcome in the history list")
         }
     }
 
     var endReasonDescription: String {
         switch endReason {
-        case .checkmate: return "by checkmate"
-        case .stalemate: return "by stalemate"
-        case .resignation: return "by resignation"
-        case .timeout: return "on time"
-        case .drawAgreement: return "by agreement"
-        case .fiftyMoveRule: return "by 50-move rule"
-        case .threefoldRepetition: return "by repetition"
-        case .insufficientMaterial: return "by insufficient material"
-        case .abandoned: return "abandoned"
+        case .checkmate: return String(localized: "by checkmate", comment: "How a game ended, follows the outcome")
+        case .stalemate: return String(localized: "by stalemate", comment: "How a game ended, follows the outcome")
+        case .resignation: return String(localized: "by resignation", comment: "How a game ended, follows the outcome")
+        case .timeout: return String(localized: "on time", comment: "How a game ended (ran out of clock), follows the outcome")
+        case .drawAgreement: return String(localized: "by agreement", comment: "How a game ended, follows the outcome")
+        case .fiftyMoveRule: return String(localized: "by 50-move rule", comment: "How a game ended, follows the outcome")
+        case .threefoldRepetition: return String(localized: "by repetition", comment: "How a game ended, follows the outcome")
+        case .insufficientMaterial: return String(localized: "by insufficient material", comment: "How a game ended, follows the outcome")
+        case .abandoned: return String(localized: "abandoned", comment: "How a game ended, follows the outcome")
         case nil: return ""
         }
     }

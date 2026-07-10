@@ -11,10 +11,10 @@ enum BoardTheme: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .classic: return "Classic"
-        case .green: return "Green"
-        case .blue: return "Blue"
-        case .gray: return "Gray"
+        case .classic: return String(localized: "Classic", comment: "Board color theme")
+        case .green: return String(localized: "Green", comment: "Board color theme")
+        case .blue: return String(localized: "Blue", comment: "Board color theme")
+        case .gray: return String(localized: "Gray", comment: "Board color theme")
         }
     }
 

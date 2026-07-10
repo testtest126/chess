@@ -1,0 +1,471 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ offers a draw" : {
+
+    },
+    "%@ was %@" : {
+      "comment" : "Move verdict; parameters: move played, verdict phrase",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ was %2$@"
+          }
+        }
+      }
+    },
+    "%@ was %@ — best was %@" : {
+      "comment" : "Move verdict; parameters: move played, verdict phrase, better move",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ was %2$@ — best was %3$@"
+          }
+        }
+      }
+    },
+    "%@%%" : {
+
+    },
+    "%@, %@ %@" : {
+      "comment" : "VoiceOver label for an occupied square: square name, piece color, piece kind",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld / %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld%%" : {
+
+    },
+    "%lld." : {
+
+    },
+    "%lld?? · %lld? · %lld?!" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld?? · %2$lld? · %3$lld?!"
+          }
+        }
+      }
+    },
+    "+%lld" : {
+
+    },
+    "Accept Draw" : {
+
+    },
+    "Accept Rematch" : {
+
+    },
+    "Account recoverable with Apple" : {
+
+    },
+    "Analyzing with engine…" : {
+
+    },
+    "Appearance" : {
+
+    },
+    "As %@ vs %@ · ^[%lld move](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "As %1$@ vs %2$@ · ^[%3$lld move](inflect: true)"
+          }
+        }
+      }
+    },
+    "Beginner" : {
+      "comment" : "Engine strength level"
+    },
+    "Bishop" : {
+      "comment" : "Chess piece"
+    },
+    "Black" : {
+      "comment" : "Chess piece color"
+    },
+    "Blitz" : {
+      "comment" : "Time control speed"
+    },
+    "Blue" : {
+      "comment" : "Board color theme"
+    },
+    "Board theme" : {
+
+    },
+    "Bullet" : {
+      "comment" : "Time control speed"
+    },
+    "By resignation" : {
+      "comment" : "Reason the game ended"
+    },
+    "Cancel" : {
+
+    },
+    "Casual" : {
+      "comment" : "Engine strength level"
+    },
+    "Change Display Name" : {
+
+    },
+    "Check that you're online and try again." : {
+
+    },
+    "Checkmate" : {
+      "comment" : "Reason the game ended"
+    },
+    "Classic" : {
+      "comment" : "Board color theme"
+    },
+    "Close" : {
+
+    },
+    "Club" : {
+      "comment" : "Engine strength level"
+    },
+    "Connecting…" : {
+
+    },
+    "Connection to the server was lost." : {
+      "comment" : "Shown when the game's WebSocket drops"
+    },
+    "Couldn't Load Leaderboard" : {
+
+    },
+    "Couldn't reach the server. Try again later." : {
+      "comment" : "Rename network error"
+    },
+    "Couldn't sign in. Try again later." : {
+      "comment" : "Sign in with Apple error"
+    },
+    "Current" : {
+
+    },
+    "Decline" : {
+
+    },
+    "Display name" : {
+
+    },
+    "Done" : {
+
+    },
+    "Draw" : {
+      "comment" : "Draw game result"
+    },
+    "Draw by agreement" : {
+      "comment" : "Reason the game ended"
+    },
+    "Draw by insufficient material" : {
+      "comment" : "Reason the game ended"
+    },
+    "Draw by the 50-move rule" : {
+      "comment" : "Reason the game ended"
+    },
+    "Draw by threefold repetition" : {
+      "comment" : "Reason the game ended"
+    },
+    "Elo %lld" : {
+
+    },
+    "Engine (%@)" : {
+      "comment" : "Opponent in a local game; parameter is the difficulty name"
+    },
+    "Engine strength" : {
+
+    },
+    "Eval" : {
+
+    },
+    "Even" : {
+
+    },
+    "Expert" : {
+      "comment" : "Engine strength level"
+    },
+    "Finding an opponent…" : {
+
+    },
+    "Finish an online game to appear here." : {
+
+    },
+    "Finished games show up here." : {
+
+    },
+    "Flip" : {
+
+    },
+    "Game in progress" : {
+
+    },
+    "Gray" : {
+      "comment" : "Board color theme"
+    },
+    "Green" : {
+      "comment" : "Board color theme"
+    },
+    "Hint" : {
+
+    },
+    "Keeps your rating safe if you lose this device." : {
+
+    },
+    "King" : {
+      "comment" : "Chess piece"
+    },
+    "Knight" : {
+      "comment" : "Chess piece"
+    },
+    "Leaderboard" : {
+
+    },
+    "Lost" : {
+      "comment" : "Game outcome in the history list"
+    },
+    "MateMate" : {
+
+    },
+    "Move" : {
+
+    },
+    "Names must be 3-24 letters, digits, spaces, _ or -." : {
+      "comment" : "Rename validation error"
+    },
+    "No Ranked Players Yet" : {
+
+    },
+    "OK" : {
+
+    },
+    "Offer Draw" : {
+
+    },
+    "On time" : {
+      "comment" : "Reason the game ended (ran out of clock)"
+    },
+    "Opponent" : {
+      "comment" : "Fallback name shown until the opponent's real name arrives"
+    },
+    "Opponent abandoned the game" : {
+      "comment" : "Reason the online game ended"
+    },
+    "Opponent left" : {
+
+    },
+    "Past Games" : {
+
+    },
+    "Pawn" : {
+      "comment" : "Chess piece"
+    },
+    "Play Online" : {
+
+    },
+    "Play as" : {
+
+    },
+    "Play the Engine" : {
+
+    },
+    "Playing as %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Playing as %1$@%2$@"
+          }
+        }
+      }
+    },
+    "Promote to" : {
+
+    },
+    "Queen" : {
+      "comment" : "Chess piece"
+    },
+    "Random" : {
+      "comment" : "Play as a randomly assigned side"
+    },
+    "Rapid" : {
+      "comment" : "Time control speed"
+    },
+    "Rating %@%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rating %1$@%2$lld"
+          }
+        }
+      }
+    },
+    "Recovers your account if you've played before." : {
+
+    },
+    "Rematch" : {
+
+    },
+    "Rename Failed" : {
+
+    },
+    "Resign" : {
+
+    },
+    "Resign this game?" : {
+
+    },
+    "Review Game" : {
+
+    },
+    "Rook" : {
+      "comment" : "Chess piece"
+    },
+    "Save" : {
+
+    },
+    "Server error (%lld)" : {
+      "comment" : "Account error; parameter is the HTTP status code"
+    },
+    "Shown to your online opponents and on the leaderboard." : {
+
+    },
+    "Sign in with Apple Failed" : {
+
+    },
+    "Sign in with Apple failed: %@" : {
+      "comment" : "Sign in with Apple error; parameter is the system error message"
+    },
+    "Signing in…" : {
+
+    },
+    "Stalemate" : {
+      "comment" : "Reason the game ended"
+    },
+    "Start Game" : {
+
+    },
+    "Take Back" : {
+
+    },
+    "Tap to resume vs %@" : {
+
+    },
+    "Time control" : {
+
+    },
+    "Unexpected credential type" : {
+      "comment" : "Sign in with Apple error"
+    },
+    "Unexpected server response" : {
+      "comment" : "Account error"
+    },
+    "Unfinished" : {
+      "comment" : "Game outcome in the history list"
+    },
+    "Waiting for opponent…" : {
+
+    },
+    "White" : {
+      "comment" : "Chess piece color"
+    },
+    "Won" : {
+      "comment" : "Game outcome in the history list"
+    },
+    "You" : {
+
+    },
+    "You Lost" : {
+      "comment" : "Game-over headline"
+    },
+    "You Won! 🎉" : {
+      "comment" : "Game-over headline"
+    },
+    "You declined the rematch" : {
+
+    },
+    "You'll be matched with the next player who wants this time control." : {
+
+    },
+    "^[%lld game](inflect: true)" : {
+
+    },
+    "a blunder" : {
+      "comment" : "Move verdict phrase"
+    },
+    "a good move" : {
+      "comment" : "Move verdict phrase"
+    },
+    "a mistake" : {
+      "comment" : "Move verdict phrase"
+    },
+    "abandoned" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "an inaccuracy" : {
+      "comment" : "Move verdict phrase"
+    },
+    "by 50-move rule" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "by agreement" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "by checkmate" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "by insufficient material" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "by repetition" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "by resignation" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "by stalemate" : {
+      "comment" : "How a game ended, follows the outcome"
+    },
+    "on time" : {
+      "comment" : "How a game ended (ran out of clock), follows the outcome"
+    },
+    "reconnecting" : {
+
+    },
+    "the best move" : {
+      "comment" : "Move verdict phrase"
+    }
+  },
+  "version" : "1.0"
+}

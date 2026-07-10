@@ -60,7 +60,7 @@ struct LeaderboardView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(entry.displayName)
                             .font(.headline)
-                        Text("\(entry.games) game\(entry.games == 1 ? "" : "s")")
+                        Text("^[\(entry.games) game](inflect: true)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

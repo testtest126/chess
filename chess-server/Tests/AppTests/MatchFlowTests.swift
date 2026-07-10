@@ -464,6 +464,50 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testRematchOfferExpires() async throws {
+        // Replace the coordinator with a sub-second rematch window.
+        app.gameCoordinator = GameCoordinator(app: app, rematchWindow: .milliseconds(800))
+
+        let match = try await startMatch()
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        // White asks; Black lets the offer sit until the window closes.
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+
+        // Both sides learn the window closed: the requester stops waiting
+        // and the unanswered offer leaves the opponent's sheet.
+        guard case .rematchUnavailable = try await match.white.next(timeoutSeconds: 5) else {
+            return XCTFail("requester should be told the offer expired")
+        }
+        guard case .rematchUnavailable = try await match.black.next(timeoutSeconds: 5) else {
+            return XCTFail("offeree should be told the offer expired")
+        }
+
+        // The slot is gone: a late request is rejected, but queueing for a
+        // new opponent still works for both players.
+        try await match.white.send(.requestRematch)
+        guard case .errorMessage = try await match.white.next() else {
+            return XCTFail("expired slot should reject rematch requests")
+        }
+        try await match.white.send(.joinQueue(timeControl: .default))
+        guard case .queued = try await match.white.next() else {
+            return XCTFail("expired slot must not block re-queueing")
+        }
+        try await match.black.send(.joinQueue(timeControl: .default))
+        guard case .gameStart = try await match.black.next() else {
+            return XCTFail("both players should be pairable after expiry")
+        }
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testRematchUnavailableWhenOpponentQueuesElsewhere() async throws {
         let match = try await startMatch()
 
