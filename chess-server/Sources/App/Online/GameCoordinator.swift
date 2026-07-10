@@ -135,6 +135,9 @@ actor GameCoordinator {
         /// A rematch is played at the same control as the finished game.
         let timeControl: TimeControl
         var requested: Set<UUID> = []
+        /// Expires the slot when the rematch window closes unanswered;
+        /// cancelled when the slot is dropped for any other reason.
+        var expiryTask: Task<Void, Never>?
 
         func opponent(of userID: UUID) -> UUID? {
             if userID == whiteID { return blackID }
@@ -157,9 +160,14 @@ actor GameCoordinator {
     private var rematchSlots: [UUID: RematchSlot] = [:]
     private var rematchSlotByUser: [UUID: UUID] = [:]
 
-    init(app: Application, clock: ClockConfig? = nil) {
+    /// How long after a game ends a rematch can still be agreed; afterwards
+    /// the slot expires and both players are told the offer is gone.
+    private let rematchWindow: Duration
+
+    init(app: Application, clock: ClockConfig? = nil, rematchWindow: Duration = .seconds(60)) {
         self.app = app
         self.clockOverride = clock
+        self.rematchWindow = rematchWindow
     }
 
     private func clockConfig(for control: TimeControl) -> ClockConfig {
@@ -290,8 +298,19 @@ actor GameCoordinator {
 
     private func dropRematchSlot(_ slotID: UUID) {
         guard let slot = rematchSlots.removeValue(forKey: slotID) else { return }
+        slot.expiryTask?.cancel()
         rematchSlotByUser[slot.whiteID] = nil
         rematchSlotByUser[slot.blackID] = nil
+    }
+
+    /// The rematch window closed with nobody (or only one side) agreeing:
+    /// both players hear the offer is gone, so a waiting requester stops
+    /// waiting and an unanswered offer disappears from the opponent's sheet.
+    private func expireRematchSlot(_ slotID: UUID) {
+        guard let slot = rematchSlots[slotID] else { return }
+        dropRematchSlot(slotID)
+        send(.rematchUnavailable, to: socketsByUser[slot.whiteID])
+        send(.rematchUnavailable, to: socketsByUser[slot.blackID])
     }
 
     private func seat(for userID: UUID) async -> Seat? {
@@ -486,6 +505,13 @@ actor GameCoordinator {
         )
         rematchSlotByUser[game.white.userID] = game.id
         rematchSlotByUser[game.black.userID] = game.id
+
+        let slotID = game.id
+        rematchSlots[game.id]?.expiryTask = Task { [weak self, rematchWindow] in
+            try? await Task.sleep(for: rematchWindow)
+            guard !Task.isCancelled else { return }
+            await self?.expireRematchSlot(slotID)
+        }
 
         let ratingDeltas = await updateRatings(for: game)
 

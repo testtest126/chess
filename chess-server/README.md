@@ -69,7 +69,8 @@ client. Client sends `join_queue` / `leave_queue` / `move` / `resign` /
   predates the picker. Clocks are enforced server-side; `game_start` echoes
   the control and both remaining clocks, every `move_played` carries both
   clocks, and a fallen flag ends the game with reason `timeout`. Rematches
-  reuse the finished game's control.
+  reuse the finished game's control; an offer that isn't agreed within 60
+  seconds of game end expires, and both players get `rematch_unavailable`.
 - **Draw offers** stay on the table until answered or either side moves.
 - **Ratings**: every user starts at Elo 1200; finished games (including
   timeouts and abandonments) are rated with K=32. Deltas ride along on
