@@ -85,6 +85,21 @@ struct AddGameRecordTimeControl: AsyncMigration {
     }
 }
 
+struct CreateAppleNonce: AsyncMigration {
+    func prepare(on database: Database) async throws {
+        try await database.schema(AppleNonce.schema)
+            .id()
+            .field("nonce_hash", .string, .required)
+            .field("expires_at", .datetime, .required)
+            .unique(on: "nonce_hash")
+            .create()
+    }
+
+    func revert(on database: Database) async throws {
+        try await database.schema(AppleNonce.schema).delete()
+    }
+}
+
 struct CreateGameRecord: AsyncMigration {
     func prepare(on database: Database) async throws {
         try await database.schema(GameRecord.schema)
