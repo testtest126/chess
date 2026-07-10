@@ -15,9 +15,12 @@ on:
       - ".github/workflows/ios.yml"
   workflow_dispatch:
 
+# Superseded pushes to a PR cancel that PR's running checks, but pushes to
+# main must never cancel each other: back-to-back merges would leave the
+# earlier merge unvalidated (this let a non-compiling commit land unnoticed).
 concurrency:
   group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ui-tests:
