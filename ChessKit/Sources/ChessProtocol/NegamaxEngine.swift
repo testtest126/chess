@@ -2,9 +2,10 @@ import Foundation
 import ChessKit
 
 /// An alpha-beta negamax search over ChessKit's evaluation, with iterative
-/// deepening, a transposition table, MVV-LVA move ordering, check extensions,
-/// and quiescence search. Deterministic when no node or time limit cuts the
-/// search short and no opening book is attached.
+/// deepening, aspiration windows, a transposition table, null-move pruning,
+/// MVV-LVA + killer + history move ordering, check extensions, and quiescence
+/// search. Deterministic when no node or time limit cuts the search short and
+/// no opening book is attached.
 public struct NegamaxEngine: ChessEngine {
     public let name: String
     public let author: String
@@ -47,32 +48,42 @@ public struct NegamaxEngine: ChessEngine {
         }
 
         let search = Search(limit: limit)
-        var orderedRoot = search.ordered(rootMoves, in: board, first: nil)
+        var orderedRoot = search.ordered(rootMoves, in: board, first: nil, ply: 0)
         var bestMove = orderedRoot[0]
         var bestScore = 0
         var completedDepth = 0
 
         // Iterative deepening: each pass reuses the previous best move for
-        // ordering; an interrupted pass is discarded so the returned move is
-        // always the product of a complete search.
+        // ordering and searches inside an aspiration window around the
+        // previous score; an interrupted pass is discarded so the returned
+        // move is always the product of a complete search.
         for depth in 1...max(1, limit.depth) {
             // The depth-1 pass always runs to completion so there is a move.
             search.abortAllowed = depth > 1
 
+            var window = 50
+            var alpha = depth > 1 ? bestScore - window : Int.min + 1
+            var beta = depth > 1 ? bestScore + window : Int.max - 1
             var passBest: Move?
-            var passScore = Int.min + 1
-            var alpha = Int.min + 1
-            let beta = Int.max - 1
+            var passScore = 0
 
-            for move in orderedRoot {
-                guard let next = board.making(move) else { continue }
-                let score = -search.negamax(next, depth: depth - 1, alpha: -beta, beta: -alpha, ply: 1)
+            while true {
+                (passBest, passScore) = rootPass(
+                    board, moves: orderedRoot, depth: depth,
+                    alpha: alpha, beta: beta, search: search
+                )
                 if search.aborted { break }
-                if score > passScore {
-                    passScore = score
-                    passBest = move
+                // Fail low/high: the true score fell outside the aspiration
+                // window; widen on the failing side and re-search.
+                if passScore <= alpha {
+                    window *= 4
+                    alpha = passScore - window
+                } else if passScore >= beta {
+                    window *= 4
+                    beta = passScore + window
+                } else {
+                    break
                 }
-                if score > alpha { alpha = score }
             }
 
             guard !search.aborted, let passMove = passBest else { break }
@@ -84,7 +95,7 @@ public struct NegamaxEngine: ChessEngine {
             // us is still worth deepening — a longer defense may exist.)
             if bestScore >= Self.mateThreshold { break }
 
-            orderedRoot = search.ordered(rootMoves, in: board, first: passMove)
+            orderedRoot = search.ordered(rootMoves, in: board, first: passMove, ply: 0)
         }
 
         return SearchResult(
@@ -94,6 +105,29 @@ public struct NegamaxEngine: ChessEngine {
             depth: completedDepth,
             nodes: search.nodes
         )
+    }
+
+    /// One full-width pass over the root moves inside an (alpha, beta) window.
+    private func rootPass(
+        _ board: Board, moves: [Move], depth: Int,
+        alpha initialAlpha: Int, beta: Int, search: Search
+    ) -> (Move?, Int) {
+        var best: Move?
+        var bestScore = Int.min + 1
+        var alpha = initialAlpha
+
+        for move in moves {
+            guard let next = board.making(move) else { continue }
+            let score = -search.negamax(next, depth: depth - 1, alpha: -beta, beta: -alpha, ply: 1)
+            if search.aborted { return (nil, 0) }
+            if score > bestScore {
+                bestScore = score
+                best = move
+            }
+            if score > alpha { alpha = score }
+            if alpha >= beta { break }
+        }
+        return (best, bestScore)
     }
 
     /// Converts a raw negamax score into plies-to-mate, or `nil` if not a mate.
@@ -106,8 +140,8 @@ public struct NegamaxEngine: ChessEngine {
 }
 
 /// Mutable state for one `search` call: node counting, limit tracking, the
-/// transposition table, and the recursive routines. Reference semantics keep
-/// the hot path free of `inout`.
+/// transposition table, killer/history ordering data, and the recursive
+/// routines. Reference semantics keep the hot path free of `inout`.
 private final class Search {
     var nodes = 0
     var aborted = false
@@ -119,6 +153,10 @@ private final class Search {
     private static let maxExtensions = 8
     /// Entry cap so pathological searches can't grow memory without bound.
     private static let maxTableEntries = 2_000_000
+    /// Deepest ply with killer slots.
+    private static let maxKillerPly = 128
+    /// Null-move depth reduction (R = 2, applied on top of the normal -1).
+    private static let nullMoveReduction = 2
 
     private enum Bound {
         case exact, lower, upper
@@ -134,6 +172,10 @@ private final class Search {
     }
 
     private var table: [UInt64: TTEntry] = [:]
+    /// Two killer (quiet refutation) moves per ply.
+    private var killers = [(Move?, Move?)](repeating: (nil, nil), count: maxKillerPly)
+    /// Quiet-move history scores indexed by from*64+to, bumped on cutoffs.
+    private var history = [Int](repeating: 0, count: 64 * 64)
 
     private let maxNodes: Int?
     private let deadline: ContinuousClock.Instant?
@@ -156,12 +198,23 @@ private final class Search {
     }
 
     private func staticEval(_ b: Board) -> Int {
-        b.sideToMove == .white ? b.evaluate() : -b.evaluate()
+        // Terminal positions are handled before stand-pat, so the cheap
+        // movegen-free evaluation is safe here — and it's the difference
+        // between a usable and an unusable search speed.
+        b.sideToMove == .white ? b.evaluateFast() : -b.evaluateFast()
     }
 
-    /// Move ordering: `first` (previous iteration's best), then promotions and
-    /// captures by MVV-LVA, then quiet moves in generation order.
-    func ordered(_ moves: [Move], in board: Board, first: Move?) -> [Move] {
+    private func isQuiet(_ move: Move, in board: Board) -> Bool {
+        board[move.to] == nil
+            && move.promotion == nil
+            && !(board[move.from]?.kind == .pawn && move.to == board.enPassantSquare)
+    }
+
+    /// Move ordering: `first` (TT/previous-iteration best), then promotions
+    /// and captures by MVV-LVA, then killer moves for this ply, then quiet
+    /// moves by history score.
+    func ordered(_ moves: [Move], in board: Board, first: Move?, ply: Int) -> [Move] {
+        let killerPair = killers[min(ply, Self.maxKillerPly - 1)]
         func priority(_ move: Move) -> Int {
             if move == first { return .max }
             var score = 0
@@ -170,9 +223,14 @@ private final class Search {
             }
             if let victim = board[move.to] {
                 let attacker = board[move.from]?.kind.centipawnValue ?? 0
-                score += 1_000 + victim.kind.centipawnValue * 10 - attacker
+                score += 1_100 + victim.kind.centipawnValue * 10 - attacker
             } else if board[move.from]?.kind == .pawn, move.to == board.enPassantSquare {
-                score += 1_000 + PieceKind.pawn.centipawnValue * 10 - PieceKind.pawn.centipawnValue
+                score += 1_100 + PieceKind.pawn.centipawnValue * 10 - PieceKind.pawn.centipawnValue
+            } else {
+                // Quiets: killers first, then history heat.
+                if move == killerPair.0 { return 1_050 }
+                if move == killerPair.1 { return 1_040 }
+                score = min(1_000, history[move.from * 64 + move.to])
             }
             return score
         }
@@ -185,10 +243,40 @@ private final class Search {
             .map(\.element)
     }
 
-    /// Negamax with alpha-beta and transposition table. Returns a score from
-    /// the perspective of `b`'s side to move. `ply` is the distance from the
-    /// root. Meaningless once `aborted` is set — callers must check.
-    func negamax(_ b: Board, depth: Int, alpha: Int, beta: Int, ply: Int, extensions: Int = 0) -> Int {
+    private func recordCutoff(_ move: Move, in board: Board, depth: Int, ply: Int) {
+        guard isQuiet(move, in: board) else { return }
+        let slot = min(ply, Self.maxKillerPly - 1)
+        if killers[slot].0 != move {
+            killers[slot].1 = killers[slot].0
+            killers[slot].0 = move
+        }
+        history[move.from * 64 + move.to] += depth * depth
+        // Keep history scores discriminating: halve everything when hot.
+        if history[move.from * 64 + move.to] > 100_000 {
+            for i in history.indices { history[i] /= 2 }
+        }
+    }
+
+    /// True if `side` has any piece besides king and pawns (null-move guard:
+    /// zugzwang is overwhelmingly a king-and-pawn phenomenon).
+    private func hasNonPawnMaterial(_ b: Board, side: PieceColor) -> Bool {
+        for square in 0..<64 {
+            if let piece = b[square], piece.color == side,
+               piece.kind != .pawn, piece.kind != .king {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Negamax with alpha-beta, transposition table, and null-move pruning.
+    /// Returns a score from the perspective of `b`'s side to move. `ply` is
+    /// the distance from the root. Meaningless once `aborted` is set —
+    /// callers must check.
+    func negamax(
+        _ b: Board, depth: Int, alpha: Int, beta: Int, ply: Int,
+        extensions: Int = 0, allowNull: Bool = true
+    ) -> Int {
         nodes += 1
         if checkAbort() { return 0 }
 
@@ -201,7 +289,8 @@ private final class Search {
         // Check extension: dangerous positions deserve one extra ply.
         var depth = depth
         var extensions = extensions
-        if extensions < Self.maxExtensions, b.isInCheck(b.sideToMove) {
+        let inCheck = b.isInCheck(b.sideToMove)
+        if inCheck, extensions < Self.maxExtensions {
             depth += 1
             extensions += 1
         }
@@ -229,19 +318,43 @@ private final class Search {
             }
         }
 
+        // Null-move pruning: if passing the move still busts beta, an actual
+        // move surely will. Skipped in check, near the horizon, when material
+        // is pawns-only (zugzwang), and never twice in a row.
+        if allowNull, !inCheck, depth >= 3,
+           beta < NegamaxEngine.mateThreshold,
+           hasNonPawnMaterial(b, side: b.sideToMove) {
+            let reduced = max(0, depth - 1 - Self.nullMoveReduction)
+            let nullScore = -negamax(
+                b.makingNullMove(), depth: reduced,
+                alpha: -beta, beta: -beta + 1,
+                ply: ply + 1, extensions: extensions, allowNull: false
+            )
+            if aborted { return 0 }
+            if nullScore >= beta, nullScore < NegamaxEngine.mateThreshold {
+                return nullScore
+            }
+        }
+
         var best = Int.min + 1
         var bestMove: Move?
         var a = alpha
-        for move in ordered(moves, in: b, first: ttMove) {
+        for move in ordered(moves, in: b, first: ttMove, ply: ply) {
             guard let next = b.making(move) else { continue }
-            let score = -negamax(next, depth: depth - 1, alpha: -beta, beta: -a, ply: ply + 1, extensions: extensions)
+            let score = -negamax(
+                next, depth: depth - 1, alpha: -beta, beta: -a,
+                ply: ply + 1, extensions: extensions
+            )
             if aborted { return 0 }
             if score > best {
                 best = score
                 bestMove = move
             }
             if score > a { a = score }
-            if a >= beta { break } // beta cutoff
+            if a >= beta {
+                recordCutoff(move, in: b, depth: depth, ply: ply)
+                break
+            }
         }
 
         if table.count < Self.maxTableEntries {
@@ -298,13 +411,10 @@ private final class Search {
             if standPat >= beta { return standPat }
             a = max(a, standPat)
             best = standPat
-            candidates = moves.filter { move in
-                if b[move.to] != nil || move.promotion != nil { return true }
-                return b[move.from]?.kind == .pawn && move.to == b.enPassantSquare
-            }
+            candidates = moves.filter { !isQuiet($0, in: b) }
         }
 
-        for move in ordered(candidates, in: b, first: nil) {
+        for move in ordered(candidates, in: b, first: nil, ply: ply) {
             guard let next = b.making(move) else { continue }
             let score = -quiesce(next, alpha: -beta, beta: -a, ply: ply + 1, moves: next.legalMoves())
             if aborted { return 0 }

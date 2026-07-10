@@ -385,6 +385,18 @@ public struct Board: Equatable, Hashable, Sendable {
         enPassantSquare = nil
     }
 
+    /// The position with the move passed to the opponent ("null move").
+    /// Not a legal chess move — used by search pruning. Must not be called
+    /// while the side to move is in check.
+    public func makingNullMove() -> Board {
+        var copy = self
+        copy.sideToMove = sideToMove.opposite
+        copy.enPassantSquare = nil
+        copy.halfmoveClock += 1
+        if sideToMove == .black { copy.fullmoveNumber += 1 }
+        return copy
+    }
+
     // MARK: - Status
 
     public enum Status: Equatable, Sendable {
@@ -477,8 +489,10 @@ public struct Board: Equatable, Hashable, Sendable {
     // MARK: - Evaluation (heuristic, for game review)
 
     /// Static evaluation in centipawns from White's perspective.
-    /// Material + piece-square tables + mobility. Not a real engine — good enough
-    /// for post-game review graphs and blunder flagging.
+    /// Material + piece-square tables + mobility. Includes terminal-state
+    /// detection (a full legal-move generation), so it's comparatively
+    /// expensive — search hot paths that already know the position isn't
+    /// terminal should use ``evaluateFast()``.
     public func evaluate() -> Int {
         switch status {
         case .checkmate(let winner): return winner == .white ? 100_000 : -100_000
@@ -486,13 +500,7 @@ public struct Board: Equatable, Hashable, Sendable {
         case .ongoing: break
         }
 
-        var score = 0
-        for (i, piece) in squares.enumerated() {
-            guard let piece else { continue }
-            var value = piece.kind.centipawnValue
-            value += PST.bonus(for: piece, at: i)
-            score += piece.color == .white ? value : -value
-        }
+        var score = evaluateFast()
 
         // Mobility (small nudge).
         var mobilityBoard = self
@@ -502,6 +510,20 @@ public struct Board: Equatable, Hashable, Sendable {
         let mobilityDiff = sideToMove == .white ? myMobility - theirMobility : theirMobility - myMobility
         score += mobilityDiff * 2
 
+        return score
+    }
+
+    /// Material + piece-square tables only: the cheap core of ``evaluate()``,
+    /// with no move generation at all. Callers are responsible for handling
+    /// terminal positions (checkmate/stalemate/draws) themselves.
+    public func evaluateFast() -> Int {
+        var score = 0
+        for (i, piece) in squares.enumerated() {
+            guard let piece else { continue }
+            var value = piece.kind.centipawnValue
+            value += PST.bonus(for: piece, at: i)
+            score += piece.color == .white ? value : -value
+        }
         return score
     }
 
