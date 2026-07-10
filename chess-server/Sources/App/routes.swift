@@ -7,6 +7,7 @@ func routes(_ app: Application) throws {
     try app.register(collection: AuthController())
     try app.register(collection: UsersController())
     try app.register(collection: GamesController())
+    try app.register(collection: LeaderboardController())
 
     // Realtime play. The upgrade request must carry a valid bearer token;
     // anything else is closed immediately.

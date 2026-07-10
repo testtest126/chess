@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var activeSession: GameSession?
     @State private var onlineSession: OnlineGameSession?
     @State private var reviewTarget: SavedGame?
+    @State private var showLeaderboard = false
 
     enum ColorChoice: String, CaseIterable, Identifiable {
         case white, black, random
@@ -102,6 +103,16 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("MateMate")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Leaderboard", systemImage: "trophy") {
+                        showLeaderboard = true
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showLeaderboard) {
+            LeaderboardView()
         }
         .fullScreenCover(item: $activeSession) { session in
             GameView(session: session)

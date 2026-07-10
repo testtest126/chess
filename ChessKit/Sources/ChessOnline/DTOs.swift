@@ -60,6 +60,24 @@ public struct UserDTO: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: - Leaderboard
+
+/// GET /leaderboard — top players by rating, best first.
+public struct LeaderboardEntry: Codable, Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var displayName: String
+    public var rating: Int
+    /// Finished online games.
+    public var games: Int
+
+    public init(id: UUID, displayName: String, rating: Int, games: Int) {
+        self.id = id
+        self.displayName = displayName
+        self.rating = rating
+        self.games = games
+    }
+}
+
 // MARK: - Game history
 
 /// GET /games and GET /games/:id

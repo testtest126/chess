@@ -12,6 +12,7 @@ authoritative — every move is validated with ChessKit before it is accepted.
 | `POST /auth/refresh` | Rotate the refresh token, mint a new access token |
 | `GET /me`, `PATCH /me` | Fetch / rename the authenticated user |
 | `GET /games`, `GET /games/:id` | The caller's finished games |
+| `GET /leaderboard` | Top 50 players by Elo (players with at least one finished game) |
 | `WS /play` | Realtime protocol (see `ChessOnline` target in ../ChessKit) |
 
 All routes except `/auth/*` and `/health` require `Authorization: Bearer <access token>`.
