@@ -10,7 +10,13 @@ extension TimeControl {
     static let storageKey = "preferred_time_control"
 
     /// Speed name shown in pickers and titles ("Bullet", "Blitz", "Rapid").
-    var label: String { rawValue.capitalized }
+    var label: String {
+        switch self {
+        case .bullet: return String(localized: "Bullet", comment: "Time control speed")
+        case .blitz: return String(localized: "Blitz", comment: "Time control speed")
+        case .rapid: return String(localized: "Rapid", comment: "Time control speed")
+        }
+    }
 
     /// Name plus conventional notation, e.g. "Blitz 5+3".
     var displayName: String { "\(label) \(shortLabel)" }

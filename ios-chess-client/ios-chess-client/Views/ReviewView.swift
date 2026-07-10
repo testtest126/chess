@@ -106,12 +106,12 @@ struct ReviewView: View {
 
     private func summaryCard(_ summary: GameReview.Summary) -> some View {
         HStack(spacing: 0) {
-            accuracyColumn("White", accuracy: summary.accuracyWhite,
+            accuracyColumn(PieceColor.white.localizedName, accuracy: summary.accuracyWhite,
                            blunders: summary.blundersWhite,
                            mistakes: summary.mistakesWhite,
                            inaccuracies: summary.inaccuraciesWhite)
             Divider().frame(height: 60)
-            accuracyColumn("Black", accuracy: summary.accuracyBlack,
+            accuracyColumn(PieceColor.black.localizedName, accuracy: summary.accuracyBlack,
                            blunders: summary.blundersBlack,
                            mistakes: summary.mistakesBlack,
                            inaccuracies: summary.inaccuraciesBlack)
@@ -200,20 +200,22 @@ struct ReviewView: View {
     }
 
     private func calloutText(_ analysis: GameReview.MoveAnalysis) -> String {
-        var text = "\(analysis.san) was \(judgmentPhrase(analysis.judgment))"
+        let phrase = judgmentPhrase(analysis.judgment)
         if let best = analysis.bestSAN, analysis.judgment != .good {
-            text += " — best was \(best)"
+            return String(localized: "\(analysis.san) was \(phrase) — best was \(best)",
+                          comment: "Move verdict; parameters: move played, verdict phrase, better move")
         }
-        return text
+        return String(localized: "\(analysis.san) was \(phrase)",
+                      comment: "Move verdict; parameters: move played, verdict phrase")
     }
 
     private func judgmentPhrase(_ judgment: GameReview.Judgment) -> String {
         switch judgment {
-        case .best: return "the best move"
-        case .good: return "a good move"
-        case .inaccuracy: return "an inaccuracy"
-        case .mistake: return "a mistake"
-        case .blunder: return "a blunder"
+        case .best: return String(localized: "the best move", comment: "Move verdict phrase")
+        case .good: return String(localized: "a good move", comment: "Move verdict phrase")
+        case .inaccuracy: return String(localized: "an inaccuracy", comment: "Move verdict phrase")
+        case .mistake: return String(localized: "a mistake", comment: "Move verdict phrase")
+        case .blunder: return String(localized: "a blunder", comment: "Move verdict phrase")
         }
     }
 
