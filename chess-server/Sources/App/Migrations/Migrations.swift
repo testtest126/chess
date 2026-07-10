@@ -1,4 +1,5 @@
 import Fluent
+import SQLKit
 
 struct CreateUser: AsyncMigration {
     func prepare(on database: Database) async throws {
@@ -40,6 +41,32 @@ struct AddUserRating: AsyncMigration {
     func revert(on database: Database) async throws {
         try await database.schema(User.schema)
             .deleteField("rating")
+            .update()
+    }
+}
+
+struct AddUserAppleID: AsyncMigration {
+    func prepare(on database: Database) async throws {
+        try await database.schema(User.schema)
+            .field("apple_user_id", .string)
+            .update()
+        // SQLite can't add a UNIQUE constraint via ALTER TABLE; a partial
+        // unique index does the same job and works on both SQLite and
+        // Postgres (NULLs — unlinked accounts — are excluded by design).
+        if let sql = database as? SQLDatabase {
+            try await sql.raw("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_user_id
+                ON users (apple_user_id) WHERE apple_user_id IS NOT NULL
+                """).run()
+        }
+    }
+
+    func revert(on database: Database) async throws {
+        if let sql = database as? SQLDatabase {
+            try await sql.raw("DROP INDEX IF EXISTS idx_users_apple_user_id").run()
+        }
+        try await database.schema(User.schema)
+            .deleteField("apple_user_id")
             .update()
     }
 }

@@ -25,7 +25,22 @@ public struct RefreshRequest: Codable, Sendable, Equatable {
     }
 }
 
-/// Response for both /auth/register and /auth/refresh.
+/// POST /auth/apple — sign in (or link the current guest account) with an
+/// Apple identity token from AuthenticationServices.
+public struct AppleSignInRequest: Codable, Sendable, Equatable {
+    /// The JWT from `ASAuthorizationAppleIDCredential.identityToken`.
+    public var identityToken: String
+    /// Preferred display name for a newly created account (Apple only
+    /// provides the name on first authorization).
+    public var displayName: String?
+
+    public init(identityToken: String, displayName: String? = nil) {
+        self.identityToken = identityToken
+        self.displayName = displayName
+    }
+}
+
+/// Response for /auth/register, /auth/refresh, and /auth/apple.
 /// The refresh token rotates on every use; the client must store the new one.
 public struct AuthResponse: Codable, Sendable, Equatable {
     public var userID: UUID
@@ -36,14 +51,20 @@ public struct AuthResponse: Codable, Sendable, Equatable {
     public var expiresIn: Int
     /// Elo rating for online play.
     public var rating: Int?
+    /// Whether this account is recoverable via Sign in with Apple.
+    public var appleLinked: Bool?
 
-    public init(userID: UUID, displayName: String, accessToken: String, refreshToken: String, expiresIn: Int, rating: Int? = nil) {
+    public init(
+        userID: UUID, displayName: String, accessToken: String, refreshToken: String,
+        expiresIn: Int, rating: Int? = nil, appleLinked: Bool? = nil
+    ) {
         self.userID = userID
         self.displayName = displayName
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.expiresIn = expiresIn
         self.rating = rating
+        self.appleLinked = appleLinked
     }
 }
 

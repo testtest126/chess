@@ -63,11 +63,22 @@ final class GameFlowUITests: XCTestCase {
         let e2 = app.descendants(matching: .any)["square_e2"]
         XCTAssertTrue(e2.waitForExistence(timeout: 5), "board should appear")
 
-        // Drag the e2 pawn to e4 instead of tapping.
-        let e4 = app.descendants(matching: .any)["square_e4"]
-        e2.press(forDuration: 0.1, thenDragTo: e4)
+        // Wait until the square is actually hittable: on slow CI simulators
+        // the board can still be laying out when it first reports existence,
+        // and a drag aimed at a moving frame misses.
+        let hittable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isHittable == true"), object: e2
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 5), .completed,
+                       "square should become hittable")
 
-        XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 5), "dragged move should be played")
+        // Drag the e2 pawn to e4 instead of tapping. The long press and slow
+        // velocity matter: the fast default delivers too few intermediate
+        // touch events for SwiftUI's DragGesture on virtualized CI simulators.
+        let e4 = app.descendants(matching: .any)["square_e4"]
+        e2.press(forDuration: 0.5, thenDragTo: e4, withVelocity: .slow, thenHoldForDuration: 0.2)
+
+        XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 10), "dragged move should be played")
     }
 
     private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
