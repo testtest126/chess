@@ -1,0 +1,49 @@
+# Fly.io config for chess-server (issue #28).
+#
+# Deploy from the repository root — the image build needs the sibling
+# ChessKit package in context:
+#
+#     fly deploy
+#
+# Required secrets (fly secrets set NAME=value):
+#   JWT_SECRET   — e.g. $(openssl rand -hex 32); the server refuses to boot
+#                  in production without it
+#   DATABASE_URL — postgres://…; set automatically by `fly postgres attach`
+#   SIWA_APP_ID  — the iOS bundle ID (private.ios-chess-client). Optional:
+#                  /auth/apple returns 503 until it is set
+#
+# Migrations run automatically at boot (configure.swift → autoMigrate).
+
+app = "matemate-chess"
+primary_region = "waw"
+
+[build]
+  dockerfile = "chess-server/Dockerfile"
+
+[env]
+  LOG_LEVEL = "info"
+  # The auth rate limiter (PR #77) keys on the Fly-appended X-Forwarded-For
+  # entry; behind Fly's proxy this is safe to trust.
+  TRUST_PROXY_HEADERS = "true"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Live games (clocks, matchmaking queues, rematch offers) are held in this
+  # process's memory: machines must never be stopped underneath them, and the
+  # app must run as exactly one machine — after first deploy, pin it:
+  #     fly scale count 1
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

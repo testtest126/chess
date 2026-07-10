@@ -54,6 +54,25 @@ from the repository root so the local ChessKit dependency is in context:
 docker build -f chess-server/Dockerfile -t chess-server .
 ```
 
+### Fly.io
+
+`fly.toml` at the repository root describes the production deployment
+(app `matemate-chess`, health-checked on `/health`, TLS terminated by Fly).
+From the repo root:
+
+```sh
+fly secrets set JWT_SECRET=$(openssl rand -hex 32)
+fly secrets set SIWA_APP_ID=private.ios-chess-client   # enables /auth/apple
+# DATABASE_URL is set by `fly postgres attach`
+fly deploy
+fly scale count 1
+```
+
+The count-1 pin matters: live games, matchmaking queues, and rematch offers
+are in-process state, so the server cannot scale horizontally (and machines
+must not auto-stop — fly.toml already disables that). Migrations run at boot.
+Release builds of the iOS app point here via `ServerConfig.swift`.
+
 ## Realtime protocol
 
 JSON messages defined in `ChessKit/Sources/ChessOnline` and shared with the
