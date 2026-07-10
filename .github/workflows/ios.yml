@@ -44,14 +44,40 @@ jobs:
       - name: Build chess-server
         run: swift build --package-path chess-server
 
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 -E "iPhone" | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+          if [ -z "$UDID" ]; then
+            echo "No iPhone simulator available"; xcrun simctl list devices; exit 1
+          fi
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and UI tests
+        # The heavy compile happens before the server boots: a background
+        # process that idles through ~10 minutes of xcodebuild + simulator
+        # memory pressure is a prime target for the macOS memory killer
+        # (observed once: the server died silently mid-build).
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            | tail -30
+
       - name: Start chess-server
         # OnlineMatchUITests talks to 127.0.0.1:8080 and skips itself when
         # nothing is listening. Booting the real server here means CI covers
         # the online flows (matchmaking, live play, rematch), not just the
         # offline ones. The test process doubles as the opponent bot, so one
-        # runner plays both sides of the match.
+        # runner plays both sides of the match. The wrapper loop revives the
+        # server if it's killed, and records each death in the log.
         run: |
-          (cd chess-server && nohup .build/debug/App serve --hostname 127.0.0.1 --port 8080 > server.log 2>&1 &)
+          (cd chess-server && nohup bash -c \
+            'while true; do .build/debug/App serve --hostname 127.0.0.1 --port 8080 >> server.log 2>&1; echo "[watchdog] server exited ($?), restarting" >> server.log; sleep 1; done' \
+            > /dev/null 2>&1 &)
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8080/health > /dev/null; then
               echo "chess-server is up after ${i}s"
@@ -63,23 +89,13 @@ jobs:
           tail -50 chess-server/server.log
           exit 1
 
-      - name: Pick an available iPhone simulator
-        id: sim
-        run: |
-          UDID=$(xcrun simctl list devices available | grep -m1 -E "iPhone" | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
-          if [ -z "$UDID" ]; then
-            echo "No iPhone simulator available"; xcrun simctl list devices; exit 1
-          fi
-          echo "Using simulator $UDID"
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-
-      - name: Build and run UI tests
+      - name: Run UI tests
         # The online E2E keeps its self-skip to protect local runs without a
         # server, but in CI a skip means the server died — fail loudly rather
         # than shipping green without the online coverage.
         run: |
           set -o pipefail
-          xcodebuild test \
+          xcodebuild test-without-building \
             -project ios-chess-client/ios-chess-client.xcodeproj \
             -scheme ios-chess-client \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
@@ -90,6 +106,14 @@ jobs:
             echo "::error::the online E2E skipped itself — chess-server was not reachable during the test"
             exit 1
           fi
+
+      - name: Server diagnostics
+        if: failure()
+        run: |
+          echo "--- processes:"; pgrep -lf "App serve" || echo "(no server process)"
+          echo "--- health:"; curl -sv --max-time 5 http://127.0.0.1:8080/health || true
+          echo "--- memory:"; vm_stat | head -8
+          echo "--- server.log tail:"; tail -30 chess-server/server.log || true
 
       - name: Upload server log
         if: failure()
