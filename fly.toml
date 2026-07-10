@@ -1,4 +1,6 @@
-# Fly.io config for chess-server (issue #28).
+# Fly.io config for chess-server (issue #28) — zero-spend posture: a single
+# shared-cpu machine that stops when idle, SQLite on a small volume instead
+# of managed Postgres, shared IPs only (no dedicated IP allocation).
 #
 # Deploy from the repository root — the image build needs the sibling
 # ChessKit package in context:
@@ -6,13 +8,13 @@
 #     fly deploy
 #
 # Required secrets (fly secrets set NAME=value):
-#   JWT_SECRET   — e.g. $(openssl rand -hex 32); the server refuses to boot
-#                  in production without it
-#   DATABASE_URL — postgres://…; set automatically by `fly postgres attach`
+#   JWT_SECRET   — e.g. $(openssl rand -hex 32); production refuses to boot
+#                  without it
 #   SIWA_APP_ID  — the iOS bundle ID (private.ios-chess-client). Optional:
 #                  /auth/apple returns 503 until it is set
 #
-# Migrations run automatically at boot (configure.swift → autoMigrate).
+# The database is SQLite at SQLITE_PATH on the mounted volume — no
+# DATABASE_URL, no Postgres cluster. Migrations run at boot.
 
 app = "matemate-chess"
 primary_region = "waw"
@@ -22,22 +24,28 @@ primary_region = "waw"
 
 [env]
   LOG_LEVEL = "info"
+  SQLITE_PATH = "/data/chess.sqlite"
   # The auth rate limiter keys on Fly-Client-IP (canonical on Fly; the
   # rightmost X-Forwarded-For entry here is the app's own IP). Trusting
   # proxy headers is safe behind Fly's proxy and required for per-client
   # rate limiting to work at all.
   TRUST_PROXY_HEADERS = "true"
 
+[mounts]
+  source = "matemate_data"
+  destination = "/data"
+
 [http_service]
   internal_port = 8080
   force_https = true
-  # Live games (clocks, matchmaking queues, rematch offers) are held in this
-  # process's memory: machines must never be stopped underneath them, and the
-  # app must run as exactly one machine — after first deploy, pin it:
-  #     fly scale count 1
-  auto_stop_machines = "off"
+  # Zero-spend: the machine stops when idle and starts on demand. Safe for
+  # in-process game state, because that state only matters while sockets
+  # are open — Fly does not stop machines with live connections, and an
+  # empty server has nothing to lose. Still exactly one machine, ever
+  # (fly scale count 1): matchmaking cannot span processes.
+  auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
   [[http_service.checks]]
     interval = "15s"
@@ -48,4 +56,4 @@ primary_region = "waw"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "256mb"

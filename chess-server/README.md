@@ -56,21 +56,23 @@ docker build -f chess-server/Dockerfile -t chess-server .
 
 ### Fly.io
 
-`fly.toml` at the repository root describes the production deployment
-(app `matemate-chess`, health-checked on `/health`, TLS terminated by Fly).
-From the repo root:
+`fly.toml` at the repository root describes the zero-spend production
+deployment: one shared-cpu machine that stops when idle, SQLite on a small
+volume (no Postgres), shared IPs, health-checked on `/health`, TLS
+terminated by Fly. From the repo root:
 
 ```sh
+fly volumes create matemate_data --size 1              # SQLite lives here
 fly secrets set JWT_SECRET=$(openssl rand -hex 32)
 fly secrets set SIWA_APP_ID=private.ios-chess-client   # enables /auth/apple
-# DATABASE_URL is set by `fly postgres attach`
 fly deploy
 fly scale count 1
 ```
 
-The count-1 pin matters: live games, matchmaking queues, and rematch offers
-are in-process state, so the server cannot scale horizontally (and machines
-must not auto-stop — fly.toml already disables that). Migrations run at boot.
+Exactly one machine, always: live games, matchmaking queues, and rematch
+offers are in-process state, so the server cannot scale horizontally. Idle
+auto-stop is safe — that state only matters while sockets are open, and Fly
+does not stop machines with live connections. Migrations run at boot.
 Release builds of the iOS app point here via `ServerConfig.swift`.
 
 ## Realtime protocol
