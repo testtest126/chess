@@ -53,6 +53,23 @@ final class GameFlowUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
     }
 
+    @MainActor
+    func testDragToMove() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["Start Game"].tap()
+
+        let e2 = app.descendants(matching: .any)["square_e2"]
+        XCTAssertTrue(e2.waitForExistence(timeout: 5), "board should appear")
+
+        // Drag the e2 pawn to e4 instead of tapping.
+        let e4 = app.descendants(matching: .any)["square_e4"]
+        e2.press(forDuration: 0.1, thenDragTo: e4)
+
+        XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 5), "dragged move should be played")
+    }
+
     private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)

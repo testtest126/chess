@@ -1,8 +1,8 @@
 import SwiftUI
 import ChessKit
 
-/// Renders a position and, when `onMove` is set, handles tap-to-move input
-/// with legal-move hints and a promotion picker.
+/// Renders a position and, when `onMove` is set, handles tap-to-move and
+/// drag-to-move input with legal-move hints and a promotion picker.
 struct BoardView: View {
     let board: Board
     var orientation: PieceColor = .white
@@ -14,6 +14,11 @@ struct BoardView: View {
 
     @State private var selectedSquare: Int?
     @State private var promotionMoves: [Move] = []
+
+    // Drag-to-move state.
+    @State private var draggedFrom: Int?
+    @State private var draggedOver: Int?
+    @State private var dragLocation: CGPoint = .zero
 
     private var legalTargets: Set<Int> {
         guard let selected = selectedSquare else { return [] }
@@ -39,6 +44,15 @@ struct BoardView: View {
             }
             .frame(width: size * 8, height: size * 8)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                // The dragged piece floats above the grid, under the finger.
+                if let from = draggedFrom, let piece = board[from] {
+                    PieceGlyph(piece: piece, size: size * 1.4)
+                        .position(dragLocation)
+                        .allowsHitTesting(false)
+                }
+            }
+            .gesture(interactionGesture(squareSize: size), including: onMove != nil ? .all : .subviews)
             .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -52,6 +66,7 @@ struct BoardView: View {
         }
         .onChange(of: board) {
             selectedSquare = nil
+            draggedFrom = nil
         }
     }
 
@@ -61,6 +76,56 @@ struct BoardView: View {
         let rank = orientation == .white ? 7 - row : row
         let file = orientation == .white ? col : 7 - col
         return Sq.index(file: file, rank: rank)
+    }
+
+    /// The square under a point in the board's own coordinate space.
+    private func square(at point: CGPoint, squareSize: CGFloat) -> Int? {
+        let col = Int(point.x / squareSize)
+        let row = Int(point.y / squareSize)
+        guard (0...7).contains(col), (0...7).contains(row) else { return nil }
+        return square(row: row, col: col)
+    }
+
+    // MARK: - Gesture
+
+    /// One gesture serves both input styles: a press that never leaves its
+    /// starting square is a tap (select / move to target); dragging a piece
+    /// lifts it under the finger and drops it on the release square.
+    private func interactionGesture(squareSize: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard onMove != nil else { return }
+                dragLocation = value.location
+
+                if draggedFrom == nil {
+                    guard let start = square(at: value.startLocation, squareSize: squareSize),
+                          let piece = board[start], piece.color == board.sideToMove
+                    else { return }
+                    // Only treat it as a lift once the finger clearly moves.
+                    let dx = value.translation.width, dy = value.translation.height
+                    guard dx * dx + dy * dy > 25 else { return }
+                    draggedFrom = start
+                    selectedSquare = start
+                }
+                draggedOver = square(at: value.location, squareSize: squareSize)
+            }
+            .onEnded { value in
+                guard onMove != nil else { return }
+                defer {
+                    draggedFrom = nil
+                    draggedOver = nil
+                }
+
+                if let from = draggedFrom {
+                    // Drop: play if the release square is a legal target.
+                    guard let target = square(at: value.location, squareSize: squareSize),
+                          target != from
+                    else { return }
+                    attemptMove(from: from, to: target)
+                } else if let tappedSquare = square(at: value.location, squareSize: squareSize) {
+                    tapped(tappedSquare)
+                }
+            }
     }
 
     @ViewBuilder
@@ -91,7 +156,7 @@ struct BoardView: View {
 
             coordinateLabels(sq: sq, size: size, row: row, col: col, isLight: isLight)
 
-            if let piece {
+            if let piece, sq != draggedFrom {
                 PieceGlyph(piece: piece, size: size)
             }
 
@@ -106,10 +171,14 @@ struct BoardView: View {
                         .frame(width: size * 0.3, height: size * 0.3)
                 }
             }
+
+            if draggedFrom != nil, sq == draggedOver {
+                Rectangle()
+                    .strokeBorder(.white.opacity(0.85), lineWidth: size * 0.06)
+            }
         }
         .frame(width: size, height: size)
         .contentShape(Rectangle())
-        .onTapGesture { tapped(sq) }
         .accessibilityElement()
         .accessibilityIdentifier("square_\(Sq.name(sq))")
         .accessibilityLabel(accessibilityDescription(sq))
@@ -144,17 +213,8 @@ struct BoardView: View {
     private func tapped(_ sq: Int) {
         guard onMove != nil else { return }
 
-        if let selected = selectedSquare {
-            let candidates = board.legalMoves(from: selected).filter { $0.to == sq }
-            if !candidates.isEmpty {
-                if candidates.count > 1 {
-                    // Same from/to with multiple options means promotion.
-                    promotionMoves = candidates.sorted { promotionOrder($0) < promotionOrder($1) }
-                } else {
-                    play(candidates[0])
-                }
-                return
-            }
+        if let selected = selectedSquare, attemptMove(from: selected, to: sq) {
+            return
         }
 
         // Select (or reselect) one of the side-to-move's pieces.
@@ -163,6 +223,21 @@ struct BoardView: View {
         } else {
             selectedSquare = nil
         }
+    }
+
+    /// Plays from→to if legal (or raises the promotion picker when several
+    /// promotions match). Returns whether the pair matched any legal move.
+    @discardableResult
+    private func attemptMove(from: Int, to: Int) -> Bool {
+        let candidates = board.legalMoves(from: from).filter { $0.to == to }
+        guard !candidates.isEmpty else { return false }
+        if candidates.count > 1 {
+            // Same from/to with multiple options means promotion.
+            promotionMoves = candidates.sorted { promotionOrder($0) < promotionOrder($1) }
+        } else {
+            play(candidates[0])
+        }
+        return true
     }
 
     private func play(_ move: Move) {
