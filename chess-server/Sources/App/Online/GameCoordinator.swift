@@ -2,14 +2,26 @@ import Vapor
 import ChessKit
 import ChessOnline
 
-/// Time control applied to every online game.
+/// Clock parameters applied to one online game.
 struct ClockConfig: Sendable {
     /// Seconds each side starts with.
     var initialSeconds: Double
     /// Seconds added to a side's clock after each of its moves.
     var incrementSeconds: Double
 
-    static let standard = ClockConfig(initialSeconds: 300, incrementSeconds: 3)
+    init(initialSeconds: Double, incrementSeconds: Double) {
+        self.initialSeconds = initialSeconds
+        self.incrementSeconds = incrementSeconds
+    }
+
+    init(_ control: TimeControl) {
+        self.init(
+            initialSeconds: control.initialSeconds,
+            incrementSeconds: control.incrementSeconds
+        )
+    }
+
+    static let standard = ClockConfig(.default)
 }
 
 /// Owns all realtime state: the matchmaking queue and live games. The server
@@ -33,6 +45,8 @@ actor GameCoordinator {
         var game = Game()
         var white: Seat
         var black: Seat
+        let timeControl: TimeControl
+        let clock: ClockConfig
         var abandonTask: Task<Void, Never>?
 
         // Clock state: the side to move has been burning time since `turnStartedAt`.
@@ -44,9 +58,11 @@ actor GameCoordinator {
         /// Color with a live draw offer on the table, if any.
         var drawOfferedBy: PieceColor?
 
-        init(white: Seat, black: Seat, clock: ClockConfig) {
+        init(white: Seat, black: Seat, timeControl: TimeControl, clock: ClockConfig) {
             self.white = white
             self.black = black
+            self.timeControl = timeControl
+            self.clock = clock
             self.whiteSeconds = clock.initialSeconds
             self.blackSeconds = clock.initialSeconds
         }
@@ -116,6 +132,8 @@ actor GameCoordinator {
     private struct RematchSlot {
         let whiteID: UUID
         let blackID: UUID
+        /// A rematch is played at the same control as the finished game.
+        let timeControl: TimeControl
         var requested: Set<UUID> = []
 
         func opponent(of userID: UUID) -> UUID? {
@@ -126,8 +144,12 @@ actor GameCoordinator {
     }
 
     private let app: Application
-    private let clock: ClockConfig
-    private var queue: [Seat] = []
+    /// Test seam: when set, every game uses these clock parameters instead of
+    /// its time control's (matchmaking pools are still per-control).
+    private let clockOverride: ClockConfig?
+    /// One matchmaking pool per time control; players are only paired within
+    /// the pool they asked for.
+    private var queues: [TimeControl: [Seat]] = [:]
     private var gamesByID: [UUID: LiveGame] = [:]
     private var gameIDByUser: [UUID: UUID] = [:]
     private var socketsByUser: [UUID: WebSocket] = [:]
@@ -135,9 +157,13 @@ actor GameCoordinator {
     private var rematchSlots: [UUID: RematchSlot] = [:]
     private var rematchSlotByUser: [UUID: UUID] = [:]
 
-    init(app: Application, clock: ClockConfig = .standard) {
+    init(app: Application, clock: ClockConfig? = nil) {
         self.app = app
-        self.clock = clock
+        self.clockOverride = clock
+    }
+
+    private func clockConfig(for control: TimeControl) -> ClockConfig {
+        clockOverride ?? ClockConfig(control)
     }
 
     // MARK: - Connection lifecycle
@@ -164,7 +190,7 @@ actor GameCoordinator {
         // Ignore close events from a superseded socket.
         guard socketsByUser[userID] === socket else { return }
         socketsByUser[userID] = nil
-        queue.removeAll { $0.userID == userID }
+        removeFromAllQueues(userID: userID)
         abandonRematch(userID: userID)
 
         guard let game = activeGame(for: userID) else { return }
@@ -193,10 +219,10 @@ actor GameCoordinator {
 
     func handle(_ message: ClientMessage, from userID: UUID) async {
         switch message {
-        case .joinQueue:
-            await joinQueue(userID: userID)
+        case .joinQueue(let timeControl):
+            await joinQueue(userID: userID, timeControl: timeControl)
         case .leaveQueue:
-            queue.removeAll { $0.userID == userID }
+            removeFromAllQueues(userID: userID)
         case .move(let uci):
             await playMove(uci: uci, from: userID)
         case .resign:
@@ -233,7 +259,7 @@ actor GameCoordinator {
                 send(.errorMessage("rematch opponent unavailable"), to: socketsByUser[userID])
                 return
             }
-            startGame(white: white, black: black)
+            startGame(white: white, black: black, timeControl: slot.timeControl)
         } else {
             send(.rematchOffered, to: socketsByUser[opponentID])
         }
@@ -261,7 +287,7 @@ actor GameCoordinator {
         return Seat(userID: userID, name: user.displayName, rating: user.rating, socket: socket)
     }
 
-    private func joinQueue(userID: UUID) async {
+    private func joinQueue(userID: UUID, timeControl: TimeControl) async {
         guard let socket = socketsByUser[userID] else { return }
 
         // Already in a game: replay its state instead of queueing.
@@ -275,27 +301,41 @@ actor GameCoordinator {
             return
         }
 
-        // Queueing for a new opponent walks away from any pending rematch.
+        // Queueing for a new opponent walks away from any pending rematch,
+        // and re-queueing (possibly at another control) replaces the old entry.
         abandonRematch(userID: userID)
-        queue.removeAll { $0.userID == userID }
+        removeFromAllQueues(userID: userID)
         let seat = Seat(userID: userID, name: user.displayName, rating: user.rating, socket: socket)
 
-        if let opponent = queue.first {
-            queue.removeFirst()
+        // Only pair players who asked for the same time control.
+        if var pool = queues[timeControl], !pool.isEmpty {
+            let opponent = pool.removeFirst()
+            queues[timeControl] = pool
             // Random colors: fair over time and resistant to queue sniping.
             if Bool.random() {
-                startGame(white: opponent, black: seat)
+                startGame(white: opponent, black: seat, timeControl: timeControl)
             } else {
-                startGame(white: seat, black: opponent)
+                startGame(white: seat, black: opponent, timeControl: timeControl)
             }
         } else {
-            queue.append(seat)
+            queues[timeControl, default: []].append(seat)
             send(.queued, to: socket)
         }
     }
 
-    private func startGame(white: Seat, black: Seat) {
-        let game = LiveGame(white: white, black: black, clock: clock)
+    private func removeFromAllQueues(userID: UUID) {
+        for control in queues.keys {
+            queues[control]?.removeAll { $0.userID == userID }
+        }
+    }
+
+    private func startGame(white: Seat, black: Seat, timeControl: TimeControl) {
+        let game = LiveGame(
+            white: white,
+            black: black,
+            timeControl: timeControl,
+            clock: clockConfig(for: timeControl)
+        )
         gamesByID[game.id] = game
         gameIDByUser[white.userID] = game.id
         gameIDByUser[black.userID] = game.id
@@ -318,7 +358,7 @@ actor GameCoordinator {
 
         // Charge thinking time before validating: a move that arrives after
         // the flag fell loses on time even if the timeout task hasn't fired.
-        guard game.chargeMover(increment: clock.incrementSeconds) else {
+        guard game.chargeMover(increment: game.clock.incrementSeconds) else {
             await flagFell(game)
             return
         }
@@ -425,7 +465,11 @@ actor GameCoordinator {
         // Open the rematch window (replacing any stale slots).
         abandonRematch(userID: game.white.userID)
         abandonRematch(userID: game.black.userID)
-        rematchSlots[game.id] = RematchSlot(whiteID: game.white.userID, blackID: game.black.userID)
+        rematchSlots[game.id] = RematchSlot(
+            whiteID: game.white.userID,
+            blackID: game.black.userID,
+            timeControl: game.timeControl
+        )
         rematchSlotByUser[game.white.userID] = game.id
         rematchSlotByUser[game.black.userID] = game.id
 
@@ -502,7 +546,8 @@ actor GameCoordinator {
             opponentName: opponent?.name ?? "Opponent",
             opponentRating: opponent?.rating,
             moves: game.game.uciMoves,
-            clock: game.currentClock()
+            clock: game.currentClock(),
+            timeControl: game.timeControl
         ))
     }
 
