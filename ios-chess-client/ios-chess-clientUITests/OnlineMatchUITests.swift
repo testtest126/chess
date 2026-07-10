@@ -58,6 +58,33 @@ final class OnlineMatchUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 10), "game over sheet should appear")
 
+        // The bot asks for a rematch on game over; accept it. A fresh game
+        // starts (colors swapped) and the sheet dismisses.
+        let acceptRematch = app.buttons["Accept Rematch"]
+        XCTAssertTrue(acceptRematch.waitForExistence(timeout: 10), "bot's rematch offer should arrive")
+        acceptRematch.tap()
+        XCTAssertTrue(
+            waitUntilGone(app.staticTexts["You Lost"], timeout: 10),
+            "rematch should start a fresh game and dismiss the sheet"
+        )
+
+        // Play one move in the rematch, colors reversed from game one.
+        if app.staticTexts["e4"].waitForExistence(timeout: 8) {
+            app.descendants(matching: .any)["square_e7"].tap()
+            app.descendants(matching: .any)["square_e5"].tap()
+            XCTAssertTrue(app.staticTexts["e5"].waitForExistence(timeout: 10), "rematch reply should be echoed")
+        } else {
+            app.descendants(matching: .any)["square_e2"].tap()
+            app.descendants(matching: .any)["square_e4"].tap()
+            XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 10), "rematch move should be echoed")
+        }
+
+        // Resign the rematch too, then review from the sheet.
+        app.buttons["Resign"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
+        app.buttons.matching(NSPredicate(format: "label == 'Resign'")).allElementsBoundByIndex.last?.tap()
+        XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 10), "second game over sheet should appear")
+
         // Post-game review over the online game's moves.
         app.buttons["Review Game"].tap()
         XCTAssertTrue(app.staticTexts["White"].waitForExistence(timeout: 30), "review summary should appear")
@@ -71,6 +98,13 @@ final class OnlineMatchUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "saved online game should list the opponent")
 
         await bot.close()
+    }
+
+    private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: element
+        )
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 }
 
@@ -118,6 +152,7 @@ final class OpponentBot: @unchecked Sendable {
     }
 
     private func runGameLoop() async {
+        var gamesFinished = 0
         while let message = try? await receive() {
             switch message {
             case .gameStart(let start):
@@ -128,7 +163,13 @@ final class OpponentBot: @unchecked Sendable {
                 try? game.play(uci: uci)
                 await moveIfOurTurn(scripted: nil)
             case .gameOver:
-                return
+                gamesFinished += 1
+                // Offer one rematch after the first game; stop after the second.
+                if gamesFinished == 1 {
+                    try? await send(.requestRematch)
+                } else {
+                    return
+                }
             default:
                 break
             }
