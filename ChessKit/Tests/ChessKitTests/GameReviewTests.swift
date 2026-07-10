@@ -43,6 +43,25 @@ final class GameReviewTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(review.summary.blundersWhite, 1)
     }
 
+    func testCustomEvaluatorAndProgress() {
+        let g = game(["e2e4", "e7e5", "g1f3", "b8c6"])
+        var evaluated = 0
+        var fractions: [Double] = []
+        let review = GameReview(
+            analyzing: g,
+            evaluator: { _ in evaluated += 1; return 0 },
+            progress: { fractions.append($0) }
+        )
+        // Every position (initial + one per ply) evaluated exactly once.
+        XCTAssertEqual(evaluated, g.moveCount + 1)
+        XCTAssertEqual(fractions.count, g.moveCount + 1)
+        XCTAssertEqual(fractions.last, 1.0)
+        // A constant evaluator means nobody ever loses centipawns.
+        XCTAssertTrue(review.moves.allSatisfy { $0.centipawnLoss == 0 })
+        // The Lichess-style accuracy curve tops out just below 100 at 0 ACL.
+        XCTAssertGreaterThan(review.summary.accuracyWhite, 99)
+    }
+
     func testJudgmentThresholds() {
         XCTAssertEqual(GameReview.Judgment(centipawnLoss: 0), .best)
         XCTAssertEqual(GameReview.Judgment(centipawnLoss: 40), .good)

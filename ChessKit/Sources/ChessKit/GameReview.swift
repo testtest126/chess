@@ -1,9 +1,15 @@
 import Foundation
 
 /// Post-game analysis: per-move evaluations and move quality classification.
-/// Uses the built-in heuristic evaluator with shallow lookahead — designed to be
-/// swapped for a real engine (Stockfish) later without changing the data model.
+///
+/// Evaluation is pluggable: the default is the built-in one-ply lookahead
+/// (cheap, rough), and callers can supply a real engine-backed evaluator for
+/// trustworthy numbers without ChessKit depending on any engine.
 public struct GameReview: Sendable {
+    /// Evaluates a position in centipawns from White's perspective, assuming
+    /// best play. Called once per position in the game.
+    public typealias Evaluator = (Board) -> Int
+
     public struct MoveAnalysis: Codable, Sendable, Identifiable {
         public var id: Int { plyIndex }
         /// 0-based ply index into the game's history.
@@ -49,30 +55,35 @@ public struct GameReview: Sendable {
     /// Length = game.moveCount + 1. White's perspective, centipawns.
     public let evalTimeline: [Int]
 
-    public init(analyzing game: Game) {
-        var analyses: [MoveAnalysis] = []
-        var timeline: [Int] = []
-
+    /// Analyzes `game`, evaluating every position exactly once.
+    ///
+    /// - Parameters:
+    ///   - evaluator: White-perspective best-play evaluation. Defaults to the
+    ///     built-in one-ply lookahead.
+    ///   - progress: Called after each position with completed fraction (0-1).
+    public init(
+        analyzing game: Game,
+        evaluator: Evaluator = { $0.evaluateWithLookahead() },
+        progress: ((Double) -> Void)? = nil
+    ) {
         let positions = game.positions
-        timeline.append(positions[0].evaluate())
+        var evals: [Int] = []
+        evals.reserveCapacity(positions.count)
+        for (i, position) in positions.enumerated() {
+            evals.append(evaluator(position))
+            progress?(Double(i + 1) / Double(positions.count))
+        }
 
+        var analyses: [MoveAnalysis] = []
         for (i, entry) in game.history.enumerated() {
-            let before = positions[i]
-            let after = entry.board
-            let mover = before.sideToMove
-
-            // Best achievable eval from `before` (one-ply minimax).
-            let bestEval = before.evaluateWithLookahead()
-            let actualEval = after.evaluate()
-            timeline.append(actualEval)
+            let mover = positions[i].sideToMove
+            let bestEval = evals[i]      // best play from the position before
+            let actualEval = evals[i + 1] // what the played move led to
 
             // Loss from the mover's perspective.
-            let loss: Int
-            if mover == .white {
-                loss = max(0, bestEval - actualEval)
-            } else {
-                loss = max(0, actualEval - bestEval)
-            }
+            let loss = mover == .white
+                ? max(0, bestEval - actualEval)
+                : max(0, actualEval - bestEval)
             // Cap: positions already lost/won shouldn't produce absurd loss values.
             let cappedLoss = min(loss, 1000)
 
@@ -88,7 +99,7 @@ public struct GameReview: Sendable {
         }
 
         self.moves = analyses
-        self.evalTimeline = timeline
+        self.evalTimeline = evals
         self.summary = GameReview.summarize(analyses)
     }
 
