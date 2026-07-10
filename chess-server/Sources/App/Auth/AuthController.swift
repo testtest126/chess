@@ -57,7 +57,7 @@ struct AuthController: RouteCollection {
         let (plaintext, model) = RefreshToken.generate(for: userID)
         try await model.save(on: req.db)
 
-        let accessToken = try req.jwt.sign(UserPayload(userID: userID))
+        let accessToken = try await req.jwt.sign(UserPayload(userID: userID))
         return AuthResponse(
             userID: userID,
             displayName: user.displayName,

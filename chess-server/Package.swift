@@ -9,7 +9,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent.git", from: "4.9.0"),
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.8.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.6.0"),
-        .package(url: "https://github.com/vapor/jwt.git", from: "4.2.2"),
+        .package(url: "https://github.com/vapor/jwt.git", from: "5.1.2"),
         .package(path: "../ChessKit"),
     ],
     targets: [

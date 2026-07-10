@@ -12,7 +12,7 @@ struct GamesController: RouteCollection {
     /// The authenticated user's finished games, newest first.
     @Sendable
     func list(req: Request) async throws -> [GameRecordDTO] {
-        let userID = try req.authenticatedUserID()
+        let userID = try await req.authenticatedUserID()
         let records = try await GameRecord.query(on: req.db)
             .group(.or) { group in
                 group.filter(\.$whiteID == userID)
@@ -26,7 +26,7 @@ struct GamesController: RouteCollection {
 
     @Sendable
     func detail(req: Request) async throws -> GameRecordDTO {
-        let userID = try req.authenticatedUserID()
+        let userID = try await req.authenticatedUserID()
         guard let gameID = req.parameters.get("gameID", as: UUID.self) else {
             throw Abort(.badRequest, reason: "invalid game id")
         }

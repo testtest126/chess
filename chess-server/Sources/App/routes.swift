@@ -12,19 +12,24 @@ func routes(_ app: Application) throws {
     // Realtime play. The upgrade request must carry a valid bearer token;
     // anything else is closed immediately.
     //
-    // Note: this uses the synchronous onUpgrade overload deliberately — it runs
-    // on the channel's event loop, which WebSocketKit requires for registering
-    // onText/onClose handlers (they're NIOLoopBound). JWT verification is pure
-    // CPU work, so nothing here blocks the loop.
-    app.webSocket("play") { req, ws in
-        let userID: UUID
-        do {
-            let payload = try req.jwt.verify(as: UserPayload.self)
-            guard let id = payload.userID else {
-                throw Abort(.unauthorized, reason: "malformed subject claim")
+    // Note: the token is checked in shouldUpgrade because JWT 5 verification is
+    // async; running it before the 101 response also guarantees no client frame
+    // can arrive before the handlers below are registered. Invalid tokens still
+    // upgrade ([:]) so onUpgrade can close the socket with .policyViolation —
+    // failing the future here would leave the client's upgrade request dangling
+    // without a response. onUpgrade uses the synchronous overload deliberately —
+    // it runs on the channel's event loop, which WebSocketKit requires for
+    // registering onText/onClose handlers (they're NIOLoopBound).
+    app.webSocket("play", shouldUpgrade: { req -> EventLoopFuture<HTTPHeaders?> in
+        req.eventLoop.makeFutureWithTask {
+            if let payload = try? await req.jwt.verify(as: UserPayload.self),
+               let id = payload.userID {
+                req.storage[AuthenticatedUserIDKey.self] = id
             }
-            userID = id
-        } catch {
+            return [:]
+        }
+    }, onUpgrade: { req, ws in
+        guard let userID = req.storage[AuthenticatedUserIDKey.self] else {
             _ = ws.close(code: .policyViolation)
             return
         }
@@ -51,5 +56,10 @@ func routes(_ app: Application) throws {
         Task {
             await coordinator.connect(userID: userID, socket: ws)
         }
-    }
+    })
+}
+
+/// Carries the verified user ID from the upgrade check into the socket handler.
+private struct AuthenticatedUserIDKey: StorageKey {
+    typealias Value = UUID
 }

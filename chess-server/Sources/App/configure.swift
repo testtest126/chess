@@ -30,14 +30,14 @@ public func configure(_ app: Application) async throws {
     // The signing secret is mandatory outside development so tokens survive
     // restarts and can never fall back to a known value.
     if let secret = Environment.get("JWT_SECRET") {
-        app.jwt.signers.use(.hs256(key: secret))
+        await app.jwt.keys.add(hmac: HMACKey(from: secret), digestAlgorithm: .sha256)
     } else {
         guard app.environment == .development || app.environment == .testing else {
             app.logger.critical("JWT_SECRET must be set in production")
             throw Abort(.internalServerError, reason: "missing JWT_SECRET")
         }
         app.logger.warning("JWT_SECRET not set; using an insecure development-only key")
-        app.jwt.signers.use(.hs256(key: "insecure-development-key-do-not-deploy"))
+        await app.jwt.keys.add(hmac: HMACKey(from: "insecure-development-key-do-not-deploy"), digestAlgorithm: .sha256)
     }
 
     // MARK: Realtime coordinator
