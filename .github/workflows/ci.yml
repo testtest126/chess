@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chesskit:
+    name: ChessKit tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: ChessKit/.build
+          key: chesskit-spm-${{ runner.os }}-${{ hashFiles('ChessKit/Package.swift') }}
+      - name: Run package tests
+        run: swift test --package-path ChessKit
+
+  server:
+    name: Server tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: chess-server/.build
+          key: server-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift') }}
+      - name: Run server tests
+        run: swift test --package-path chess-server
