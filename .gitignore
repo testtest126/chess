@@ -1,7 +1,23 @@
+# macOS
 .DS_Store
-chess-server/chess-dev.sqlite
-ios-chess-client/ios-chess-client.xcodeproj/project.xcworkspace/xcuserdata/
-ios-chess-client/ios-chess-client.xcodeproj/xcschemes/xcschememanagement.plist
-ios-chess-client/ios-chess-client.xcodeproj/xcuserdata/
-ios-chess-client/ios-chess-client.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Swift Package Manager
 .build/
+.swiftpm/
+
+# Xcode user state (per-machine, never shared)
+xcuserdata/
+*.xcuserstate
+xcschememanagement.plist
+DerivedData/
+*.xcresult
+
+# Local databases (dev server)
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Secrets & logs
+.env
+.env.*
+*.log

@@ -13,25 +13,29 @@ jobs:
   chesskit:
     name: ChessKit tests
     runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Cache SwiftPM build
         uses: actions/cache@v4
         with:
           path: ChessKit/.build
-          key: chesskit-spm-${{ runner.os }}-${{ hashFiles('ChessKit/Package.swift') }}
+          key: chesskit-spm-${{ runner.os }}-${{ hashFiles('ChessKit/Package.swift', 'ChessKit/Package.resolved') }}
+          restore-keys: chesskit-spm-${{ runner.os }}-
       - name: Run package tests
         run: swift test --package-path ChessKit
 
   server:
     name: Server tests
     runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Cache SwiftPM build
         uses: actions/cache@v4
         with:
           path: chess-server/.build
-          key: server-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift') }}
+          key: server-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift', 'chess-server/Package.resolved') }}
+          restore-keys: server-spm-${{ runner.os }}-
       - name: Run server tests
         run: swift test --package-path chess-server
