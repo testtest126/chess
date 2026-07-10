@@ -25,7 +25,12 @@ concurrency:
 jobs:
   ui-tests:
     name: App build & UI tests
-    runs-on: macos-15
+    # macos-26 ships Xcode 26.x (default 26.5) with the iOS 26 SDK, so the
+    # Liquid Glass code paths behind `#if compiler(>=6.2)` are compiled and
+    # exercised here instead of silently skipped (#44). The gate itself stays
+    # for contributors on older local toolchains. Package jobs (ci.yml) don't
+    # need the newer SDK and stay on macos-15.
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
