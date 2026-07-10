@@ -112,12 +112,28 @@ actor GameCoordinator {
         }
     }
 
+    /// A finished game's players, kept around so both can agree to a rematch.
+    private struct RematchSlot {
+        let whiteID: UUID
+        let blackID: UUID
+        var requested: Set<UUID> = []
+
+        func opponent(of userID: UUID) -> UUID? {
+            if userID == whiteID { return blackID }
+            if userID == blackID { return whiteID }
+            return nil
+        }
+    }
+
     private let app: Application
     private let clock: ClockConfig
     private var queue: [Seat] = []
     private var gamesByID: [UUID: LiveGame] = [:]
     private var gameIDByUser: [UUID: UUID] = [:]
     private var socketsByUser: [UUID: WebSocket] = [:]
+    /// Keyed by finished game ID; also indexed per player for lookup.
+    private var rematchSlots: [UUID: RematchSlot] = [:]
+    private var rematchSlotByUser: [UUID: UUID] = [:]
 
     init(app: Application, clock: ClockConfig = .standard) {
         self.app = app
@@ -149,6 +165,7 @@ actor GameCoordinator {
         guard socketsByUser[userID] === socket else { return }
         socketsByUser[userID] = nil
         queue.removeAll { $0.userID == userID }
+        abandonRematch(userID: userID)
 
         guard let game = activeGame(for: userID) else { return }
         game.setSocket(nil, for: userID)
@@ -190,7 +207,58 @@ actor GameCoordinator {
             await acceptDraw(userID: userID)
         case .declineDraw:
             declineDraw(userID: userID)
+        case .requestRematch:
+            await requestRematch(userID: userID)
         }
+    }
+
+    // MARK: - Rematch
+
+    private func requestRematch(userID: UUID) async {
+        guard let slotID = rematchSlotByUser[userID], var slot = rematchSlots[slotID] else {
+            send(.errorMessage("no rematch available"), to: socketsByUser[userID])
+            return
+        }
+        slot.requested.insert(userID)
+        rematchSlots[slotID] = slot
+
+        guard let opponentID = slot.opponent(of: userID) else { return }
+        if slot.requested.count == 2 {
+            dropRematchSlot(slotID)
+            // Colors swap; ratings are re-read so the new game uses post-Elo
+            // values, and sockets are taken fresh.
+            guard let white = await seat(for: slot.blackID),
+                  let black = await seat(for: slot.whiteID)
+            else {
+                send(.errorMessage("rematch opponent unavailable"), to: socketsByUser[userID])
+                return
+            }
+            startGame(white: white, black: black)
+        } else {
+            send(.rematchOffered, to: socketsByUser[opponentID])
+        }
+    }
+
+    /// Removes `userID` from any pending rematch, telling the other player.
+    private func abandonRematch(userID: UUID) {
+        guard let slotID = rematchSlotByUser[userID], let slot = rematchSlots[slotID] else { return }
+        dropRematchSlot(slotID)
+        if let opponentID = slot.opponent(of: userID) {
+            send(.rematchUnavailable, to: socketsByUser[opponentID])
+        }
+    }
+
+    private func dropRematchSlot(_ slotID: UUID) {
+        guard let slot = rematchSlots.removeValue(forKey: slotID) else { return }
+        rematchSlotByUser[slot.whiteID] = nil
+        rematchSlotByUser[slot.blackID] = nil
+    }
+
+    private func seat(for userID: UUID) async -> Seat? {
+        guard let socket = socketsByUser[userID],
+              let user = try? await User.find(userID, on: app.db)
+        else { return nil }
+        return Seat(userID: userID, name: user.displayName, rating: user.rating, socket: socket)
     }
 
     private func joinQueue(userID: UUID) async {
@@ -207,6 +275,8 @@ actor GameCoordinator {
             return
         }
 
+        // Queueing for a new opponent walks away from any pending rematch.
+        abandonRematch(userID: userID)
         queue.removeAll { $0.userID == userID }
         let seat = Seat(userID: userID, name: user.displayName, rating: user.rating, socket: socket)
 
@@ -351,6 +421,13 @@ actor GameCoordinator {
         gamesByID[game.id] = nil
         gameIDByUser[game.white.userID] = nil
         gameIDByUser[game.black.userID] = nil
+
+        // Open the rematch window (replacing any stale slots).
+        abandonRematch(userID: game.white.userID)
+        abandonRematch(userID: game.black.userID)
+        rematchSlots[game.id] = RematchSlot(whiteID: game.white.userID, blackID: game.black.userID)
+        rematchSlotByUser[game.white.userID] = game.id
+        rematchSlotByUser[game.black.userID] = game.id
 
         let ratingDeltas = await updateRatings(for: game)
 
