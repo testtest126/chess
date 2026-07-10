@@ -1,0 +1,36 @@
+name: Bug report
+description: Something broke — a wrong move, a crash, a stuck game
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - iOS app
+        - Server (chess-server)
+        - Engine / rules (ChessKit)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what actually happened?
+      placeholder: I promoted a pawn during an online game and …
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start an online game
+        2. …
+  - type: textarea
+    id: position
+    attributes:
+      label: Position / moves (if rules- or engine-related)
+      description: A FEN string or the UCI/SAN move list makes chess bugs vastly easier to fix.
+      placeholder: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
