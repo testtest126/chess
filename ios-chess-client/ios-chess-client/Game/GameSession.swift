@@ -52,7 +52,8 @@ final class GameSession: Identifiable {
     private(set) var hintMove: Move?
     private(set) var isFindingHint = false
 
-    private let engine = NegamaxEngine()
+    /// Book-backed so games open with variety instead of one deterministic line.
+    private let engine = NegamaxEngine(book: .standard)
 
     init(playerColor: PieceColor, difficulty: Difficulty) {
         self.playerColor = playerColor

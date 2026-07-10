@@ -80,6 +80,47 @@ final class EngineTests: XCTestCase {
         XCTAssertNotNil(result.bestMove)
     }
 
+    // MARK: - Opening book
+
+    func testStandardBookCoversCommonOpenings() {
+        let book = OpeningBook.standard
+        XCTAssertGreaterThan(book.positionCount, 40)
+        // The initial position offers at least the three main first moves.
+        let firstMoves = Set(book.moves(for: Board()).map(\.uci))
+        XCTAssertTrue(firstMoves.isSuperset(of: ["e2e4", "d2d4", "c2c4"]))
+        // Transposition-friendly keying: 1.e4 has book replies.
+        let afterE4 = Board(fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")!
+        XCTAssertFalse(book.moves(for: afterE4).isEmpty)
+    }
+
+    func testBookMoveIsInstantAndLegal() {
+        let bookEngine = NegamaxEngine(book: .standard)
+        let board = Board()
+        let result = bookEngine.search(board, limit: .default)
+        XCTAssertEqual(result.nodes, 0, "book hits shouldn't search")
+        let move = try! XCTUnwrap(result.bestMove)
+        XCTAssertTrue(board.isLegal(move))
+    }
+
+    func testOutOfBookFallsBackToSearch() {
+        let bookEngine = NegamaxEngine(book: .standard)
+        // 1.a3 is not in any book line.
+        let board = Board(fen: "rnbqkbnr/pppppppp/8/8/8/P7/1PPPPPPP/RNBQKBNR b KQkq - 0 1")!
+        let result = bookEngine.search(board, limit: SearchLimit(depth: 2))
+        XCTAssertGreaterThan(result.nodes, 0)
+        XCTAssertNotNil(result.bestMove)
+    }
+
+    // MARK: - Transposition table
+
+    func testTranspositionTableKeepsMateScoresCorrect() {
+        // Same mate-in-two, deeper search: TT hits at different plies must not
+        // corrupt the mate distance.
+        let board = Board(fen: "7k/8/8/8/8/8/R7/1R4K1 w - - 0 1")!
+        let result = engine.search(board, limit: SearchLimit(depth: 6))
+        XCTAssertEqual(result.mateInPlies, 3)
+    }
+
     func testMatePliesConversion() {
         // Scores near the mate bound decode to the right ply distance.
         XCTAssertEqual(NegamaxEngine.matePlies(from: NegamaxEngine.mateScore - 1), 1)

@@ -2,11 +2,15 @@ import Foundation
 import ChessKit
 
 /// An alpha-beta negamax search over ChessKit's evaluation, with iterative
-/// deepening, MVV-LVA move ordering, and quiescence search. Deterministic
-/// when no node or time limit cuts the search short.
+/// deepening, a transposition table, MVV-LVA move ordering, check extensions,
+/// and quiescence search. Deterministic when no node or time limit cuts the
+/// search short and no opening book is attached.
 public struct NegamaxEngine: ChessEngine {
     public let name: String
     public let author: String
+    /// When set, positions found in the book are answered instantly with a
+    /// (uniformly random) book move instead of searching.
+    public let book: OpeningBook?
 
     /// Score assigned to a checkmate at the root. Mates found deeper are worth
     /// slightly less so the search prefers the fastest one.
@@ -14,12 +18,21 @@ public struct NegamaxEngine: ChessEngine {
     /// Scores at or beyond this magnitude are treated as forced mates.
     static let mateThreshold = mateScore - 1000
 
-    public init(name: String = "ChessKit-Negamax", author: String = "ChessKit") {
+    public init(
+        name: String = "ChessKit-Negamax",
+        author: String = "ChessKit",
+        book: OpeningBook? = nil
+    ) {
         self.name = name
         self.author = author
+        self.book = book
     }
 
     public func search(_ board: Board, limit: SearchLimit) -> SearchResult {
+        if let bookMove = book?.moves(for: board).randomElement(), board.isLegal(bookMove) {
+            return SearchResult(bestMove: bookMove, scoreCentipawns: 0, depth: 0, nodes: 0)
+        }
+
         let rootMoves = board.legalMoves()
         guard !rootMoves.isEmpty else {
             // Terminal position: report the game-theoretic score, no move.
@@ -92,13 +105,35 @@ public struct NegamaxEngine: ChessEngine {
     }
 }
 
-/// Mutable state for one `search` call: node counting, limit tracking, and the
-/// recursive routines. Reference semantics keep the hot path free of `inout`.
+/// Mutable state for one `search` call: node counting, limit tracking, the
+/// transposition table, and the recursive routines. Reference semantics keep
+/// the hot path free of `inout`.
 private final class Search {
     var nodes = 0
     var aborted = false
     /// The depth-1 pass runs with aborts disabled so a move always comes back.
     var abortAllowed = false
+
+    /// A line may extend at most this many times (check extensions), so
+    /// perpetual-check lines can't recurse unboundedly.
+    private static let maxExtensions = 8
+    /// Entry cap so pathological searches can't grow memory without bound.
+    private static let maxTableEntries = 2_000_000
+
+    private enum Bound {
+        case exact, lower, upper
+    }
+
+    private struct TTEntry {
+        let depth: Int
+        /// Mate scores are stored relative to the entry's node (see
+        /// `storeScore`/`probeScore`) so they stay correct at any ply.
+        let score: Int
+        let bound: Bound
+        let move: Move?
+    }
+
+    private var table: [UInt64: TTEntry] = [:]
 
     private let maxNodes: Int?
     private let deadline: ContinuousClock.Instant?
@@ -150,10 +185,10 @@ private final class Search {
             .map(\.element)
     }
 
-    /// Negamax with alpha-beta. Returns a score from the perspective of `b`'s
-    /// side to move. `ply` is the distance from the root. Meaningless once
-    /// `aborted` is set — callers must check.
-    func negamax(_ b: Board, depth: Int, alpha: Int, beta: Int, ply: Int) -> Int {
+    /// Negamax with alpha-beta and transposition table. Returns a score from
+    /// the perspective of `b`'s side to move. `ply` is the distance from the
+    /// root. Meaningless once `aborted` is set — callers must check.
+    func negamax(_ b: Board, depth: Int, alpha: Int, beta: Int, ply: Int, extensions: Int = 0) -> Int {
         nodes += 1
         if checkAbort() { return 0 }
 
@@ -162,25 +197,83 @@ private final class Search {
             return b.isInCheck(b.sideToMove) ? -(NegamaxEngine.mateScore - ply) : 0
         }
         if b.halfmoveClock >= 100 || b.hasInsufficientMaterial { return 0 }
+
+        // Check extension: dangerous positions deserve one extra ply.
+        var depth = depth
+        var extensions = extensions
+        if extensions < Self.maxExtensions, b.isInCheck(b.sideToMove) {
+            depth += 1
+            extensions += 1
+        }
         if depth == 0 {
             return quiesce(b, alpha: alpha, beta: beta, ply: ply, moves: moves)
         }
 
+        // Transposition table probe: reuse an earlier visit of this position
+        // if it searched at least as deep; otherwise keep its best move for
+        // ordering.
+        let key = Zobrist.key(for: b)
+        var ttMove: Move?
+        if let entry = table[key] {
+            ttMove = entry.move
+            if entry.depth >= depth {
+                let score = Self.probeScore(entry.score, ply: ply)
+                switch entry.bound {
+                case .exact:
+                    return score
+                case .lower:
+                    if score >= beta { return score }
+                case .upper:
+                    if score <= alpha { return score }
+                }
+            }
+        }
+
         var best = Int.min + 1
+        var bestMove: Move?
         var a = alpha
-        for move in ordered(moves, in: b, first: nil) {
+        for move in ordered(moves, in: b, first: ttMove) {
             guard let next = b.making(move) else { continue }
-            let score = -negamax(next, depth: depth - 1, alpha: -beta, beta: -a, ply: ply + 1)
+            let score = -negamax(next, depth: depth - 1, alpha: -beta, beta: -a, ply: ply + 1, extensions: extensions)
             if aborted { return 0 }
-            if score > best { best = score }
+            if score > best {
+                best = score
+                bestMove = move
+            }
             if score > a { a = score }
             if a >= beta { break } // beta cutoff
+        }
+
+        if table.count < Self.maxTableEntries {
+            let bound: Bound = best >= beta ? .lower : (best <= alpha ? .upper : .exact)
+            table[key] = TTEntry(
+                depth: depth,
+                score: Self.storeScore(best, ply: ply),
+                bound: bound,
+                move: bestMove
+            )
         }
         return best
     }
 
+    /// Mate scores are ply-relative to the root; convert to node-relative on
+    /// store and back on probe so a mate found via one path scores correctly
+    /// when the position is reached at a different ply.
+    private static func storeScore(_ score: Int, ply: Int) -> Int {
+        if score >= NegamaxEngine.mateThreshold { return score + ply }
+        if score <= -NegamaxEngine.mateThreshold { return score - ply }
+        return score
+    }
+
+    private static func probeScore(_ score: Int, ply: Int) -> Int {
+        if score >= NegamaxEngine.mateThreshold { return score - ply }
+        if score <= -NegamaxEngine.mateThreshold { return score + ply }
+        return score
+    }
+
     /// Quiescence: at the horizon, keep resolving captures and promotions so
     /// the static evaluation is never taken in the middle of an exchange.
+    /// In check there is no standing pat — every evasion is searched.
     private func quiesce(_ b: Board, alpha: Int, beta: Int, ply: Int, moves: [Move]) -> Int {
         nodes += 1
         if checkAbort() { return 0 }
@@ -190,17 +283,28 @@ private final class Search {
         }
         if b.halfmoveClock >= 100 || b.hasInsufficientMaterial { return 0 }
 
-        // Stand pat: the side to move may decline all captures.
-        let standPat = staticEval(b)
-        if standPat >= beta { return standPat }
-        var a = max(alpha, standPat)
-        var best = standPat
+        let inCheck = b.isInCheck(b.sideToMove)
+        var a = alpha
+        var best: Int
+        let candidates: [Move]
 
-        let tactical = moves.filter { move in
-            if b[move.to] != nil || move.promotion != nil { return true }
-            return b[move.from]?.kind == .pawn && move.to == b.enPassantSquare
+        if inCheck {
+            // A checked side can't decline to respond; consider all evasions.
+            best = Int.min + 1
+            candidates = moves
+        } else {
+            // Stand pat: the side to move may decline all captures.
+            let standPat = staticEval(b)
+            if standPat >= beta { return standPat }
+            a = max(a, standPat)
+            best = standPat
+            candidates = moves.filter { move in
+                if b[move.to] != nil || move.promotion != nil { return true }
+                return b[move.from]?.kind == .pawn && move.to == b.enPassantSquare
+            }
         }
-        for move in ordered(tactical, in: b, first: nil) {
+
+        for move in ordered(candidates, in: b, first: nil) {
             guard let next = b.making(move) else { continue }
             let score = -quiesce(next, alpha: -beta, beta: -a, ply: ply + 1, moves: next.legalMoves())
             if aborted { return 0 }
