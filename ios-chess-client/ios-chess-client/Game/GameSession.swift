@@ -72,7 +72,10 @@ final class GameSession: Identifiable {
 
     func playPlayerMove(_ move: Move) {
         guard isPlayerTurn else { return }
+        let boardBefore = board
         guard (try? game.play(move)) != nil else { return }
+        SoundPlayer.playMove(move, on: boardBefore)
+        if game.isOver { SoundPlayer.play(.gameEnd) }
         hintMove = nil
         engineMoveIfNeeded()
     }
@@ -147,7 +150,10 @@ final class GameSession: Identifiable {
             isEngineThinking = false
             // The game may have been resigned while searching.
             guard !game.isOver, game.board == position, let move = result.bestMove else { return }
-            try? game.play(move)
+            let boardBefore = game.board
+            guard (try? game.play(move)) != nil else { return }
+            SoundPlayer.playMove(move, on: boardBefore)
+            if game.isOver { SoundPlayer.play(.gameEnd) }
         }
     }
 }
