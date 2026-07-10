@@ -4,7 +4,10 @@ import XCTest
 final class MessageCodingTests: XCTestCase {
 
     func testClientMessageRoundTrip() throws {
-        let messages: [ClientMessage] = [.joinQueue, .leaveQueue, .move(uci: "e7e8q"), .resign]
+        let messages: [ClientMessage] = [
+            .joinQueue, .leaveQueue, .move(uci: "e7e8q"), .resign,
+            .offerDraw, .acceptDraw, .declineDraw,
+        ]
         for message in messages {
             let decoded = try ClientMessage(jsonString: try message.jsonString())
             XCTAssertEqual(decoded, message)
@@ -13,13 +16,19 @@ final class MessageCodingTests: XCTestCase {
 
     func testServerMessageRoundTrip() throws {
         let start = ServerMessage.GameStart(
-            gameID: UUID(), yourColor: "black", opponentName: "Guest-1234", moves: ["e2e4", "c7c5"]
+            gameID: UUID(), yourColor: "black", opponentName: "Guest-1234",
+            opponentRating: 1234, moves: ["e2e4", "c7c5"],
+            clock: ClockState(whiteSeconds: 300, blackSeconds: 287.5)
         )
         let messages: [ServerMessage] = [
             .queued,
             .gameStart(start),
-            .movePlayed(uci: "g1f3"),
-            .gameOver(result: "0-1", reason: "checkmate"),
+            .movePlayed(uci: "g1f3", clock: ClockState(whiteSeconds: 100, blackSeconds: 50)),
+            .movePlayed(uci: "g1f3", clock: nil),
+            .gameOver(.init(result: "0-1", reason: "checkmate", ratingDeltaWhite: -16, ratingDeltaBlack: 16)),
+            .gameOver(.init(result: "1/2-1/2", reason: "drawAgreement")),
+            .drawOffered,
+            .drawDeclined,
             .opponentStatus(connected: false),
             .errorMessage("not your turn"),
         ]
@@ -27,6 +36,19 @@ final class MessageCodingTests: XCTestCase {
             let decoded = try ServerMessage(jsonString: try message.jsonString())
             XCTAssertEqual(decoded, message)
         }
+    }
+
+    func testOptionalFieldsDecodeWhenAbsent() throws {
+        // Older peers may omit clock/rating fields entirely.
+        let start = try ServerMessage(jsonString:
+            #"{"type":"game_start","gameID":"00000000-0000-0000-0000-000000000000","yourColor":"white","opponentName":"X","moves":[]}"#
+        )
+        guard case .gameStart(let payload) = start else { return XCTFail() }
+        XCTAssertNil(payload.clock)
+        XCTAssertNil(payload.opponentRating)
+
+        let move = try ServerMessage(jsonString: #"{"type":"move_played","uci":"e2e4"}"#)
+        XCTAssertEqual(move, .movePlayed(uci: "e2e4", clock: nil))
     }
 
     func testWireFormatUsesTypeDiscriminator() throws {

@@ -56,8 +56,18 @@ docker build -f chess-server/Dockerfile -t chess-server .
 ## Realtime protocol
 
 JSON messages defined in `ChessKit/Sources/ChessOnline` and shared with the
-client. Client sends `join_queue` / `leave_queue` / `move` / `resign`; server
-sends `queued`, `game_start` (also used for reconnect resync), `move_played`,
-`game_over`, `opponent_status`, and `error`. Matchmaking is FIFO; the
-first-queued player gets White. A disconnected player has 60 seconds to
-reconnect before forfeiting by abandonment.
+client. Client sends `join_queue` / `leave_queue` / `move` / `resign` /
+`offer_draw` / `accept_draw` / `decline_draw`; server sends `queued`,
+`game_start` (also used for reconnect resync), `move_played`, `game_over`,
+`draw_offered`, `draw_declined`, `opponent_status`, and `error`.
+
+- **Matchmaking** is FIFO with random color assignment.
+- **Time control** is 5 minutes + 3 seconds increment, enforced server-side;
+  `game_start` and every `move_played` carry both remaining clocks, and a
+  fallen flag ends the game with reason `timeout`.
+- **Draw offers** stay on the table until answered or either side moves.
+- **Ratings**: every user starts at Elo 1200; finished games (including
+  timeouts and abandonments) are rated with K=32. Deltas ride along on
+  `game_over`, and `GET /me` reports the current rating.
+- A disconnected player has 60 seconds to reconnect before forfeiting by
+  abandonment (the chess clock keeps running regardless).

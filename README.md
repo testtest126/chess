@@ -17,8 +17,10 @@ and a Vapor backend for realtime online play.
   alpha-beta negamax search. Tap-to-move board with legal-move hints, last-move
   and check highlights, promotion picker, captured pieces and material count.
 - **Play online** — guest account is created transparently on first use;
-  FIFO matchmaking pairs you with the next player. The server validates every
-  move; disconnected players get 60 seconds to reconnect before forfeiting.
+  FIFO matchmaking pairs you with the next player (random colors). Games are
+  5+3 blitz with server-enforced clocks, draw offers, and Elo ratings. The
+  server validates every move; disconnected players get 60 seconds to
+  reconnect before forfeiting.
 - **Game review** — per-move judgments (best → blunder), Lichess-style
   accuracy, an evaluation graph, and full board playback. Every finished game
   (local or online) is saved on-device with SwiftData.

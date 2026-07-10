@@ -34,13 +34,16 @@ public struct AuthResponse: Codable, Sendable, Equatable {
     public var refreshToken: String
     /// Seconds until the access token expires.
     public var expiresIn: Int
+    /// Elo rating for online play.
+    public var rating: Int?
 
-    public init(userID: UUID, displayName: String, accessToken: String, refreshToken: String, expiresIn: Int) {
+    public init(userID: UUID, displayName: String, accessToken: String, refreshToken: String, expiresIn: Int, rating: Int? = nil) {
         self.userID = userID
         self.displayName = displayName
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.expiresIn = expiresIn
+        self.rating = rating
     }
 }
 
@@ -48,10 +51,12 @@ public struct AuthResponse: Codable, Sendable, Equatable {
 public struct UserDTO: Codable, Sendable, Equatable {
     public var id: UUID
     public var displayName: String
+    public var rating: Int?
 
-    public init(id: UUID, displayName: String) {
+    public init(id: UUID, displayName: String, rating: Int? = nil) {
         self.id = id
         self.displayName = displayName
+        self.rating = rating
     }
 }
 

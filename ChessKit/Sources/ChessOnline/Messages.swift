@@ -5,6 +5,20 @@ import Foundation
 //   {"type":"move","uci":"e2e4"}
 //   {"type":"game_start","gameID":"…","yourColor":"white","opponentName":"…","moves":[]}
 
+// MARK: - Shared payloads
+
+/// Remaining thinking time for both sides, in seconds, as of the moment the
+/// enclosing message was sent. The receiver ticks the active side locally.
+public struct ClockState: Codable, Sendable, Equatable {
+    public var whiteSeconds: Double
+    public var blackSeconds: Double
+
+    public init(whiteSeconds: Double, blackSeconds: Double) {
+        self.whiteSeconds = whiteSeconds
+        self.blackSeconds = blackSeconds
+    }
+}
+
 // MARK: - Client → Server
 
 public enum ClientMessage: Sendable, Equatable {
@@ -16,6 +30,12 @@ public enum ClientMessage: Sendable, Equatable {
     case move(uci: String)
     /// Resign the caller's active game.
     case resign
+    /// Offer the opponent a draw (valid until they move).
+    case offerDraw
+    /// Accept the opponent's pending draw offer.
+    case acceptDraw
+    /// Decline the opponent's pending draw offer.
+    case declineDraw
 }
 
 extension ClientMessage: Codable {
@@ -24,6 +44,9 @@ extension ClientMessage: Codable {
         case leaveQueue = "leave_queue"
         case move
         case resign
+        case offerDraw = "offer_draw"
+        case acceptDraw = "accept_draw"
+        case declineDraw = "decline_draw"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -37,6 +60,9 @@ extension ClientMessage: Codable {
         case .leaveQueue: self = .leaveQueue
         case .move: self = .move(uci: try container.decode(String.self, forKey: .uci))
         case .resign: self = .resign
+        case .offerDraw: self = .offerDraw
+        case .acceptDraw: self = .acceptDraw
+        case .declineDraw: self = .declineDraw
         }
     }
 
@@ -52,6 +78,12 @@ extension ClientMessage: Codable {
             try container.encode(uci, forKey: .uci)
         case .resign:
             try container.encode(Kind.resign, forKey: .type)
+        case .offerDraw:
+            try container.encode(Kind.offerDraw, forKey: .type)
+        case .acceptDraw:
+            try container.encode(Kind.acceptDraw, forKey: .type)
+        case .declineDraw:
+            try container.encode(Kind.declineDraw, forKey: .type)
         }
     }
 }
@@ -65,10 +97,16 @@ public enum ServerMessage: Sendable, Equatable {
     /// `moves` replays the game so far (empty for a fresh match).
     case gameStart(GameStart)
     /// A legal move was played by either side (including echo of your own).
-    case movePlayed(uci: String)
+    /// `clock` reflects both remaining times right after the move.
+    case movePlayed(uci: String, clock: ClockState?)
     /// The game ended. `result` is "1-0"/"0-1"/"1/2-1/2"; `reason` is the raw
-    /// Game.EndReason ("checkmate", "resignation", "abandoned", …).
-    case gameOver(result: String, reason: String)
+    /// Game.EndReason ("checkmate", "resignation", "timeout", "abandoned", …).
+    /// Rating deltas are present for rated games.
+    case gameOver(GameOver)
+    /// The opponent offered a draw (valid until either side moves).
+    case drawOffered
+    /// The opponent declined your draw offer.
+    case drawDeclined
     /// The opponent's connection state changed. Disconnected opponents forfeit
     /// after a grace period unless they reconnect.
     case opponentStatus(connected: Bool)
@@ -80,14 +118,39 @@ public enum ServerMessage: Sendable, Equatable {
         /// "white" or "black".
         public var yourColor: String
         public var opponentName: String
+        public var opponentRating: Int?
         /// UCI moves already played (non-empty only on reconnect).
         public var moves: [String]
+        public var clock: ClockState?
 
-        public init(gameID: UUID, yourColor: String, opponentName: String, moves: [String]) {
+        public init(
+            gameID: UUID,
+            yourColor: String,
+            opponentName: String,
+            opponentRating: Int? = nil,
+            moves: [String],
+            clock: ClockState? = nil
+        ) {
             self.gameID = gameID
             self.yourColor = yourColor
             self.opponentName = opponentName
+            self.opponentRating = opponentRating
             self.moves = moves
+            self.clock = clock
+        }
+    }
+
+    public struct GameOver: Codable, Sendable, Equatable {
+        public var result: String
+        public var reason: String
+        public var ratingDeltaWhite: Int?
+        public var ratingDeltaBlack: Int?
+
+        public init(result: String, reason: String, ratingDeltaWhite: Int? = nil, ratingDeltaBlack: Int? = nil) {
+            self.result = result
+            self.reason = reason
+            self.ratingDeltaWhite = ratingDeltaWhite
+            self.ratingDeltaBlack = ratingDeltaBlack
         }
     }
 }
@@ -98,13 +161,16 @@ extension ServerMessage: Codable {
         case gameStart = "game_start"
         case movePlayed = "move_played"
         case gameOver = "game_over"
+        case drawOffered = "draw_offered"
+        case drawDeclined = "draw_declined"
         case opponentStatus = "opponent_status"
         case error
     }
 
     private enum CodingKeys: String, CodingKey {
         case type, uci, result, reason, connected, message
-        case gameID, yourColor, opponentName, moves
+        case gameID, yourColor, opponentName, opponentRating, moves, clock
+        case ratingDeltaWhite, ratingDeltaBlack
     }
 
     public init(from decoder: Decoder) throws {
@@ -117,15 +183,26 @@ extension ServerMessage: Codable {
                 gameID: try container.decode(UUID.self, forKey: .gameID),
                 yourColor: try container.decode(String.self, forKey: .yourColor),
                 opponentName: try container.decode(String.self, forKey: .opponentName),
-                moves: try container.decode([String].self, forKey: .moves)
+                opponentRating: try container.decodeIfPresent(Int.self, forKey: .opponentRating),
+                moves: try container.decode([String].self, forKey: .moves),
+                clock: try container.decodeIfPresent(ClockState.self, forKey: .clock)
             ))
         case .movePlayed:
-            self = .movePlayed(uci: try container.decode(String.self, forKey: .uci))
-        case .gameOver:
-            self = .gameOver(
-                result: try container.decode(String.self, forKey: .result),
-                reason: try container.decode(String.self, forKey: .reason)
+            self = .movePlayed(
+                uci: try container.decode(String.self, forKey: .uci),
+                clock: try container.decodeIfPresent(ClockState.self, forKey: .clock)
             )
+        case .gameOver:
+            self = .gameOver(GameOver(
+                result: try container.decode(String.self, forKey: .result),
+                reason: try container.decode(String.self, forKey: .reason),
+                ratingDeltaWhite: try container.decodeIfPresent(Int.self, forKey: .ratingDeltaWhite),
+                ratingDeltaBlack: try container.decodeIfPresent(Int.self, forKey: .ratingDeltaBlack)
+            ))
+        case .drawOffered:
+            self = .drawOffered
+        case .drawDeclined:
+            self = .drawDeclined
         case .opponentStatus:
             self = .opponentStatus(connected: try container.decode(Bool.self, forKey: .connected))
         case .error:
@@ -143,14 +220,23 @@ extension ServerMessage: Codable {
             try container.encode(start.gameID, forKey: .gameID)
             try container.encode(start.yourColor, forKey: .yourColor)
             try container.encode(start.opponentName, forKey: .opponentName)
+            try container.encodeIfPresent(start.opponentRating, forKey: .opponentRating)
             try container.encode(start.moves, forKey: .moves)
-        case .movePlayed(let uci):
+            try container.encodeIfPresent(start.clock, forKey: .clock)
+        case .movePlayed(let uci, let clock):
             try container.encode(Kind.movePlayed, forKey: .type)
             try container.encode(uci, forKey: .uci)
-        case .gameOver(let result, let reason):
+            try container.encodeIfPresent(clock, forKey: .clock)
+        case .gameOver(let over):
             try container.encode(Kind.gameOver, forKey: .type)
-            try container.encode(result, forKey: .result)
-            try container.encode(reason, forKey: .reason)
+            try container.encode(over.result, forKey: .result)
+            try container.encode(over.reason, forKey: .reason)
+            try container.encodeIfPresent(over.ratingDeltaWhite, forKey: .ratingDeltaWhite)
+            try container.encodeIfPresent(over.ratingDeltaBlack, forKey: .ratingDeltaBlack)
+        case .drawOffered:
+            try container.encode(Kind.drawOffered, forKey: .type)
+        case .drawDeclined:
+            try container.encode(Kind.drawDeclined, forKey: .type)
         case .opponentStatus(let connected):
             try container.encode(Kind.opponentStatus, forKey: .type)
             try container.encode(connected, forKey: .connected)

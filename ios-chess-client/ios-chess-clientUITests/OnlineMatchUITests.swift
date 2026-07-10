@@ -21,7 +21,7 @@ final class OnlineMatchUITests: XCTestCase {
             throw XCTSkip("chess-server not running on 127.0.0.1:8080")
         }
 
-        // The opponent queues first, so it gets White and the app gets Black.
+        // The opponent bot queues first; color assignment is random.
         let bot = OpponentBot()
         try await bot.registerAndQueue()
 
@@ -29,14 +29,27 @@ final class OnlineMatchUITests: XCTestCase {
         app.launch()
         app.buttons["Play Online"].tap()
 
-        // Match forms as soon as the app joins the queue; the bot opens 1. e4.
-        let openingMove = app.staticTexts["e4"]
-        XCTAssertTrue(openingMove.waitForExistence(timeout: 15), "bot's opening move should appear")
+        // Match forms as soon as the app joins the queue.
+        let board = app.descendants(matching: .any)["square_e2"]
+        XCTAssertTrue(board.waitForExistence(timeout: 15), "board should appear once matched")
 
-        // Reply 1... e5 by tapping.
-        app.descendants(matching: .any)["square_e7"].tap()
-        app.descendants(matching: .any)["square_e5"].tap()
-        XCTAssertTrue(app.staticTexts["e5"].waitForExistence(timeout: 10), "our reply should be accepted and echoed")
+        // Clocks are shown for both sides.
+        XCTAssertTrue(app.staticTexts["clock_white"].waitForExistence(timeout: 5), "white clock should render")
+        XCTAssertTrue(app.staticTexts["clock_black"].exists, "black clock should render")
+
+        // If the bot got White it opens 1. e4 immediately; otherwise we're
+        // White and open ourselves. Either way we make exactly one move.
+        if app.staticTexts["e4"].waitForExistence(timeout: 8) {
+            // We are Black: reply 1... e5.
+            app.descendants(matching: .any)["square_e7"].tap()
+            app.descendants(matching: .any)["square_e5"].tap()
+            XCTAssertTrue(app.staticTexts["e5"].waitForExistence(timeout: 10), "our reply should be accepted and echoed")
+        } else {
+            // We are White: open 1. e4; the bot answers with an engine move.
+            app.descendants(matching: .any)["square_e2"].tap()
+            app.descendants(matching: .any)["square_e4"].tap()
+            XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 10), "our move should be accepted and echoed")
+        }
 
         // Resign and confirm.
         app.buttons["Resign"].firstMatch.tap()
@@ -111,7 +124,7 @@ final class OpponentBot: @unchecked Sendable {
                 color = start.yourColor == "white" ? .white : .black
                 game = (try? Game.from(uciMoves: start.moves)) ?? Game()
                 await moveIfOurTurn(scripted: "e2e4")
-            case .movePlayed(let uci):
+            case .movePlayed(let uci, _):
                 try? game.play(uci: uci)
                 await moveIfOurTurn(scripted: nil)
             case .gameOver:

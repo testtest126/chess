@@ -43,7 +43,8 @@ struct HomeView: View {
                     .listRowBackground(Color.clear)
 
                     if let name = AccountStore.shared.displayName {
-                        Text("Playing as \(name)")
+                        let rating = AccountStore.shared.rating.map { " · Elo \($0)" } ?? ""
+                        Text("Playing as \(name)\(rating)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)

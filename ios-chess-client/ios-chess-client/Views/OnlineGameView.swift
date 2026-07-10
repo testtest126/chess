@@ -48,6 +48,10 @@ struct OnlineGameView: View {
                     Button("Flip", systemImage: "arrow.up.arrow.down") {
                         withAnimation { flipped.toggle() }
                     }
+                    Button("Offer Draw", systemImage: "equal.circle") {
+                        session.offerDraw()
+                    }
+                    .disabled(session.phase != .playing || session.outgoingDrawOffer)
                     Button("Resign", systemImage: "flag.fill") {
                         showResignConfirmation = true
                     }
@@ -58,6 +62,17 @@ struct OnlineGameView: View {
                 "Resign this game?", isPresented: $showResignConfirmation, titleVisibility: .visible
             ) {
                 Button("Resign", role: .destructive) { session.resign() }
+            }
+            .confirmationDialog(
+                "\(session.opponentName) offers a draw",
+                isPresented: Binding(
+                    get: { session.incomingDrawOffer },
+                    set: { if !$0 { session.respondToDrawOffer(accept: false) } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Accept Draw") { session.respondToDrawOffer(accept: true) }
+                Button("Decline", role: .cancel) { session.respondToDrawOffer(accept: false) }
             }
             .sheet(isPresented: $showGameOver) {
                 gameOverSheet
@@ -144,8 +159,15 @@ struct OnlineGameView: View {
         HStack(spacing: 8) {
             Image(systemName: isOpponent ? "person.crop.circle" : "person.fill")
                 .foregroundStyle(.secondary)
-            Text(isOpponent ? session.opponentName : "You")
-                .font(.headline)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(isOpponent ? session.opponentName : "You")
+                    .font(.headline)
+                if isOpponent, let rating = session.opponentRating {
+                    Text("Elo \(rating)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
             if isOpponent && !session.opponentConnected {
                 Label("reconnecting", systemImage: "wifi.slash")
                     .font(.caption)
@@ -154,9 +176,35 @@ struct OnlineGameView: View {
             }
             Spacer()
             CapturedPiecesView(board: session.board, capturer: color)
+            clockView(for: color)
         }
         .playerCardStyle()
         .padding(.horizontal)
+    }
+
+    /// Ticking clock; the active side counts down between server syncs.
+    @ViewBuilder
+    private func clockView(for color: PieceColor) -> some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+            if let seconds = session.remainingSeconds(for: color, at: context.date) {
+                let isRunning = session.phase == .playing && session.board.sideToMove == color
+                Text(Self.formatClock(seconds))
+                    .font(.callout.monospacedDigit().weight(isRunning ? .bold : .regular))
+                    .foregroundStyle(seconds < 30 && isRunning ? .red : (isRunning ? .primary : .secondary))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        isRunning ? Color.accentColor.opacity(0.15) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 6)
+                    )
+                    .accessibilityIdentifier("clock_\(color.rawValue)")
+            }
+        }
+    }
+
+    static func formatClock(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded(.up))
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 
     // MARK: - Game over
@@ -184,6 +232,12 @@ struct OnlineGameView: View {
                 .font(.largeTitle.bold())
             Text(resultDetail)
                 .foregroundStyle(.secondary)
+
+            if let delta = session.ratingDelta {
+                Text("Rating \(delta >= 0 ? "+" : "")\(delta)")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(delta > 0 ? .green : (delta < 0 ? .red : .secondary))
+            }
 
             if session.game.moveCount > 0 {
                 Button {
