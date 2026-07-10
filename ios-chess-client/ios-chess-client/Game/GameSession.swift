@@ -52,8 +52,14 @@ final class GameSession: Identifiable {
     private(set) var hintMove: Move?
     private(set) var isFindingHint = false
 
-    /// Book-backed so games open with variety instead of one deterministic line.
-    private let engine = NegamaxEngine(book: .standard)
+    /// Book-backed so games open with variety instead of one deterministic
+    /// line. The persistent transposition table keeps search work from earlier
+    /// moves (and from pondering on the player's time) so later searches
+    /// start warm.
+    private let engine = PersistentNegamaxEngine(book: .standard)
+    /// Speculative search of the expected reply, running while the player
+    /// thinks. Results are discarded; the warm table is the payoff.
+    private var ponderTask: Task<Void, Never>?
 
     init(playerColor: PieceColor, difficulty: Difficulty) {
         self.playerColor = playerColor
@@ -65,9 +71,11 @@ final class GameSession: Identifiable {
     var lastMove: Move? { game.history.last?.move }
     var isPlayerTurn: Bool { !game.isOver && board.sideToMove == playerColor && !isEngineThinking }
 
-    /// Kick off the engine's first move when the player is Black.
+    /// Kick off the engine's first move when the player is Black — or start
+    /// pondering right away when the player opens the game.
     func start() {
         engineMoveIfNeeded()
+        if isPlayerTurn { startPondering() }
     }
 
     func playPlayerMove(_ move: Move) {
@@ -77,6 +85,7 @@ final class GameSession: Identifiable {
         SoundPlayer.playMove(move, on: boardBefore)
         if game.isOver { SoundPlayer.play(.gameEnd) }
         hintMove = nil
+        stopPondering()
         engineMoveIfNeeded()
     }
 
@@ -88,15 +97,19 @@ final class GameSession: Identifiable {
     func takeBack() {
         guard canTakeBack else { return }
         hintMove = nil
+        stopPondering()
         if let rewound = try? Game.from(uciMoves: game.uciMoves.dropLast(2).map { $0 }) {
             game = rewound
         }
     }
 
     /// Asks the engine what it would play for the player; shown on the board.
+    /// Pondering stops first so the hint search gets the engine immediately —
+    /// and it usually rides the table the ponder just filled.
     func requestHint() {
         guard isPlayerTurn, hintMove == nil, !isFindingHint else { return }
         isFindingHint = true
+        stopPondering()
         let position = board
         let engine = self.engine
 
@@ -114,6 +127,7 @@ final class GameSession: Identifiable {
 
     func resign() {
         guard !game.isOver else { return }
+        stopPondering()
         game.end(
             result: playerColor == .white ? .blackWins : .whiteWins,
             reason: .resignation
@@ -154,6 +168,33 @@ final class GameSession: Identifiable {
             guard (try? game.play(move)) != nil else { return }
             SoundPlayer.playMove(move, on: boardBefore)
             if game.isOver { SoundPlayer.play(.gameEnd) }
+            // The player is on the move now — think on their time.
+            startPondering()
         }
+    }
+
+    /// Ponder on the player's time: predict their reply and search the
+    /// position that would follow, filling the engine's persistent table so
+    /// the real search after their actual move starts warm. The result is
+    /// thrown away — only the table matters.
+    private func startPondering() {
+        guard !game.isOver, board.sideToMove == playerColor else { return }
+        let position = board
+        let engine = self.engine
+        let limit = difficulty.limit
+
+        ponderTask = Task.detached(priority: .utility) {
+            guard !Task.isCancelled else { return }
+            engine.ponder(position, limit: limit)
+        }
+    }
+
+    /// Cancels a not-yet-started ponder task and interrupts a running one.
+    /// Safe to call when nothing is pondering; a real engine search started
+    /// afterwards is unaffected (the stop flag resets on each new search).
+    private func stopPondering() {
+        ponderTask?.cancel()
+        ponderTask = nil
+        engine.stopSearch()
     }
 }

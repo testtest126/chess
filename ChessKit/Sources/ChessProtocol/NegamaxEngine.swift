@@ -30,6 +30,14 @@ public struct NegamaxEngine: ChessEngine {
     }
 
     public func search(_ board: Board, limit: SearchLimit) -> SearchResult {
+        search(board, limit: limit, session: Search(limit: limit))
+    }
+
+    /// The full search driver, parameterized on the mutable session so
+    /// ``PersistentNegamaxEngine`` can inject one whose transposition table
+    /// survives across calls. The public `search` always passes a fresh
+    /// session, keeping the value-type engine deterministic.
+    func search(_ board: Board, limit: SearchLimit, session search: Search) -> SearchResult {
         if let bookMove = book?.moves(for: board).randomElement(), board.isLegal(bookMove) {
             return SearchResult(bestMove: bookMove, scoreCentipawns: 0, depth: 0, nodes: 0)
         }
@@ -47,7 +55,6 @@ public struct NegamaxEngine: ChessEngine {
             )
         }
 
-        let search = Search(limit: limit)
         var orderedRoot = search.ordered(rootMoves, in: board, first: nil, ply: 0)
         var bestMove = orderedRoot[0]
         var bestScore = 0
@@ -142,7 +149,12 @@ public struct NegamaxEngine: ChessEngine {
 /// Mutable state for one `search` call: node counting, limit tracking, the
 /// transposition table, killer/history ordering data, and the recursive
 /// routines. Reference semantics keep the hot path free of `inout`.
-private final class Search {
+///
+/// The transposition table can be seeded from a previous session (and read
+/// back afterwards) so ``PersistentNegamaxEngine`` can carry it across moves;
+/// killers and history stay per-session because their ply indexing is only
+/// meaningful relative to one root.
+final class Search {
     var nodes = 0
     var aborted = false
     /// The depth-1 pass runs with aborts disabled so a move always comes back.
@@ -158,11 +170,11 @@ private final class Search {
     /// Null-move depth reduction (R = 2, applied on top of the normal -1).
     private static let nullMoveReduction = 2
 
-    private enum Bound {
+    enum Bound {
         case exact, lower, upper
     }
 
-    private struct TTEntry {
+    struct TTEntry {
         let depth: Int
         /// Mate scores are stored relative to the entry's node (see
         /// `storeScore`/`probeScore`) so they stay correct at any ply.
@@ -171,7 +183,8 @@ private final class Search {
         let move: Move?
     }
 
-    private var table: [UInt64: TTEntry] = [:]
+    /// Readable after the search so a persistent engine can keep it warm.
+    private(set) var table: [UInt64: TTEntry]
     /// Two killer (quiet refutation) moves per ply.
     private var killers = [(Move?, Move?)](repeating: (nil, nil), count: maxKillerPly)
     /// Quiet-move history scores indexed by from*64+to, bumped on cutoffs.
@@ -179,20 +192,29 @@ private final class Search {
 
     private let maxNodes: Int?
     private let deadline: ContinuousClock.Instant?
+    /// Optional external interrupt (e.g. "the opponent moved, stop pondering").
+    private let stop: SearchStopSignal?
 
-    init(limit: SearchLimit) {
+    init(limit: SearchLimit, table: [UInt64: TTEntry] = [:], stop: SearchStopSignal? = nil) {
+        self.table = table
+        self.stop = stop
         self.maxNodes = limit.maxNodes
         self.deadline = limit.moveTime.map { ContinuousClock.now + .seconds($0) }
     }
 
-    /// Checks limits (time only every 1024 nodes — clock reads aren't free).
+    /// Checks limits (time and the stop signal only every 1024 nodes — clock
+    /// reads and lock acquisitions aren't free).
     private func checkAbort() -> Bool {
         if aborted { return true }
         guard abortAllowed else { return false }
         if let maxNodes, nodes >= maxNodes {
             aborted = true
-        } else if nodes & 1023 == 0, let deadline, ContinuousClock.now >= deadline {
-            aborted = true
+        } else if nodes & 1023 == 0 {
+            if let stop, stop.isStopRequested {
+                aborted = true
+            } else if let deadline, ContinuousClock.now >= deadline {
+                aborted = true
+            }
         }
         return aborted
     }
