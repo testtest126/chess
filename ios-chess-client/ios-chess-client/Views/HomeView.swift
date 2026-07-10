@@ -292,7 +292,7 @@ struct HomeView: View {
                 switch result {
                 case .success(let authorization):
                     guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-                        signInError = "Unexpected credential type"
+                        signInError = String(localized: "Unexpected credential type", comment: "Sign in with Apple error")
                         return
                     }
                     try await AccountStore.shared.signInWithApple(
@@ -301,13 +301,14 @@ struct HomeView: View {
                     )
                 case .failure(let error):
                     if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
-                        signInError = "Sign in with Apple failed: \(error.localizedDescription)"
+                        signInError = String(localized: "Sign in with Apple failed: \(error.localizedDescription)",
+                                             comment: "Sign in with Apple error; parameter is the system error message")
                     }
                 }
             } catch AccountError.server(let status) {
-                signInError = "Server error (\(status))"
+                signInError = String(localized: "Server error (\(status))", comment: "Account error; parameter is the HTTP status code")
             } catch {
-                signInError = "Couldn't sign in. Try again later."
+                signInError = String(localized: "Couldn't sign in. Try again later.", comment: "Sign in with Apple error")
             }
             isSigningInWithApple = false
         }
