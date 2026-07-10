@@ -13,7 +13,7 @@ final class GameFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        app.buttons["Start Game"].tap()
+        tapStartGame(in: app)
 
         // Play 1. e4 by tapping the pawn's square, then the target square.
         let e2 = app.descendants(matching: .any)["square_e2"]
@@ -58,7 +58,7 @@ final class GameFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        app.buttons["Start Game"].tap()
+        tapStartGame(in: app)
 
         let e2 = app.descendants(matching: .any)["square_e2"]
         XCTAssertTrue(e2.waitForExistence(timeout: 5), "board should appear")
@@ -85,5 +85,22 @@ final class GameFlowUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// The home screen's List has grown past one screenful (time controls,
+    /// difficulty, resume banner), and row heights differ between toolchains —
+    /// with Xcode 16's bordered buttons, "Start Game" can start below the
+    /// fold. XCUITest doesn't auto-scroll, so swipe until it's hittable.
+    @MainActor
+    private func tapStartGame(in app: XCUIApplication) {
+        let button = app.buttons["Start Game"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "home screen should show Start Game")
+        var swipes = 0
+        while !button.isHittable && swipes < 5 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(button.isHittable, "Start Game should be reachable by scrolling")
+        button.tap()
     }
 }
