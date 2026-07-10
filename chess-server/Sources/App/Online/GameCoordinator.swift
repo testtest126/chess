@@ -235,6 +235,8 @@ actor GameCoordinator {
             declineDraw(userID: userID)
         case .requestRematch:
             await requestRematch(userID: userID)
+        case .declineRematch:
+            declineRematch(userID: userID)
         }
     }
 
@@ -263,6 +265,18 @@ actor GameCoordinator {
         } else {
             send(.rematchOffered, to: socketsByUser[opponentID])
         }
+    }
+
+    /// Declining kills the slot for both players. The opponent hears
+    /// `rematchDeclined` if they had asked — `rematchUnavailable` otherwise,
+    /// since a decline out of the blue would read as answering an offer they
+    /// never made.
+    private func declineRematch(userID: UUID) {
+        guard let slotID = rematchSlotByUser[userID], let slot = rematchSlots[slotID] else { return }
+        dropRematchSlot(slotID)
+        guard let opponentID = slot.opponent(of: userID) else { return }
+        send(slot.requested.contains(opponentID) ? .rematchDeclined : .rematchUnavailable,
+             to: socketsByUser[opponentID])
     }
 
     /// Removes `userID` from any pending rematch, telling the other player.

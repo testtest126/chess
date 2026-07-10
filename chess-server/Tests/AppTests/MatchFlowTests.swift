@@ -402,6 +402,33 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testRematchDeclineNotifiesOfferer() async throws {
+        let match = try await startMatch()
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+
+        try await match.black.send(.declineRematch)
+        guard case .rematchDeclined = try await match.white.next() else {
+            return XCTFail("expected rematch decline relay")
+        }
+
+        // Declining killed the slot for both players.
+        try await match.white.send(.requestRematch)
+        guard case .errorMessage = try await match.white.next() else {
+            return XCTFail("expected no-rematch error after decline")
+        }
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testUnauthenticatedSocketIsClosed() async throws {
         do {
             let socket = try await TestSocket.connect(port: port, token: "garbage", on: app.eventLoopGroup)

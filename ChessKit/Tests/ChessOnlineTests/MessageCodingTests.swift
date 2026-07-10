@@ -8,7 +8,7 @@ final class MessageCodingTests: XCTestCase {
             .joinQueue(timeControl: .bullet), .joinQueue(timeControl: .blitz),
             .joinQueue(timeControl: .rapid),
             .leaveQueue, .move(uci: "e7e8q"), .resign,
-            .offerDraw, .acceptDraw, .declineDraw, .requestRematch,
+            .offerDraw, .acceptDraw, .declineDraw, .requestRematch, .declineRematch,
         ]
         for message in messages {
             let decoded = try ClientMessage(jsonString: try message.jsonString())
@@ -33,6 +33,7 @@ final class MessageCodingTests: XCTestCase {
             .drawOffered,
             .drawDeclined,
             .rematchOffered,
+            .rematchDeclined,
             .rematchUnavailable,
             .opponentStatus(connected: false),
             .errorMessage("not your turn"),
