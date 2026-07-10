@@ -185,6 +185,52 @@ struct BoardView: View {
         .accessibilityElement()
         .accessibilityIdentifier("square_\(Sq.name(sq))")
         .accessibilityLabel(accessibilityDescription(sq))
+        .accessibilityValue(Self.accessibilityValue(
+            square: sq,
+            selected: selectedSquare,
+            legalTargets: legalTargets,
+            lastMove: lastMove,
+            hintMove: hintMove,
+            checkedKing: checkedKingSquare
+        ))
+        .accessibilityAddTraits(squareTraits(sq))
+    }
+
+    /// Squares act as buttons on interactive boards; the picked-up square
+    /// reads as selected.
+    private func squareTraits(_ sq: Int) -> AccessibilityTraits {
+        guard onMove != nil else { return [] }
+        return selectedSquare == sq ? [.isButton, .isSelected] : .isButton
+    }
+
+    /// VoiceOver state for a square — everything the highlights show visually:
+    /// "selected", "possible move", "last move", "hint", "in check". Empty for
+    /// a plain square. Static and state-injected so tests can cover the matrix.
+    static func accessibilityValue(
+        square: Int,
+        selected: Int?,
+        legalTargets: Set<Int>,
+        lastMove: Move?,
+        hintMove: Move?,
+        checkedKing: Int?
+    ) -> String {
+        var parts: [String] = []
+        if selected == square {
+            parts.append(String(localized: "selected", comment: "VoiceOver square state"))
+        }
+        if legalTargets.contains(square) {
+            parts.append(String(localized: "possible move", comment: "VoiceOver square state"))
+        }
+        if lastMove?.from == square || lastMove?.to == square {
+            parts.append(String(localized: "last move", comment: "VoiceOver square state"))
+        }
+        if hintMove?.from == square || hintMove?.to == square {
+            parts.append(String(localized: "hint", comment: "VoiceOver square state"))
+        }
+        if checkedKing == square {
+            parts.append(String(localized: "in check", comment: "VoiceOver square state"))
+        }
+        return parts.joined(separator: ", ")
     }
 
     @ViewBuilder
