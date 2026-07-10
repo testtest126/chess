@@ -7,6 +7,41 @@ import Foundation
 
 // MARK: - Shared payloads
 
+/// A named time control a player can queue for. The raw value is the wire
+/// string carried by join_queue and echoed back in game_start.
+public enum TimeControl: String, Codable, Sendable, CaseIterable, Equatable {
+    case bullet
+    case blitz
+    case rapid
+
+    /// Seconds each side starts with.
+    public var initialSeconds: Double {
+        switch self {
+        case .bullet: return 60
+        case .blitz: return 300
+        case .rapid: return 600
+        }
+    }
+
+    /// Seconds added to a side's clock after each of its moves.
+    public var incrementSeconds: Double {
+        switch self {
+        case .bullet: return 0
+        case .blitz: return 3
+        case .rapid: return 5
+        }
+    }
+
+    /// Conventional "minutes+increment" notation: "1+0", "5+3", "10+5".
+    public var shortLabel: String {
+        "\(Int(initialSeconds) / 60)+\(Int(incrementSeconds))"
+    }
+
+    /// Peers that predate time controls always played 5+3, so blitz is
+    /// assumed whenever the field is absent from a message.
+    public static let `default`: TimeControl = .blitz
+}
+
 /// Remaining thinking time for both sides, in seconds, as of the moment the
 /// enclosing message was sent. The receiver ticks the active side locally.
 public struct ClockState: Codable, Sendable, Equatable {
@@ -22,8 +57,9 @@ public struct ClockState: Codable, Sendable, Equatable {
 // MARK: - Client → Server
 
 public enum ClientMessage: Sendable, Equatable {
-    /// Enter the matchmaking queue.
-    case joinQueue
+    /// Enter the matchmaking queue for the given time control. Only players
+    /// waiting for the same control are paired.
+    case joinQueue(timeControl: TimeControl)
     /// Leave the queue before a match is found.
     case leaveQueue
     /// Play a move in the caller's active game.
@@ -54,13 +90,17 @@ extension ClientMessage: Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, uci
+        case type, uci, timeControl
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(Kind.self, forKey: .type) {
-        case .joinQueue: self = .joinQueue
+        case .joinQueue:
+            // Absent on peers that predate selectable controls: assume 5+3.
+            self = .joinQueue(timeControl:
+                try container.decodeIfPresent(TimeControl.self, forKey: .timeControl) ?? .default
+            )
         case .leaveQueue: self = .leaveQueue
         case .move: self = .move(uci: try container.decode(String.self, forKey: .uci))
         case .resign: self = .resign
@@ -74,8 +114,9 @@ extension ClientMessage: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .joinQueue:
+        case .joinQueue(let timeControl):
             try container.encode(Kind.joinQueue, forKey: .type)
+            try container.encode(timeControl, forKey: .timeControl)
         case .leaveQueue:
             try container.encode(Kind.leaveQueue, forKey: .type)
         case .move(let uci):
@@ -133,6 +174,8 @@ public enum ServerMessage: Sendable, Equatable {
         /// UCI moves already played (non-empty only on reconnect).
         public var moves: [String]
         public var clock: ClockState?
+        /// The control this game is played at (nil from older servers).
+        public var timeControl: TimeControl?
 
         public init(
             gameID: UUID,
@@ -140,7 +183,8 @@ public enum ServerMessage: Sendable, Equatable {
             opponentName: String,
             opponentRating: Int? = nil,
             moves: [String],
-            clock: ClockState? = nil
+            clock: ClockState? = nil,
+            timeControl: TimeControl? = nil
         ) {
             self.gameID = gameID
             self.yourColor = yourColor
@@ -148,6 +192,7 @@ public enum ServerMessage: Sendable, Equatable {
             self.opponentRating = opponentRating
             self.moves = moves
             self.clock = clock
+            self.timeControl = timeControl
         }
     }
 
@@ -182,7 +227,7 @@ extension ServerMessage: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case type, uci, result, reason, connected, message
-        case gameID, yourColor, opponentName, opponentRating, moves, clock
+        case gameID, yourColor, opponentName, opponentRating, moves, clock, timeControl
         case ratingDeltaWhite, ratingDeltaBlack
     }
 
@@ -198,7 +243,8 @@ extension ServerMessage: Codable {
                 opponentName: try container.decode(String.self, forKey: .opponentName),
                 opponentRating: try container.decodeIfPresent(Int.self, forKey: .opponentRating),
                 moves: try container.decode([String].self, forKey: .moves),
-                clock: try container.decodeIfPresent(ClockState.self, forKey: .clock)
+                clock: try container.decodeIfPresent(ClockState.self, forKey: .clock),
+                timeControl: try container.decodeIfPresent(TimeControl.self, forKey: .timeControl)
             ))
         case .movePlayed:
             self = .movePlayed(
@@ -240,6 +286,7 @@ extension ServerMessage: Codable {
             try container.encodeIfPresent(start.opponentRating, forKey: .opponentRating)
             try container.encode(start.moves, forKey: .moves)
             try container.encodeIfPresent(start.clock, forKey: .clock)
+            try container.encodeIfPresent(start.timeControl, forKey: .timeControl)
         case .movePlayed(let uci, let clock):
             try container.encode(Kind.movePlayed, forKey: .type)
             try container.encode(uci, forKey: .uci)
