@@ -7,6 +7,7 @@ struct LeaderboardView: View {
 
     @State private var entries: [LeaderboardEntry]?
     @State private var loadFailed = false
+    @State private var selectedPlayer: LeaderboardEntry?
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,9 @@ struct LeaderboardView: View {
             }
             .task { await load() }
             .refreshable { await load() }
+            .sheet(item: $selectedPlayer) { entry in
+                PlayerProfileView(entry: entry)
+            }
         }
     }
 
@@ -48,6 +52,9 @@ struct LeaderboardView: View {
         List {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 let isMe = entry.id == AccountStore.shared.userID
+                Button {
+                    selectedPlayer = entry
+                } label: {
                 HStack(spacing: 12) {
                     rankBadge(index + 1)
                     VStack(alignment: .leading, spacing: 1) {
@@ -61,6 +68,9 @@ struct LeaderboardView: View {
                     Text("\(entry.rating)")
                         .font(.title3.monospacedDigit().bold())
                 }
+                .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 .listRowBackground(isMe ? Color.accentColor.opacity(0.12) : nil)
             }
         }

@@ -10,7 +10,7 @@ struct HomeView: View {
     @Query(sort: \SavedGame.date, order: .reverse) private var savedGames: [SavedGame]
 
     @State private var colorChoice: ColorChoice = .white
-    @State private var difficulty: Difficulty = .casual
+    @AppStorage(Difficulty.storageKey) private var difficultyRaw = Difficulty.casual.rawValue
     @AppStorage(TimeControl.storageKey) private var timeControlRaw = TimeControl.default.rawValue
     @State private var activeSession: GameSession?
     @State private var onlineSession: OnlineGameSession?
@@ -167,16 +167,16 @@ struct HomeView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    Picker("Engine strength", selection: $difficulty) {
+                    Picker("Engine strength", selection: $difficultyRaw) {
                         ForEach(Difficulty.allCases) { level in
-                            Text(level.label).tag(level)
+                            Text(level.label).tag(level.rawValue)
                         }
                     }
 
                     Button {
                         activeSession = GameSession(
                             playerColor: colorChoice.resolved,
-                            difficulty: difficulty
+                            difficulty: Difficulty(rawValue: difficultyRaw) ?? .casual
                         )
                     } label: {
                         Label("Start Game", systemImage: "play.fill")

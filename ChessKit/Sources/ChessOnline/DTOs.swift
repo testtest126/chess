@@ -99,6 +99,37 @@ public struct LeaderboardEntry: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+// MARK: - Player profiles
+
+/// GET /players/:id — a player's public profile: rating and lifetime record.
+/// Visible to any signed-in player (like the leaderboard); game *contents*
+/// remain participants-only.
+public struct PlayerProfileDTO: Codable, Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var displayName: String
+    public var rating: Int
+    public var wins: Int
+    public var draws: Int
+    public var losses: Int
+    public var memberSince: Date
+
+    /// Finished online games.
+    public var games: Int { wins + draws + losses }
+
+    public init(
+        id: UUID, displayName: String, rating: Int,
+        wins: Int, draws: Int, losses: Int, memberSince: Date
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.rating = rating
+        self.wins = wins
+        self.draws = draws
+        self.losses = losses
+        self.memberSince = memberSince
+    }
+}
+
 // MARK: - Game history
 
 /// GET /games and GET /games/:id

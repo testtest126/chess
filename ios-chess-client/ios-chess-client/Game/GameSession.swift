@@ -7,6 +7,9 @@ import ChessProtocol
 enum Difficulty: String, CaseIterable, Codable, Identifiable {
     case beginner, casual, club, expert
 
+    /// The Home screen's last-picked level, persisted in UserDefaults.
+    static let storageKey = "engine_difficulty"
+
     var id: String { rawValue }
 
     var label: String {
@@ -20,10 +23,26 @@ enum Difficulty: String, CaseIterable, Codable, Identifiable {
 
     var limit: SearchLimit {
         switch self {
-        case .beginner: return SearchLimit(depth: 1)
+        // Depth 1 alone still punishes every hanging piece through the
+        // quiescence search; the node cap cuts those dives short.
+        case .beginner: return SearchLimit(depth: 1, maxNodes: 1_000)
         case .casual: return SearchLimit(depth: 2, moveTime: 0.5)
         case .club: return SearchLimit(depth: 4, moveTime: 1.0)
         case .expert: return SearchLimit(depth: 6, moveTime: 2.5)
+        }
+    }
+
+    /// Whether this level opens from the book. Beginners shouldn't play
+    /// perfect theory; their opening variety comes from `blunderChance`.
+    var usesBook: Bool { self != .beginner }
+
+    /// Whether this level thinks on the player's time. Pondering warms the
+    /// persistent table — a strength boost the lower tiers shouldn't get, and
+    /// battery a casual game shouldn't spend.
+    var ponders: Bool {
+        switch self {
+        case .beginner, .casual: return false
+        case .club, .expert: return true
         }
     }
 
@@ -52,11 +71,11 @@ final class GameSession: Identifiable {
     private(set) var hintMove: Move?
     private(set) var isFindingHint = false
 
-    /// Book-backed so games open with variety instead of one deterministic
-    /// line. The persistent transposition table keeps search work from earlier
-    /// moves (and from pondering on the player's time) so later searches
-    /// start warm.
-    private let engine = PersistentNegamaxEngine(book: .standard)
+    /// Book-backed (on levels that use it) so games open with variety instead
+    /// of one deterministic line. The persistent transposition table keeps
+    /// search work from earlier moves (and from pondering on the player's
+    /// time) so later searches start warm.
+    private let engine: PersistentNegamaxEngine
     /// Speculative search of the expected reply, running while the player
     /// thinks. Results are discarded; the warm table is the payoff.
     private var ponderTask: Task<Void, Never>?
@@ -65,6 +84,7 @@ final class GameSession: Identifiable {
         self.playerColor = playerColor
         self.difficulty = difficulty
         self.game = Game()
+        self.engine = PersistentNegamaxEngine(book: difficulty.usesBook ? .standard : nil)
     }
 
     var board: Board { game.board }
@@ -178,7 +198,7 @@ final class GameSession: Identifiable {
     /// the real search after their actual move starts warm. The result is
     /// thrown away — only the table matters.
     private func startPondering() {
-        guard !game.isOver, board.sideToMove == playerColor else { return }
+        guard difficulty.ponders, !game.isOver, board.sideToMove == playerColor else { return }
         let position = board
         let engine = self.engine
         let limit = difficulty.limit
