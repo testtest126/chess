@@ -22,8 +22,10 @@ primary_region = "waw"
 
 [env]
   LOG_LEVEL = "info"
-  # The auth rate limiter (PR #77) keys on the Fly-appended X-Forwarded-For
-  # entry; behind Fly's proxy this is safe to trust.
+  # The auth rate limiter keys on Fly-Client-IP (canonical on Fly; the
+  # rightmost X-Forwarded-For entry here is the app's own IP). Trusting
+  # proxy headers is safe behind Fly's proxy and required for per-client
+  # rate limiting to work at all.
   TRUST_PROXY_HEADERS = "true"
 
 [http_service]
