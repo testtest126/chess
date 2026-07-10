@@ -62,10 +62,14 @@ client. Client sends `join_queue` / `leave_queue` / `move` / `resign` /
 `game_start` (also used for reconnect resync), `move_played`, `game_over`,
 `draw_offered`, `draw_declined`, `opponent_status`, and `error`.
 
-- **Matchmaking** is FIFO with random color assignment.
-- **Time control** is 5 minutes + 3 seconds increment, enforced server-side;
-  `game_start` and every `move_played` carry both remaining clocks, and a
-  fallen flag ends the game with reason `timeout`.
+- **Matchmaking** is FIFO per time control (only players who asked for the
+  same control are paired), with random color assignment.
+- **Time controls**: `join_queue` names one of `bullet` (1+0), `blitz` (5+3),
+  or `rapid` (10+5); a missing field means blitz, the fixed control that
+  predates the picker. Clocks are enforced server-side; `game_start` echoes
+  the control and both remaining clocks, every `move_played` carries both
+  clocks, and a fallen flag ends the game with reason `timeout`. Rematches
+  reuse the finished game's control.
 - **Draw offers** stay on the table until answered or either side moves.
 - **Ratings**: every user starts at Elo 1200; finished games (including
   timeouts and abandonments) are rated with K=32. Deltas ride along on

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import ChessKit
+import ChessOnline
 import AuthenticationServices
 
 /// Root screen: start a new game against the engine, or revisit past games.
@@ -10,6 +11,7 @@ struct HomeView: View {
 
     @State private var colorChoice: ColorChoice = .white
     @State private var difficulty: Difficulty = .casual
+    @AppStorage(TimeControl.storageKey) private var timeControlRaw = TimeControl.default.rawValue
     @State private var activeSession: GameSession?
     @State private var onlineSession: OnlineGameSession?
     @State private var reviewTarget: SavedGame?
@@ -39,9 +41,21 @@ struct HomeView: View {
         NavigationStack {
             List {
                 Section("Play Online") {
+                    // Bare speed names: three notated segments ("Blitz 5+3")
+                    // truncate on narrow phones. The notation shows up on the
+                    // matchmaking screen and the in-game title instead.
+                    Picker("Time control", selection: $timeControlRaw) {
+                        ForEach(TimeControl.allCases, id: \.rawValue) { control in
+                            Text(control.label).tag(control.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
                     // Guest-first: online play never requires signing in.
                     Button {
-                        onlineSession = OnlineGameSession()
+                        onlineSession = OnlineGameSession(
+                            timeControl: TimeControl(rawValue: timeControlRaw) ?? .default
+                        )
                     } label: {
                         Label("Play Online", systemImage: "globe")
                             .frame(maxWidth: .infinity)
