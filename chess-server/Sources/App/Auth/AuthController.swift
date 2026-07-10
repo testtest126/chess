@@ -5,7 +5,9 @@ import ChessOnline
 
 struct AuthController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
-        let auth = routes.grouped("auth")
+        // All three endpoints are unauthenticated (or pre-authentication),
+        // so they share the per-IP throttle.
+        let auth = routes.grouped("auth").grouped(AuthRateLimitMiddleware())
         auth.post("register", use: register)
         auth.post("refresh", use: refresh)
         auth.post("apple", use: signInWithApple)
