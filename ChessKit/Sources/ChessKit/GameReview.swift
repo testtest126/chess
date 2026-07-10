@@ -126,7 +126,10 @@ public struct GameReview: Sendable {
 
     /// The built-in evaluator: one-ply minimax over the static evaluation,
     /// returning both the value and the move that attains it.
-    public static let lookaheadEvaluator: Evaluator = { board in
+    /// Typed `@Sendable` (it captures nothing) so the shared static is
+    /// concurrency-safe in the Swift 6 language mode; it converts to the
+    /// plain `Evaluator` function type at every use site.
+    public static let lookaheadEvaluator: @Sendable (Board) -> PositionAssessment = { board in
         let moves = board.legalMoves()
         guard !moves.isEmpty else {
             return PositionAssessment(score: board.evaluate())
