@@ -22,7 +22,18 @@ final class OnlineGameSession: Identifiable {
     private(set) var game = Game()
     private(set) var playerColor: PieceColor = .white
     private(set) var opponentName = "Opponent"
+    private(set) var opponentRating: Int?
     private(set) var opponentConnected = true
+
+    /// Server-reported clock and when we received it; the active side's
+    /// display ticks down locally from this reference point.
+    private(set) var clock: ClockState?
+    private(set) var clockSyncedAt = Date()
+
+    private(set) var incomingDrawOffer = false
+    private(set) var outgoingDrawOffer = false
+    /// The player's own Elo change, once the game is over.
+    private(set) var ratingDelta: Int?
 
     private let account: AccountStore
     private var client: OnlineGameClient?
@@ -63,6 +74,29 @@ final class OnlineGameSession: Identifiable {
     func resign() {
         guard let client, phase == .playing else { return }
         Task { try? await client.send(.resign) }
+    }
+
+    func offerDraw() {
+        guard let client, phase == .playing, !outgoingDrawOffer else { return }
+        outgoingDrawOffer = true
+        Task { try? await client.send(.offerDraw) }
+    }
+
+    func respondToDrawOffer(accept: Bool) {
+        guard let client, incomingDrawOffer else { return }
+        incomingDrawOffer = false
+        Task { try? await client.send(accept ? .acceptDraw : .declineDraw) }
+    }
+
+    /// Remaining seconds for `color` as displayed at `date` (the active side
+    /// ticks down between server updates), or nil before the game starts.
+    func remainingSeconds(for color: PieceColor, at date: Date) -> Double? {
+        guard let clock else { return nil }
+        var value = color == .white ? clock.whiteSeconds : clock.blackSeconds
+        if phase == .playing, !game.isOver, board.sideToMove == color {
+            value -= date.timeIntervalSince(clockSyncedAt)
+        }
+        return max(0, value)
     }
 
     // MARK: - Connection loop
@@ -113,24 +147,44 @@ final class OnlineGameSession: Identifiable {
         case .gameStart(let start):
             playerColor = start.yourColor == "black" ? .black : .white
             opponentName = start.opponentName
+            opponentRating = start.opponentRating
             opponentConnected = true
             game = (try? Game.from(uciMoves: start.moves)) ?? Game()
+            clock = start.clock
+            clockSyncedAt = Date()
             phase = .playing
 
-        case .movePlayed(let uci):
+        case .movePlayed(let uci, let newClock):
             try? game.play(uci: uci)
+            if let newClock {
+                clock = newClock
+                clockSyncedAt = Date()
+            }
+            // Any move sweeps draw offers off the table (mirrors the server).
+            incomingDrawOffer = false
+            outgoingDrawOffer = false
 
-        case .gameOver(let result, let reason):
-            let gameResult = Game.Result(rawValue: result) ?? .draw
-            let endReason = Game.EndReason(rawValue: reason)
+        case .gameOver(let over):
+            let gameResult = Game.Result(rawValue: over.result) ?? .draw
+            let endReason = Game.EndReason(rawValue: over.reason)
             // Mirror the terminal state locally for terminal reasons the
-            // board can't infer (resignation, abandonment).
+            // board can't infer (resignation, timeout, abandonment).
             if !game.isOver {
                 game.end(result: gameResult, reason: endReason ?? .abandoned)
+            }
+            ratingDelta = playerColor == .white ? over.ratingDeltaWhite : over.ratingDeltaBlack
+            if let delta = ratingDelta {
+                account.applyRatingDelta(delta)
             }
             phase = .finished(result: gameResult, reason: endReason)
             isTerminal = true
             client?.close()
+
+        case .drawOffered:
+            incomingDrawOffer = true
+
+        case .drawDeclined:
+            outgoingDrawOffer = false
 
         case .opponentStatus(let connected):
             opponentConnected = connected

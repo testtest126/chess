@@ -10,14 +10,33 @@ final class User: Model, Content, @unchecked Sendable {
     @Field(key: "display_name")
     var displayName: String
 
+    /// Elo rating for online play.
+    @Field(key: "rating")
+    var rating: Int
+
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
 
+    static let initialRating = 1200
+
     init() {}
 
-    init(id: UUID? = nil, displayName: String) {
+    init(id: UUID? = nil, displayName: String, rating: Int = User.initialRating) {
         self.id = id
         self.displayName = displayName
+        self.rating = rating
+    }
+}
+
+/// Standard Elo with K=32.
+enum Elo {
+    static let kFactor = 32.0
+
+    /// Rating change for a player scoring `score` (1 win, 0.5 draw, 0 loss)
+    /// against an opponent. Positive means the player gains points.
+    static func delta(rating: Int, opponent: Int, score: Double) -> Int {
+        let expected = 1.0 / (1.0 + pow(10.0, Double(opponent - rating) / 400.0))
+        return Int((kFactor * (score - expected)).rounded())
     }
 }
 

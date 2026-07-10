@@ -11,7 +11,7 @@ struct UsersController: RouteCollection {
     @Sendable
     func me(req: Request) async throws -> UserDTO {
         let user = try await req.authenticatedUser()
-        return UserDTO(id: try user.requireID(), displayName: user.displayName)
+        return UserDTO(id: try user.requireID(), displayName: user.displayName, rating: user.rating)
     }
 
     @Sendable
@@ -23,6 +23,6 @@ struct UsersController: RouteCollection {
         let body = try req.content.decode(RenameRequest.self, as: .json)
         user.displayName = try User.validateDisplayName(body.displayName)
         try await user.save(on: req.db)
-        return UserDTO(id: try user.requireID(), displayName: user.displayName)
+        return UserDTO(id: try user.requireID(), displayName: user.displayName, rating: user.rating)
     }
 }

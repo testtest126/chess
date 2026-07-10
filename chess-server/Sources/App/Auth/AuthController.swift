@@ -63,7 +63,8 @@ struct AuthController: RouteCollection {
             displayName: user.displayName,
             accessToken: accessToken,
             refreshToken: plaintext,
-            expiresIn: Int(UserPayload.lifetime)
+            expiresIn: Int(UserPayload.lifetime),
+            rating: user.rating
         )
     }
 }

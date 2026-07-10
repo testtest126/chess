@@ -30,6 +30,20 @@ struct CreateRefreshToken: AsyncMigration {
     }
 }
 
+struct AddUserRating: AsyncMigration {
+    func prepare(on database: Database) async throws {
+        try await database.schema(User.schema)
+            .field("rating", .int, .required, .sql(.default(1200)))
+            .update()
+    }
+
+    func revert(on database: Database) async throws {
+        try await database.schema(User.schema)
+            .deleteField("rating")
+            .update()
+    }
+}
+
 struct CreateGameRecord: AsyncMigration {
     func prepare(on database: Database) async throws {
         try await database.schema(GameRecord.schema)

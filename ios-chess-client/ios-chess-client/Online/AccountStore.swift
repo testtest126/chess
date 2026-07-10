@@ -25,9 +25,11 @@ final class AccountStore {
     private static let refreshTokenKey = "refresh_token"
     private static let userIDKey = "account_user_id"
     private static let displayNameKey = "account_display_name"
+    private static let ratingKey = "account_rating"
 
     private(set) var userID: UUID?
     private(set) var displayName: String?
+    private(set) var rating: Int?
 
     private var accessToken: String?
     private var accessTokenExpiry = Date.distantPast
@@ -35,6 +37,15 @@ final class AccountStore {
     init() {
         userID = UserDefaults.standard.string(forKey: Self.userIDKey).flatMap(UUID.init(uuidString:))
         displayName = UserDefaults.standard.string(forKey: Self.displayNameKey)
+        let storedRating = UserDefaults.standard.integer(forKey: Self.ratingKey)
+        rating = storedRating > 0 ? storedRating : nil
+    }
+
+    /// Keeps the locally shown rating in sync after a rated game ends.
+    func applyRatingDelta(_ delta: Int) {
+        guard let current = rating else { return }
+        rating = current + delta
+        UserDefaults.standard.set(current + delta, forKey: Self.ratingKey)
     }
 
     /// Returns a usable access token, refreshing or registering as necessary.
@@ -60,11 +71,15 @@ final class AccountStore {
     private func adopt(_ auth: AuthResponse) -> String {
         userID = auth.userID
         displayName = auth.displayName
+        rating = auth.rating
         accessToken = auth.accessToken
         accessTokenExpiry = Date().addingTimeInterval(TimeInterval(auth.expiresIn))
         KeychainStore.set(auth.refreshToken, for: Self.refreshTokenKey)
         UserDefaults.standard.set(auth.userID.uuidString, forKey: Self.userIDKey)
         UserDefaults.standard.set(auth.displayName, forKey: Self.displayNameKey)
+        if let rating = auth.rating {
+            UserDefaults.standard.set(rating, forKey: Self.ratingKey)
+        }
         return auth.accessToken
     }
 
