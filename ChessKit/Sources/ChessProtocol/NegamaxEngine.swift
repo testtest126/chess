@@ -181,6 +181,12 @@ final class Search {
         let score: Int
         let bound: Bound
         let move: Move?
+        /// The search-call counter in effect when this entry was stored.
+        /// Only ``PersistentNegamaxEngine`` sets and reads it — to evict the
+        /// oldest entries first when its table is capped. The deterministic
+        /// struct leaves it at 0 and never evicts, so it can't affect probes
+        /// or node counts.
+        var generation: UInt32 = 0
     }
 
     /// Readable after the search so a persistent engine can keep it warm.
@@ -194,10 +200,19 @@ final class Search {
     private let deadline: ContinuousClock.Instant?
     /// Optional external interrupt (e.g. "the opponent moved, stop pondering").
     private let stop: SearchStopSignal?
+    /// Stamped onto every entry this session stores, so a persistent engine
+    /// can evict by age. Left at 0 for the deterministic struct.
+    private let generation: UInt32
 
-    init(limit: SearchLimit, table: [UInt64: TTEntry] = [:], stop: SearchStopSignal? = nil) {
+    init(
+        limit: SearchLimit,
+        table: [UInt64: TTEntry] = [:],
+        stop: SearchStopSignal? = nil,
+        generation: UInt32 = 0
+    ) {
         self.table = table
         self.stop = stop
+        self.generation = generation
         self.maxNodes = limit.maxNodes
         self.deadline = limit.moveTime.map { ContinuousClock.now + .seconds($0) }
     }
@@ -385,7 +400,8 @@ final class Search {
                 depth: depth,
                 score: Self.storeScore(best, ply: ply),
                 bound: bound,
-                move: bestMove
+                move: bestMove,
+                generation: generation
             )
         }
         return best
