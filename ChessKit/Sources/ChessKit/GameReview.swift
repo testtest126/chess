@@ -6,9 +6,20 @@ import Foundation
 /// (cheap, rough), and callers can supply a real engine-backed evaluator for
 /// trustworthy numbers without ChessKit depending on any engine.
 public struct GameReview: Sendable {
-    /// Evaluates a position in centipawns from White's perspective, assuming
-    /// best play. Called once per position in the game.
-    public typealias Evaluator = (Board) -> Int
+    /// A position's evaluation: score in centipawns from White's perspective
+    /// assuming best play, plus (optionally) the move that achieves it.
+    public struct PositionAssessment: Sendable {
+        public var score: Int
+        public var bestMove: Move?
+
+        public init(score: Int, bestMove: Move? = nil) {
+            self.score = score
+            self.bestMove = bestMove
+        }
+    }
+
+    /// Assesses a position. Called once per position in the game.
+    public typealias Evaluator = (Board) -> PositionAssessment
 
     public struct MoveAnalysis: Codable, Sendable, Identifiable {
         public var id: Int { plyIndex }
@@ -22,6 +33,9 @@ public struct GameReview: Sendable {
         /// How many centipawns the mover gave up vs. the best available move. >= 0.
         public let centipawnLoss: Int
         public let judgment: Judgment
+        /// SAN of the evaluator's preferred move, when it differs from what
+        /// was played. What the review shows as "best was …".
+        public let bestSAN: String?
     }
 
     public enum Judgment: String, Codable, Sendable {
@@ -58,27 +72,27 @@ public struct GameReview: Sendable {
     /// Analyzes `game`, evaluating every position exactly once.
     ///
     /// - Parameters:
-    ///   - evaluator: White-perspective best-play evaluation. Defaults to the
+    ///   - evaluator: White-perspective best-play assessment. Defaults to the
     ///     built-in one-ply lookahead.
     ///   - progress: Called after each position with completed fraction (0-1).
     public init(
         analyzing game: Game,
-        evaluator: Evaluator = { $0.evaluateWithLookahead() },
+        evaluator: Evaluator = GameReview.lookaheadEvaluator,
         progress: ((Double) -> Void)? = nil
     ) {
         let positions = game.positions
-        var evals: [Int] = []
-        evals.reserveCapacity(positions.count)
+        var assessments: [PositionAssessment] = []
+        assessments.reserveCapacity(positions.count)
         for (i, position) in positions.enumerated() {
-            evals.append(evaluator(position))
+            assessments.append(evaluator(position))
             progress?(Double(i + 1) / Double(positions.count))
         }
 
         var analyses: [MoveAnalysis] = []
         for (i, entry) in game.history.enumerated() {
             let mover = positions[i].sideToMove
-            let bestEval = evals[i]      // best play from the position before
-            let actualEval = evals[i + 1] // what the played move led to
+            let bestEval = assessments[i].score      // best play from the position before
+            let actualEval = assessments[i + 1].score // what the played move led to
 
             // Loss from the mover's perspective.
             let loss = mover == .white
@@ -87,6 +101,12 @@ public struct GameReview: Sendable {
             // Cap: positions already lost/won shouldn't produce absurd loss values.
             let cappedLoss = min(loss, 1000)
 
+            // Only name a better move when one was actually preferred.
+            var bestSAN: String?
+            if let best = assessments[i].bestMove, best != entry.move {
+                bestSAN = positions[i].san(for: best)
+            }
+
             analyses.append(MoveAnalysis(
                 plyIndex: i,
                 san: entry.san,
@@ -94,13 +114,35 @@ public struct GameReview: Sendable {
                 mover: mover,
                 evalAfter: actualEval,
                 centipawnLoss: cappedLoss,
-                judgment: Judgment(centipawnLoss: cappedLoss)
+                judgment: Judgment(centipawnLoss: cappedLoss),
+                bestSAN: bestSAN
             ))
         }
 
         self.moves = analyses
-        self.evalTimeline = evals
+        self.evalTimeline = assessments.map(\.score)
         self.summary = GameReview.summarize(analyses)
+    }
+
+    /// The built-in evaluator: one-ply minimax over the static evaluation,
+    /// returning both the value and the move that attains it.
+    public static let lookaheadEvaluator: Evaluator = { board in
+        let moves = board.legalMoves()
+        guard !moves.isEmpty else {
+            return PositionAssessment(score: board.evaluate())
+        }
+        var bestScore = board.sideToMove == .white ? Int.min : Int.max
+        var bestMove: Move?
+        for move in moves {
+            var next = board
+            next.apply(move)
+            let value = next.evaluate()
+            if board.sideToMove == .white ? value > bestScore : value < bestScore {
+                bestScore = value
+                bestMove = move
+            }
+        }
+        return PositionAssessment(score: bestScore, bestMove: bestMove)
     }
 
     private static func summarize(_ analyses: [MoveAnalysis]) -> Summary {

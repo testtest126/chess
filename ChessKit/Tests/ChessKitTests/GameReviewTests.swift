@@ -41,6 +41,8 @@ final class GameReviewTests: XCTestCase {
         XCTAssertGreaterThan(blunder.centipawnLoss, 250)
         XCTAssertEqual(blunder.judgment, .blunder)
         XCTAssertGreaterThanOrEqual(review.summary.blundersWhite, 1)
+        // The review names the move that should have been played.
+        XCTAssertEqual(blunder.bestSAN, "Rxd4")
     }
 
     func testCustomEvaluatorAndProgress() {
@@ -49,7 +51,7 @@ final class GameReviewTests: XCTestCase {
         var fractions: [Double] = []
         let review = GameReview(
             analyzing: g,
-            evaluator: { _ in evaluated += 1; return 0 },
+            evaluator: { _ in evaluated += 1; return GameReview.PositionAssessment(score: 0) },
             progress: { fractions.append($0) }
         )
         // Every position (initial + one per ply) evaluated exactly once.
