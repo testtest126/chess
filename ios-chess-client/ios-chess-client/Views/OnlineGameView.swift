@@ -87,7 +87,16 @@ struct OnlineGameView: View {
             }
             .onAppear { session.start() }
             .onChange(of: session.phase) { _, phase in
-                if case .finished = phase { gameEnded() }
+                switch phase {
+                case .finished:
+                    gameEnded()
+                case .playing:
+                    // A rematch started: hide the sheet, arm saving again.
+                    showGameOver = false
+                    saved = false
+                default:
+                    break
+                }
             }
         }
         .interactiveDismissDisabled()
@@ -239,6 +248,8 @@ struct OnlineGameView: View {
                     .foregroundStyle(delta > 0 ? .green : (delta < 0 ? .red : .secondary))
             }
 
+            rematchButton
+
             if session.game.moveCount > 0 {
                 Button {
                     showGameOver = false
@@ -252,6 +263,9 @@ struct OnlineGameView: View {
 
             Button {
                 showGameOver = false
+                // Walk away: closes the socket so the opponent's rematch
+                // option flips to "opponent left".
+                session.cancel()
                 dismiss()
             } label: {
                 Text("Done")
@@ -262,6 +276,38 @@ struct OnlineGameView: View {
         .padding(24)
         .presentationCornerRadius(28)
         .presentationDragIndicator(.visible)
+    }
+
+    /// Rematch states: available → waiting for opponent → (game restarts),
+    /// or unavailable once the opponent leaves.
+    @ViewBuilder
+    private var rematchButton: some View {
+        if session.rematchUnavailable {
+            Label("Opponent left", systemImage: "person.slash")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        } else if session.rematchRequested {
+            Label("Waiting for opponent…", systemImage: "hourglass")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        } else {
+            Button {
+                session.requestRematch()
+            } label: {
+                Label(
+                    session.rematchOfferedByOpponent ? "Accept Rematch" : "Rematch",
+                    systemImage: "arrow.2.squarepath"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .primaryActionButtonStyle()
+            .overlay(alignment: .topTrailing) {
+                if session.rematchOfferedByOpponent {
+                    Circle().fill(.red).frame(width: 10, height: 10)
+                        .offset(x: 4, y: -4)
+                }
+            }
+        }
     }
 
     private var resultHeadline: String {

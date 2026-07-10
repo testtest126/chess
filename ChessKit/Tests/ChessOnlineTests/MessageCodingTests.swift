@@ -6,7 +6,7 @@ final class MessageCodingTests: XCTestCase {
     func testClientMessageRoundTrip() throws {
         let messages: [ClientMessage] = [
             .joinQueue, .leaveQueue, .move(uci: "e7e8q"), .resign,
-            .offerDraw, .acceptDraw, .declineDraw,
+            .offerDraw, .acceptDraw, .declineDraw, .requestRematch,
         ]
         for message in messages {
             let decoded = try ClientMessage(jsonString: try message.jsonString())
@@ -29,6 +29,8 @@ final class MessageCodingTests: XCTestCase {
             .gameOver(.init(result: "1/2-1/2", reason: "drawAgreement")),
             .drawOffered,
             .drawDeclined,
+            .rematchOffered,
+            .rematchUnavailable,
             .opponentStatus(connected: false),
             .errorMessage("not your turn"),
         ]
