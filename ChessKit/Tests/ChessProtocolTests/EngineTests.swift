@@ -111,6 +111,20 @@ final class EngineTests: XCTestCase {
         XCTAssertNotNil(result.bestMove)
     }
 
+    func testSearchEfficiency() {
+        // Node-count regression guard: ordering + TT + null move should keep
+        // fixed-depth searches small. Deterministic, so bounds aren't flaky —
+        // they only trip if a change genuinely regresses pruning.
+        let start = engine.search(Board(), limit: SearchLimit(depth: 4))
+        print("efficiency: startpos depth 4 -> \(start.nodes) nodes")
+        XCTAssertLessThan(start.nodes, 100_000)
+
+        let middlegame = Board(fen: "r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP2BPPP/R1BQ1RK1 w - - 0 8")!
+        let result = engine.search(middlegame, limit: SearchLimit(depth: 3))
+        print("efficiency: middlegame depth 3 -> \(result.nodes) nodes")
+        XCTAssertLessThan(result.nodes, 50_000)
+    }
+
     // MARK: - Transposition table
 
     func testTranspositionTableKeepsMateScoresCorrect() {
