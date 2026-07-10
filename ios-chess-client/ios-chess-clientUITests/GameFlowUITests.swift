@@ -13,7 +13,7 @@ final class GameFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        app.buttons["Start Game"].tap()
+        tapStartGame(in: app)
 
         // Play 1. e4 by tapping the pawn's square, then the target square.
         let e2 = app.descendants(matching: .any)["square_e2"]
@@ -37,20 +37,14 @@ final class GameFlowUITests: XCTestCase {
             _ = engineReplied
         }
 
-        // Resign via the toolbar, then confirm in the dialog. The dialog adds a
-        // Cancel button plus a second "Resign"; tap the newest one.
-        app.buttons["Resign"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5), "resign confirmation should appear")
-        let resignButtons = app.buttons.matching(NSPredicate(format: "label == 'Resign'"))
-        resignButtons.allElementsBoundByIndex.last?.tap()
-
-        // Game-over sheet.
-        XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 5), "game over sheet should appear")
+        endGame(in: app)
 
         // Open the review and wait for analysis to finish.
         app.buttons["Review Game"].tap()
         XCTAssertTrue(app.staticTexts["White"].waitForExistence(timeout: 30), "review summary should appear")
         app.buttons["Done"].firstMatch.tap()
+
+        app.terminate()
     }
 
     @MainActor
@@ -58,7 +52,7 @@ final class GameFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        app.buttons["Start Game"].tap()
+        tapStartGame(in: app)
 
         let e2 = app.descendants(matching: .any)["square_e2"]
         XCTAssertTrue(e2.waitForExistence(timeout: 5), "board should appear")
@@ -79,11 +73,51 @@ final class GameFlowUITests: XCTestCase {
         e2.press(forDuration: 0.5, thenDragTo: e4, withVelocity: .slow, thenHoldForDuration: 0.2)
 
         XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 10), "dragged move should be played")
+
+        // End the game before finishing. Leaving a live game keeps the engine
+        // searching (and pondering) in the background, and on a slow CI VM
+        // the compute-pegged process can't be terminated in time when the
+        // next test launches — the "Failed to terminate" flake.
+        endGame(in: app)
+        app.terminate()
     }
 
     private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Resigns the current game and waits for the game-over sheet, so the
+    /// test never abandons a live game with the engine still searching.
+    /// Resign via the toolbar, then confirm in the dialog. The dialog adds a
+    /// Cancel button plus a second "Resign"; tap the newest one.
+    @MainActor
+    private func endGame(in app: XCUIApplication) {
+        let thinking = app.activityIndicators.firstMatch
+        if thinking.exists {
+            XCTAssertTrue(waitUntilGone(thinking, timeout: 20), "engine should finish thinking")
+        }
+        app.buttons["Resign"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5), "resign confirmation should appear")
+        app.buttons.matching(NSPredicate(format: "label == 'Resign'")).allElementsBoundByIndex.last?.tap()
+        XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 10), "game over sheet should appear")
+    }
+
+    /// The home screen's List has grown past one screenful (time controls,
+    /// difficulty, resume banner), and row heights differ between toolchains —
+    /// with Xcode 16's bordered buttons, "Start Game" can start below the
+    /// fold. XCUITest doesn't auto-scroll, so swipe until it's hittable.
+    @MainActor
+    private func tapStartGame(in app: XCUIApplication) {
+        let button = app.buttons["Start Game"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "home screen should show Start Game")
+        var swipes = 0
+        while !button.isHittable && swipes < 5 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(button.isHittable, "Start Game should be reachable by scrolling")
+        button.tap()
     }
 }
