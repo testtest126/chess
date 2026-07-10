@@ -20,6 +20,9 @@ final class OnlineGameSession: Identifiable {
     let id = UUID()
     private(set) var phase: Phase = .connecting
     private(set) var game = Game()
+    /// The server's id for the current game (a rematch gets a fresh one);
+    /// stored with the finished game so history syncs can dedupe against it.
+    private(set) var serverGameID: UUID?
     /// The control chosen in the lobby; games are matched within it. Kept in
     /// sync with the server's game_start echo (a resync is authoritative).
     private(set) var timeControl: TimeControl
@@ -187,6 +190,7 @@ final class OnlineGameSession: Identifiable {
             ActiveGameStore.shared.clear()
 
         case .gameStart(let start):
+            serverGameID = start.gameID
             playerColor = start.yourColor == "black" ? .black : .white
             if let control = start.timeControl {
                 timeControl = control // e.g. a rematch resync after reconnect

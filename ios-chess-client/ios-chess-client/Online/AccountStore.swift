@@ -142,6 +142,23 @@ final class AccountStore {
         return try decoder.decode(PlayerProfileDTO.self, from: data)
     }
 
+    /// The account's finished online games, newest first (participants-only
+    /// server side). Callers should check `userID` first: this refreshes or
+    /// registers as needed, which is wasted work for a history that would
+    /// necessarily be empty.
+    func fetchGames() async throws -> [GameRecordDTO] {
+        let token = try await validAccessToken()
+        var request = URLRequest(url: ServerConfig.httpBase.appending(path: "games"))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AccountError.server(status: (response as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([GameRecordDTO].self, from: data)
+    }
+
     private func register() async throws -> AuthResponse {
         try await post("auth/register", body: RegisterRequest())
     }
