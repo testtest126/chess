@@ -1,5 +1,6 @@
 import Vapor
 import Fluent
+import SQLKit
 import JWT
 import ChessOnline
 
@@ -93,15 +94,8 @@ struct AuthController: RouteCollection {
             throw Abort(.badRequest, reason: "missing nonce (call /auth/apple/nonce first)")
         }
         let expectedNonce = AppleNonce.hash(rawNonce)
-        guard let stored = try await AppleNonce.query(on: req.db)
-            .filter(\.$nonceHash == expectedNonce)
-            .first()
-        else {
-            throw Abort(.unauthorized, reason: "unknown or already-used nonce")
-        }
-        try await stored.delete(on: req.db)
-        guard stored.expiresAt > Date() else {
-            throw Abort(.unauthorized, reason: "expired nonce")
+        guard try await Self.consumeNonce(hash: expectedNonce, on: req.db) else {
+            throw Abort(.unauthorized, reason: "unknown, expired, or already-used nonce")
         }
 
         let claims: AppleTokenClaims
@@ -137,6 +131,27 @@ struct AuthController: RouteCollection {
             on: req.db
         )
         return try await issueTokens(for: user, on: req)
+    }
+
+    /// Atomically consumes a nonce: one DELETE … RETURNING statement, so two
+    /// concurrent sign-ins presenting the same nonce can never both pass — a
+    /// SELECT-then-DELETE here would be a TOCTOU replay window (review
+    /// finding on this PR). Expired rows never match, so they can't be
+    /// consumed either; the mint endpoint sweeps them. Works on both SQLite
+    /// (3.35+) and Postgres.
+    static func consumeNonce(hash: String, on db: Database) async throws -> Bool {
+        struct Consumed: Decodable {
+            let nonce_hash: String
+        }
+        guard let sql = db as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "nonce store requires an SQL database")
+        }
+        let consumed = try await sql.raw("""
+            DELETE FROM apple_nonces
+            WHERE nonce_hash = \(bind: hash) AND expires_at > \(bind: Date())
+            RETURNING nonce_hash
+            """).first(decoding: Consumed.self)
+        return consumed != nil
     }
 
     /// Account-resolution policy, factored out for testing:

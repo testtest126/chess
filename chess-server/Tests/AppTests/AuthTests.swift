@@ -358,6 +358,24 @@ final class AuthTests: XCTestCase {
         XCTAssertEqual(reuse, .unauthorized, "a nonce burned by a failed attempt must stay burned")
     }
 
+    func testNonceConsumptionIsAtomicAndExpiryAware() async throws {
+        // Fresh nonce: consumable exactly once (single DELETE..RETURNING —
+        // no SELECT-then-DELETE TOCTOU window).
+        let (raw, model) = AppleNonce.generate()
+        try await model.save(on: app.db)
+        let hash = AppleNonce.hash(raw)
+        let first = try await AuthController.consumeNonce(hash: hash, on: app.db)
+        XCTAssertTrue(first)
+        let second = try await AuthController.consumeNonce(hash: hash, on: app.db)
+        XCTAssertFalse(second, "a consumed nonce must never be consumable again")
+
+        // Expired nonce: never consumable, and left for the sweeper.
+        let expired = AppleNonce(nonceHash: AppleNonce.hash("old"), expiresAt: Date(timeIntervalSinceNow: -60))
+        try await expired.save(on: app.db)
+        let expiredResult = try await AuthController.consumeNonce(hash: AppleNonce.hash("old"), on: app.db)
+        XCTAssertFalse(expiredResult, "expired nonces must not authenticate")
+    }
+
     // MARK: - First-link race (#53)
 
     func testFirstLinkRaceLoserGetsWinnersAccount() async throws {
