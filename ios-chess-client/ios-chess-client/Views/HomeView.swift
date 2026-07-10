@@ -148,11 +148,14 @@ struct HomeView: View {
                             .frame(maxWidth: .infinity)
                             .listRowBackground(Color.clear)
                         } else {
+                            // .secondary, not .tertiary: this is informative
+                            // text and tertiary fails WCAG contrast on the
+                            // grouped background (audit #83, finding P2.4).
                             Text(AccountStore.shared.displayName == nil
                                  ? "Recovers your account if you've played before."
                                  : "Keeps your rating safe if you lose this device.")
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity)
                                 .listRowBackground(Color.clear)
                         }
@@ -363,7 +366,7 @@ struct SavedGameRow: View {
             Spacer()
             Text(saved.date.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
     }
