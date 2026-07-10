@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import ChessKit
+import ChessOnline
 
 /// A finished game persisted for the history list and post-game review.
 /// Stores moves as space-separated UCI so the full `Game` can be rebuilt.
@@ -16,6 +17,12 @@ final class SavedGame {
     var uciMoves: String
     /// Set for online games only.
     var opponentName: String?
+    /// The server's GameRecord id, used to dedupe against GET /games history.
+    /// Nil for engine games and for online rows saved before this existed.
+    var onlineGameID: UUID?
+    /// Raw TimeControl value for online games; nil for engine games and rows
+    /// that predate selectable controls.
+    var timeControlRaw: String?
 
     init(
         date: Date,
@@ -24,7 +31,9 @@ final class SavedGame {
         result: Game.Result,
         endReason: Game.EndReason?,
         uciMoves: [String],
-        opponentName: String? = nil
+        opponentName: String? = nil,
+        onlineGameID: UUID? = nil,
+        timeControl: TimeControl? = nil
     ) {
         self.date = date
         self.playerColorRaw = playerColor.rawValue
@@ -34,10 +43,13 @@ final class SavedGame {
         self.moveCount = uciMoves.count
         self.uciMoves = uciMoves.joined(separator: " ")
         self.opponentName = opponentName
+        self.onlineGameID = onlineGameID
+        self.timeControlRaw = timeControl?.rawValue
     }
 
     var playerColor: PieceColor { PieceColor(rawValue: playerColorRaw) ?? .white }
     var difficulty: Difficulty? { Difficulty(rawValue: difficultyRaw) }
+    var timeControl: TimeControl? { timeControlRaw.flatMap(TimeControl.init(rawValue:)) }
 
     /// "Engine (Club)" for local games, the opponent's name for online ones.
     var opponentDescription: String {

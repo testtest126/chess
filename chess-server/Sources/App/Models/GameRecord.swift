@@ -34,13 +34,19 @@ final class GameRecord: Model, Content, @unchecked Sendable {
     @Timestamp(key: "finished_at", on: .create)
     var finishedAt: Date?
 
+    /// Raw TimeControl value; nil for records that predate selectable
+    /// time controls.
+    @OptionalField(key: "time_control")
+    var timeControl: String?
+
     init() {}
 
     init(
         id: UUID? = nil,
         whiteID: UUID, blackID: UUID,
         whiteName: String, blackName: String,
-        result: String, endReason: String, uciMoves: String
+        result: String, endReason: String, uciMoves: String,
+        timeControl: String? = nil
     ) {
         self.id = id
         self.whiteID = whiteID
@@ -50,6 +56,7 @@ final class GameRecord: Model, Content, @unchecked Sendable {
         self.result = result
         self.endReason = endReason
         self.uciMoves = uciMoves
+        self.timeControl = timeControl
     }
 
     func dto() throws -> GameRecordDTO {
@@ -62,7 +69,8 @@ final class GameRecord: Model, Content, @unchecked Sendable {
             result: result,
             endReason: endReason,
             uciMoves: uciMoves,
-            finishedAt: finishedAt ?? Date()
+            finishedAt: finishedAt ?? Date(),
+            timeControl: timeControl.flatMap(TimeControl.init(rawValue:))
         )
     }
 }

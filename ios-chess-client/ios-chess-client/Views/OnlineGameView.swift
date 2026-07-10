@@ -233,7 +233,9 @@ struct OnlineGameView: View {
                 result: result,
                 endReason: reason,
                 uciMoves: session.game.uciMoves,
-                opponentName: session.opponentName
+                opponentName: session.opponentName,
+                onlineGameID: session.serverGameID,
+                timeControl: session.timeControl
             ))
         }
         showGameOver = true

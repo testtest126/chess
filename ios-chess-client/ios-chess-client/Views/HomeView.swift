@@ -229,6 +229,10 @@ struct HomeView: View {
                     }
                 }
             }
+            // Offline-first history: local rows are already on screen; this
+            // fills in online games from other devices or past installs.
+            .task { await GameHistorySync.sync(into: modelContext) }
+            .refreshable { await GameHistorySync.sync(into: modelContext) }
         }
         .sheet(isPresented: $showLeaderboard) {
             LeaderboardView()
@@ -337,12 +341,22 @@ extension HomeView {
 struct SavedGameRow: View {
     let saved: SavedGame
 
+    /// "As White vs Guest-1234 · 12 moves · Blitz"; the control tag is absent
+    /// for engine games and online rows that predate selectable controls.
+    /// `control.label` is already localized, so it composes verbatim onto the
+    /// localized base line.
+    private var detail: Text {
+        let base = Text("As \(saved.playerColor.localizedName) vs \(saved.opponentDescription) · ^[\((saved.moveCount + 1) / 2) move](inflect: true)")
+        guard let control = saved.timeControl else { return base }
+        return base + Text(verbatim: " · \(control.label)")
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(saved.playerOutcome) \(saved.endReasonDescription)")
                     .font(.headline)
-                Text("As \(saved.playerColor.localizedName) vs \(saved.opponentDescription) · ^[\((saved.moveCount + 1) / 2) move](inflect: true)")
+                detail
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
