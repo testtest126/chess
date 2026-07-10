@@ -1,17 +1,21 @@
 name: iOS
 
-# Simulator jobs are slow, so this only runs when app-facing code changes.
+# Simulator jobs are slow, so this only runs when code the app or its online
+# E2E depends on changes — which includes the server, since the UI-test job
+# boots chess-server to cover the live matchmaking and rematch flows.
 on:
   push:
     branches: [main]
     paths:
       - "ios-chess-client/**"
       - "ChessKit/**"
+      - "chess-server/**"
       - ".github/workflows/ios.yml"
   pull_request:
     paths:
       - "ios-chess-client/**"
       - "ChessKit/**"
+      - "chess-server/**"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
 
@@ -27,6 +31,35 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Cache SwiftPM build (server)
+        uses: actions/cache@v6
+        with:
+          path: chess-server/.build
+          key: server-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift', 'chess-server/Package.resolved') }}
+          restore-keys: server-spm-${{ runner.os }}-
+
+      - name: Build chess-server
+        run: swift build --package-path chess-server
+
+      - name: Start chess-server
+        # OnlineMatchUITests talks to 127.0.0.1:8080 and skips itself when
+        # nothing is listening. Booting the real server here means CI covers
+        # the online flows (matchmaking, live play, rematch), not just the
+        # offline ones. The test process doubles as the opponent bot, so one
+        # runner plays both sides of the match.
+        run: |
+          (cd chess-server && nohup .build/debug/App serve --hostname 127.0.0.1 --port 8080 > server.log 2>&1 &)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+              echo "chess-server is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::chess-server did not become healthy within 30s"
+          tail -50 chess-server/server.log
+          exit 1
+
       - name: Pick an available iPhone simulator
         id: sim
         run: |
@@ -38,8 +71,9 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       - name: Build and run UI tests
-        # OnlineMatchUITests skips itself when no server is listening on
-        # 127.0.0.1:8080, so this covers the offline flows.
+        # The online E2E keeps its self-skip to protect local runs without a
+        # server, but in CI a skip means the server died — fail loudly rather
+        # than shipping green without the online coverage.
         run: |
           set -o pipefail
           xcodebuild test \
@@ -48,4 +82,16 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -only-testing:ios-chess-clientUITests/GameFlowUITests \
             -only-testing:ios-chess-clientUITests/OnlineMatchUITests \
-            | tail -100
+            | tee ui-tests.log | tail -100
+          if grep -q "testOnlineMatchAgainstBot.*skipped" ui-tests.log; then
+            echo "::error::the online E2E skipped itself — chess-server was not reachable during the test"
+            exit 1
+          fi
+
+      - name: Upload server log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chess-server-log
+          path: chess-server/server.log
+          if-no-files-found: ignore
