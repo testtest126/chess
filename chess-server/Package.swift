@@ -30,6 +30,7 @@ let package = Package(
             dependencies: [
                 .target(name: "App"),
                 .product(name: "XCTVapor", package: "vapor"),
+                .product(name: "Fluent", package: "fluent"),
             ]
         ),
     ]
