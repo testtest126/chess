@@ -14,10 +14,10 @@ enum Difficulty: String, CaseIterable, Codable, Identifiable {
 
     var label: String {
         switch self {
-        case .beginner: return "Beginner"
-        case .casual: return "Casual"
-        case .club: return "Club"
-        case .expert: return "Expert"
+        case .beginner: return String(localized: "Beginner", comment: "Engine strength level")
+        case .casual: return String(localized: "Casual", comment: "Engine strength level")
+        case .club: return String(localized: "Club", comment: "Engine strength level")
+        case .expert: return String(localized: "Expert", comment: "Engine strength level")
         }
     }
 

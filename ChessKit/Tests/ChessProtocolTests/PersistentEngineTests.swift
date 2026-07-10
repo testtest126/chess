@@ -90,6 +90,77 @@ final class PersistentEngineTests: XCTestCase {
         XCTAssertTrue(beforeMate.making(mate)!.legalMoves().isEmpty, "the found move should deliver mate")
     }
 
+    // MARK: - Bounded table
+
+    func testTableStaysWithinConfiguredCapAcrossAGame() throws {
+        // Walk a short game, giving each search a fixed node budget so it
+        // stores far more entries than the cap. A bounded engine must never
+        // exceed its cap; an unbounded one following the same line proves the
+        // walk really overflows it, so the bound is exercised, not vacuous.
+        let cap = 200
+        let bounded = PersistentNegamaxEngine(maxTableEntries: cap)
+        let unbounded = PersistentNegamaxEngine(maxTableEntries: .max)
+        let limit = SearchLimit(depth: 20, maxNodes: 3_000)
+        var board = Board()
+
+        for _ in 0..<3 {
+            let result = bounded.search(board, limit: limit)
+            _ = unbounded.search(board, limit: limit)
+            XCTAssertLessThanOrEqual(bounded.tableEntryCount, cap,
+                                     "bounded engine must never exceed its cap")
+            guard let move = result.bestMove, let next = board.making(move) else { break }
+            board = next
+        }
+
+        XCTAssertGreaterThan(unbounded.tableEntryCount, cap,
+                             "sanity: the same walk overflows the cap, so the bound was real")
+        XCTAssertGreaterThan(bounded.tableEntryCount, 0)
+    }
+
+    func testBoundedEnginePlaysALegalGameUnderConstantEviction() throws {
+        // A table so small it evicts after every move must still drive a
+        // coherent game: each search seeds from the previous move's pruned
+        // table, yet every move it returns is legal and the bound always holds.
+        let cap = 300
+        let engine = PersistentNegamaxEngine(maxTableEntries: cap)
+        let limit = SearchLimit(depth: 20, maxNodes: 3_000)
+        var game = Game()
+
+        for _ in 0..<5 {
+            guard !game.isOver else { break }
+            let move = try XCTUnwrap(engine.search(game.board, limit: limit).bestMove)
+            XCTAssertTrue(game.board.isLegal(move))
+            XCTAssertLessThanOrEqual(engine.tableEntryCount, cap,
+                                     "the bound must hold after every move")
+            _ = try game.play(move)
+        }
+
+        XCTAssertGreaterThan(game.moveCount, 0)
+    }
+
+    func testEvictionKeepsTheJustSearchedPositionWarm() throws {
+        // Overflow a modest cap over several moves, then re-search the most
+        // recent position: its current-generation entries are evicted last, so
+        // the repeat rides a warm table — far cheaper than a cold search of it.
+        let cap = 1_500
+        let engine = PersistentNegamaxEngine(maxTableEntries: cap)
+        var board = Board()
+        var recent = board
+
+        for _ in 0..<5 {
+            recent = board
+            guard let move = engine.search(board, limit: SearchLimit(depth: 3)).bestMove,
+                  let next = board.making(move) else { break }
+            board = next
+        }
+
+        let warm = engine.search(recent, limit: SearchLimit(depth: 3))
+        let cold = NegamaxEngine().search(recent, limit: SearchLimit(depth: 3))
+        XCTAssertLessThan(warm.nodes, cold.nodes,
+                          "the just-searched position must stay warm despite eviction")
+        XCTAssertLessThanOrEqual(engine.tableEntryCount, cap)
+    }
+
     // MARK: - Pondering
 
     func testPonderReturnsLegalPredictionAndWarmsTable() throws {
