@@ -39,19 +39,20 @@ struct HomeView: View {
         NavigationStack {
             List {
                 Section("Play Online") {
-                    if let name = AccountStore.shared.displayName {
-                        Button {
-                            onlineSession = OnlineGameSession()
-                        } label: {
-                            Label("Play Online", systemImage: "globe")
-                                .frame(maxWidth: .infinity)
-                                .fontWeight(.semibold)
-                        }
-                        .primaryActionButtonStyle()
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        .disabled(isSigningInWithApple)
+                    // Guest-first: online play never requires signing in.
+                    Button {
+                        onlineSession = OnlineGameSession()
+                    } label: {
+                        Label("Play Online", systemImage: "globe")
+                            .frame(maxWidth: .infinity)
+                            .fontWeight(.semibold)
+                    }
+                    .primaryActionButtonStyle()
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .disabled(isSigningInWithApple)
 
+                    if let name = AccountStore.shared.displayName {
                         let rating = AccountStore.shared.rating.map { " · Elo \($0)" } ?? ""
                         Button {
                             nameInput = name
@@ -68,15 +69,25 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .listRowBackground(Color.clear)
+                    }
+
+                    // Optional: link (guests keep rating/history) or recover
+                    // an account from another device. Hidden once linked.
+                    if AccountStore.shared.appleLinked {
+                        Label("Account recoverable with Apple", systemImage: "checkmark.shield")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
                     } else {
                         SignInWithAppleButton { request in
                             request.requestedScopes = [.fullName]
                         } onCompletion: { result in
                             handleAppleSignInResult(result)
                         }
-                        .frame(height: 44)
+                        .frame(height: 40)
                         .disabled(isSigningInWithApple)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 2, trailing: 16))
                         .listRowBackground(Color.clear)
 
                         if isSigningInWithApple {
@@ -89,6 +100,14 @@ struct HomeView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .listRowBackground(Color.clear)
+                        } else {
+                            Text(AccountStore.shared.displayName == nil
+                                 ? "Recovers your account if you've played before."
+                                 : "Keeps your rating safe if you lose this device.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity)
+                                .listRowBackground(Color.clear)
                         }
                     }
                 }

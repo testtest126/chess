@@ -20,22 +20,6 @@ struct UserPayload: JWTPayload {
     var userID: UUID? { UUID(uuidString: sub.value) }
 }
 
-/// Apple identity token payload. Verified against Apple's public keys at
-/// https://appleid.apple.com/auth/keys. The `sub` claim is a stable,
-/// private-email user ID unique to the app's team.
-struct AppleIdentityTokenPayload: JWTPayload {
-    var sub: String?
-    var exp: ExpirationClaim
-    var iss: IssuerClaim
-    var aud: AudienceClaim
-
-    func verify(using algorithm: some JWTAlgorithm) async throws {
-        try exp.verifyNotExpired()
-        // iss and aud verification is handled by Vapor's JWT middleware
-        // based on the configured signer or verifier.
-    }
-}
-
 extension Request {
     /// Verifies the bearer token and loads the authenticated user's ID.
     func authenticatedUserID() async throws -> UUID {

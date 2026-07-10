@@ -27,10 +27,13 @@ final class AccountStore {
     private static let userIDKey = "account_user_id"
     private static let displayNameKey = "account_display_name"
     private static let ratingKey = "account_rating"
+    private static let appleLinkedKey = "account_apple_linked"
 
     private(set) var userID: UUID?
     private(set) var displayName: String?
     private(set) var rating: Int?
+    /// Whether the account can be recovered via Sign in with Apple.
+    private(set) var appleLinked = false
 
     private var accessToken: String?
     private var accessTokenExpiry = Date.distantPast
@@ -40,6 +43,7 @@ final class AccountStore {
         displayName = UserDefaults.standard.string(forKey: Self.displayNameKey)
         let storedRating = UserDefaults.standard.integer(forKey: Self.ratingKey)
         rating = storedRating > 0 ? storedRating : nil
+        appleLinked = UserDefaults.standard.bool(forKey: Self.appleLinkedKey)
     }
 
     /// Keeps the locally shown rating in sync after a rated game ends.
@@ -80,6 +84,10 @@ final class AccountStore {
         UserDefaults.standard.set(auth.displayName, forKey: Self.displayNameKey)
         if let rating = auth.rating {
             UserDefaults.standard.set(rating, forKey: Self.ratingKey)
+        }
+        if let linked = auth.appleLinked {
+            appleLinked = linked
+            UserDefaults.standard.set(linked, forKey: Self.appleLinkedKey)
         }
         return auth.accessToken
     }
@@ -129,26 +137,46 @@ final class AccountStore {
     }
 
     /// Signs in with an Apple identity credential from AuthenticationServices.
-    /// If the credential's user ID is new, creates a fresh account; if it
-    /// exists, returns that account. The displayName is only used during
-    /// account creation.
+    /// The server resolves the account with recovery first: an account already
+    /// linked to this Apple ID is returned (any rating/history restored);
+    /// otherwise the current guest account is linked in place — which is why
+    /// this request carries our bearer token when we have an account — and
+    /// only failing both is a fresh account created.
     func signInWithApple(_ credential: ASAuthorizationAppleIDCredential, displayName: String? = nil) async throws {
-        guard let tokenData = credential.identityToken else {
+        guard let tokenData = credential.identityToken,
+              let token = String(data: tokenData, encoding: .utf8)
+        else {
             throw AccountError.invalidResponse
         }
-        guard let token = String(data: tokenData, encoding: .utf8) else {
-            throw AccountError.invalidResponse
-        }
-        _ = try await adopt(post("auth/apple", body: AppleSignInRequest(
-            identityToken: token,
-            displayName: displayName
-        )))
+        // Never auto-register here: creating a throwaway guest just to link it
+        // would defeat recovery on a fresh install.
+        let bearer = await existingAccessToken()
+        _ = adopt(try await post(
+            "auth/apple",
+            body: AppleSignInRequest(identityToken: token, displayName: displayName),
+            bearer: bearer
+        ))
     }
 
-    private func post<Body: Encodable>(_ path: String, body: Body) async throws -> AuthResponse {
+    /// A valid access token if an account already exists (refreshing when
+    /// needed), or nil. Unlike `validAccessToken()`, never registers.
+    private func existingAccessToken() async -> String? {
+        if let token = accessToken, accessTokenExpiry > Date().addingTimeInterval(60) {
+            return token
+        }
+        guard let refreshToken = KeychainStore.string(for: Self.refreshTokenKey) else {
+            return nil
+        }
+        return try? adopt(await refresh(with: refreshToken))
+    }
+
+    private func post<Body: Encodable>(_ path: String, body: Body, bearer: String? = nil) async throws -> AuthResponse {
         var request = URLRequest(url: ServerConfig.httpBase.appending(path: path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let bearer {
+            request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

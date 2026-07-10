@@ -41,6 +41,14 @@ public func configure(_ app: Application) async throws {
         await app.jwt.keys.add(hmac: HMACKey(from: "insecure-development-key-do-not-deploy"), digestAlgorithm: .sha256)
     }
 
+    // MARK: Sign in with Apple
+    // SIWA_APP_ID is the iOS app's bundle identifier; Apple identity tokens
+    // are verified against it as the audience. The /auth/apple endpoint
+    // returns 503 until this is configured.
+    if let appleAppID = Environment.get("SIWA_APP_ID") {
+        app.jwt.apple.applicationIdentifier = appleAppID
+    }
+
     // MARK: Realtime coordinator
     app.gameCoordinator = GameCoordinator(app: app)
 
