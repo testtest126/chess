@@ -24,6 +24,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateRefreshToken())
     app.migrations.add(CreateGameRecord())
     app.migrations.add(AddUserRating())
+    app.migrations.add(AddUserAppleID())
     try await app.autoMigrate()
 
     // MARK: JWT signing key
@@ -38,6 +39,14 @@ public func configure(_ app: Application) async throws {
         }
         app.logger.warning("JWT_SECRET not set; using an insecure development-only key")
         await app.jwt.keys.add(hmac: HMACKey(from: "insecure-development-key-do-not-deploy"), digestAlgorithm: .sha256)
+    }
+
+    // MARK: Sign in with Apple
+    // SIWA_APP_ID is the iOS app's bundle identifier; Apple identity tokens
+    // are verified against it as the audience. The /auth/apple endpoint
+    // returns 503 until this is configured.
+    if let appleAppID = Environment.get("SIWA_APP_ID") {
+        app.jwt.apple.applicationIdentifier = appleAppID
     }
 
     // MARK: Realtime coordinator

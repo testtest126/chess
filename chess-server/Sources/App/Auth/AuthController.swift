@@ -8,6 +8,7 @@ struct AuthController: RouteCollection {
         let auth = routes.grouped("auth")
         auth.post("register", use: register)
         auth.post("refresh", use: refresh)
+        auth.post("apple", use: signInWithApple)
     }
 
     /// Creates a guest account and returns its first token pair. The refresh
@@ -52,6 +53,67 @@ struct AuthController: RouteCollection {
         return try await issueTokens(for: user, on: req)
     }
 
+    /// Sign in with Apple. Verifies the identity token against Apple's JWKS
+    /// (never our own keys, and never by decoding without verification), then
+    /// resolves an account with recovery taking precedence.
+    @Sendable
+    func signInWithApple(req: Request) async throws -> AuthResponse {
+        // Refuse rather than mis-verify when the audience isn't configured.
+        guard req.application.jwt.apple.applicationIdentifier != nil else {
+            throw Abort(.serviceUnavailable,
+                        reason: "Sign in with Apple is not configured on this server (set SIWA_APP_ID)")
+        }
+        let body = try req.content.decode(AppleSignInRequest.self, as: .json)
+
+        let subject: String
+        do {
+            subject = try await req.application.appleTokenVerifier.verify(body.identityToken, req)
+        } catch {
+            throw Abort(.unauthorized, reason: "invalid Apple identity token")
+        }
+
+        let user = try await Self.resolveAppleUser(
+            subject: subject,
+            requestedName: body.displayName,
+            currentUser: try? await req.authenticatedUser(),
+            on: req.db
+        )
+        return try await issueTokens(for: user, on: req)
+    }
+
+    /// Account-resolution policy, factored out for testing:
+    /// 1. An account already linked to this Apple ID always wins — signing in
+    ///    is recovery, even when a different guest session is calling.
+    /// 2. Otherwise the calling guest account (if any) gets linked in place,
+    ///    keeping its rating and history.
+    /// 3. Otherwise a fresh account is created.
+    static func resolveAppleUser(
+        subject: String,
+        requestedName: String?,
+        currentUser: User?,
+        on db: Database
+    ) async throws -> User {
+        if let linked = try await User.query(on: db)
+            .filter(\.$appleUserID == subject)
+            .first() {
+            return linked
+        }
+
+        if let currentUser {
+            currentUser.appleUserID = subject
+            try await currentUser.save(on: db)
+            return currentUser
+        }
+
+        // Apple only shares the name on first authorization; fall back to a
+        // guest name rather than failing signup over an invalid one.
+        let name = requestedName.flatMap { try? User.validateDisplayName($0) }
+            ?? User.generatedGuestName()
+        let user = User(displayName: name, appleUserID: subject)
+        try await user.save(on: db)
+        return user
+    }
+
     private func issueTokens(for user: User, on req: Request) async throws -> AuthResponse {
         let userID = try user.requireID()
         let (plaintext, model) = RefreshToken.generate(for: userID)
@@ -64,7 +126,8 @@ struct AuthController: RouteCollection {
             accessToken: accessToken,
             refreshToken: plaintext,
             expiresIn: Int(UserPayload.lifetime),
-            rating: user.rating
+            rating: user.rating,
+            appleLinked: user.appleUserID != nil
         )
     }
 }

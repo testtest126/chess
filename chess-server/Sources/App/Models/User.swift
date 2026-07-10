@@ -14,6 +14,11 @@ final class User: Model, Content, @unchecked Sendable {
     @Field(key: "rating")
     var rating: Int
 
+    /// Apple's stable per-team user identifier, set once the account is
+    /// linked via Sign in with Apple. The account's recovery credential.
+    @OptionalField(key: "apple_user_id")
+    var appleUserID: String?
+
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
 
@@ -21,10 +26,11 @@ final class User: Model, Content, @unchecked Sendable {
 
     init() {}
 
-    init(id: UUID? = nil, displayName: String, rating: Int = User.initialRating) {
+    init(id: UUID? = nil, displayName: String, rating: Int = User.initialRating, appleUserID: String? = nil) {
         self.id = id
         self.displayName = displayName
         self.rating = rating
+        self.appleUserID = appleUserID
     }
 }
 
