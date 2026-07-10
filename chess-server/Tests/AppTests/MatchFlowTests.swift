@@ -342,6 +342,67 @@ final class MatchFlowTests: XCTestCase {
         return try JSONDecoder().decode([LeaderboardEntry].self, from: data)
     }
 
+    func profile(of playerID: UUID, token: String) async throws -> (HTTPStatus, PlayerProfileDTO?) {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port!)/players/\(playerID.uuidString)")!)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = HTTPStatus(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (status, try? decoder.decode(PlayerProfileDTO.self, from: data))
+    }
+
+    func testPlayerProfileAggregatesRecordAcrossColors() async throws {
+        // Game 1: white resigns → black wins.
+        let match = try await startMatch()
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        // Game 2 (rematch, colors swapped): agreed draw.
+        try await match.white.send(.requestRematch)
+        _ = try await match.black.next() // rematch offered
+        try await match.black.send(.requestRematch)
+        _ = try await match.white.next() // game start
+        _ = try await match.black.next() // game start
+        try await match.white.send(.offerDraw)
+        _ = try await match.black.next() // draw offered
+        try await match.black.send(.acceptDraw)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        // The original White has: 1 loss (as white) + 1 draw (as black, after
+        // the color swap). Any signed-in player can view the profile.
+        let (status, dto) = try await profile(of: match.whiteAuth.userID, token: match.blackAuth.accessToken)
+        XCTAssertEqual(status, .ok)
+        let p = try XCTUnwrap(dto)
+        XCTAssertEqual(p.displayName, match.whiteAuth.displayName)
+        XCTAssertEqual(p.wins, 0)
+        XCTAssertEqual(p.draws, 1)
+        XCTAssertEqual(p.losses, 1)
+        XCTAssertEqual(p.games, 2)
+        // -16 for the loss; then +1 for drawing as the lower-rated side
+        // (1184 vs 1216: expected ≈ 0.454, so a draw gains a point).
+        XCTAssertEqual(p.rating, 1185)
+
+        // The winner's mirror image.
+        let (_, winner) = try await profile(of: match.blackAuth.userID, token: match.blackAuth.accessToken)
+        XCTAssertEqual(try XCTUnwrap(winner).wins, 1)
+        XCTAssertEqual(try XCTUnwrap(winner).draws, 1)
+        XCTAssertEqual(try XCTUnwrap(winner).losses, 0)
+
+        // Unknown player → 404; no auth → 401.
+        let (missing, _) = try await profile(of: UUID(), token: match.blackAuth.accessToken)
+        XCTAssertEqual(missing, .notFound)
+        var anon = URLRequest(url: URL(string: "http://127.0.0.1:\(port!)/players/\(match.whiteAuth.userID.uuidString)")!)
+        anon.httpMethod = "GET"
+        let (_, anonResponse) = try await URLSession.shared.data(for: anon)
+        XCTAssertEqual((anonResponse as? HTTPURLResponse)?.statusCode, 401)
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testRematchSwapsColorsAndUsesUpdatedRatings() async throws {
         let match = try await startMatch()
 
