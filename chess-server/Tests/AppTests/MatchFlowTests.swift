@@ -380,6 +380,29 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testDeclineRematchNotifiesRequester() async throws {
+        let match = try await startMatch()
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+
+        // Explicit decline (the client's decline button): the requester gets
+        // rematch_declined, distinct from the opponent-left withdrawal.
+        try await match.black.send(.declineRematch)
+        guard case .rematchDeclined = try await match.white.next() else {
+            return XCTFail("expected explicit decline notice")
+        }
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testRematchUnavailableWhenOpponentQueuesElsewhere() async throws {
         let match = try await startMatch()
 
