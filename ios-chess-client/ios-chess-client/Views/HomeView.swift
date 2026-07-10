@@ -38,6 +38,33 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let opponent = ActiveGameStore.shared.opponentName {
+                    Section {
+                        Button {
+                            onlineSession = OnlineGameSession()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.tint)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Game in progress")
+                                        .fontWeight(.semibold)
+                                    Text("Tap to resume vs \(opponent)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 Section("Play Online") {
                     // Guest-first: online play never requires signing in.
                     Button {
