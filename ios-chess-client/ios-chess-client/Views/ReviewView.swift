@@ -60,9 +60,10 @@ struct ReviewView: View {
                         analyzing: game,
                         evaluator: { board in
                             let result = engine.search(board, limit: limit)
-                            return board.sideToMove == .white
+                            let whiteScore = board.sideToMove == .white
                                 ? result.scoreCentipawns
                                 : -result.scoreCentipawns
+                            return GameReview.PositionAssessment(score: whiteScore, bestMove: result.bestMove)
                         },
                         progress: onProgress
                     )
@@ -94,6 +95,8 @@ struct ReviewView: View {
                 .padding(.horizontal, 8)
 
                 playbackControls(moveCount: game.moveCount)
+
+                moveCallout(review: review)
 
                 moveGrid(review: review)
             }
@@ -174,6 +177,44 @@ struct ReviewView: View {
         }
         .font(.title3)
         .buttonStyle(.plain)
+    }
+
+    /// Verdict line for the currently shown move, naming the better move
+    /// when the played one lost ground.
+    @ViewBuilder
+    private func moveCallout(review: GameReview) -> some View {
+        if ply > 0, ply - 1 < review.moves.count {
+            let analysis = review.moves[ply - 1]
+            if analysis.judgment != .best {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(judgmentColor(analysis.judgment))
+                        .frame(width: 8, height: 8)
+                    Text(calloutText(analysis))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private func calloutText(_ analysis: GameReview.MoveAnalysis) -> String {
+        var text = "\(analysis.san) was \(judgmentPhrase(analysis.judgment))"
+        if let best = analysis.bestSAN, analysis.judgment != .good {
+            text += " — best was \(best)"
+        }
+        return text
+    }
+
+    private func judgmentPhrase(_ judgment: GameReview.Judgment) -> String {
+        switch judgment {
+        case .best: return "the best move"
+        case .good: return "a good move"
+        case .inaccuracy: return "an inaccuracy"
+        case .mistake: return "a mistake"
+        case .blunder: return "a blunder"
+        }
     }
 
     private func moveGrid(review: GameReview) -> some View {
