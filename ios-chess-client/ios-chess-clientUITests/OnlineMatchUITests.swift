@@ -160,7 +160,7 @@ final class OpponentBot: @unchecked Sendable {
                 game = (try? Game.from(uciMoves: start.moves)) ?? Game()
                 await moveIfOurTurn(scripted: "e2e4")
             case .movePlayed(let uci, _):
-                try? game.play(uci: uci)
+                _ = try? game.play(uci: uci)
                 await moveIfOurTurn(scripted: nil)
             case .gameOver:
                 gamesFinished += 1
@@ -185,7 +185,7 @@ final class OpponentBot: @unchecked Sendable {
             guard let move = engine.search(game.board, limit: SearchLimit(depth: 2)).bestMove else { return }
             uci = move.uci
         }
-        try? game.play(uci: uci)
+        _ = try? game.play(uci: uci)
         try? await send(.move(uci: uci))
     }
 
