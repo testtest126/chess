@@ -1,0 +1,32 @@
+name: Docker
+
+# Builds the production server image so a broken Dockerfile (or code that
+# doesn't compile under the image's Swift toolchain) fails the PR instead of
+# the first `fly deploy`. Build-only: nothing is pushed anywhere.
+
+on:
+  pull_request:
+    paths:
+      - "chess-server/**"
+      - "ChessKit/Sources/**"
+      - "fly.toml"
+      - ".github/workflows/docker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "chess-server/**"
+      - "ChessKit/Sources/**"
+      - "fly.toml"
+      - ".github/workflows/docker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    name: Server image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build production image
+        run: docker build -f chess-server/Dockerfile .
