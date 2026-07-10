@@ -11,7 +11,7 @@ struct LeaderboardController: RouteCollection {
     /// game appear — fresh guest accounts don't clutter the board.
     @Sendable
     func leaderboard(req: Request) async throws -> [LeaderboardEntry] {
-        _ = try req.authenticatedUserID()
+        _ = try await req.authenticatedUserID()
 
         let users = try await User.query(on: req.db)
             .sort(\.$rating, .descending)

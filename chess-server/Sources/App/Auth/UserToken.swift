@@ -13,7 +13,7 @@ struct UserPayload: JWTPayload {
         self.exp = ExpirationClaim(value: Date().addingTimeInterval(Self.lifetime))
     }
 
-    func verify(using signer: JWTSigner) throws {
+    func verify(using algorithm: some JWTAlgorithm) async throws {
         try exp.verifyNotExpired()
     }
 
@@ -22,8 +22,8 @@ struct UserPayload: JWTPayload {
 
 extension Request {
     /// Verifies the bearer token and loads the authenticated user's ID.
-    func authenticatedUserID() throws -> UUID {
-        let payload = try jwt.verify(as: UserPayload.self)
+    func authenticatedUserID() async throws -> UUID {
+        let payload = try await jwt.verify(as: UserPayload.self)
         guard let id = payload.userID else {
             throw Abort(.unauthorized, reason: "malformed subject claim")
         }
@@ -31,7 +31,7 @@ extension Request {
     }
 
     func authenticatedUser() async throws -> User {
-        let id = try authenticatedUserID()
+        let id = try await authenticatedUserID()
         guard let user = try await User.find(id, on: db) else {
             throw Abort(.unauthorized, reason: "unknown user")
         }
