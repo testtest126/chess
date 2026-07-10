@@ -62,7 +62,7 @@ struct BoardView: View {
         .aspectRatio(1, contentMode: .fit)
         .confirmationDialog("Promote to", isPresented: promotionDialogShown, titleVisibility: .visible) {
             ForEach(promotionMoves, id: \.self) { move in
-                Button(move.promotion.map(promotionLabel) ?? "") {
+                Button(move.promotion?.localizedName ?? "") {
                     play(move)
                 }
             }
@@ -208,7 +208,8 @@ struct BoardView: View {
 
     private func accessibilityDescription(_ sq: Int) -> String {
         guard let piece = board[sq] else { return Sq.name(sq) }
-        return "\(Sq.name(sq)), \(piece.color.rawValue) \(piece.kind.rawValue)"
+        return String(localized: "\(Sq.name(sq)), \(piece.color.localizedName) \(piece.kind.localizedName)",
+                      comment: "VoiceOver label for an occupied square: square name, piece color, piece kind")
     }
 
     // MARK: - Interaction
@@ -254,16 +255,6 @@ struct BoardView: View {
             get: { !promotionMoves.isEmpty },
             set: { if !$0 { promotionMoves = [] } }
         )
-    }
-
-    private func promotionLabel(_ kind: PieceKind) -> String {
-        switch kind {
-        case .queen: return "Queen"
-        case .rook: return "Rook"
-        case .bishop: return "Bishop"
-        case .knight: return "Knight"
-        default: return kind.rawValue.capitalized
-        }
     }
 
     private func promotionOrder(_ move: Move) -> Int {

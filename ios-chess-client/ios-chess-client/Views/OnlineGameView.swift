@@ -330,9 +330,15 @@ struct OnlineGameView: View {
     private var resultHeadline: String {
         guard case .finished(let result, _) = session.phase else { return "" }
         switch result {
-        case .draw: return "Draw"
-        case .whiteWins: return session.playerColor == .white ? "You Won! 🎉" : "You Lost"
-        case .blackWins: return session.playerColor == .black ? "You Won! 🎉" : "You Lost"
+        case .draw: return String(localized: "Draw", comment: "Draw game result")
+        case .whiteWins:
+            return session.playerColor == .white
+                ? String(localized: "You Won! 🎉", comment: "Game-over headline")
+                : String(localized: "You Lost", comment: "Game-over headline")
+        case .blackWins:
+            return session.playerColor == .black
+                ? String(localized: "You Won! 🎉", comment: "Game-over headline")
+                : String(localized: "You Lost", comment: "Game-over headline")
         case .ongoing: return ""
         }
     }
@@ -340,15 +346,15 @@ struct OnlineGameView: View {
     private var resultDetail: String {
         guard case .finished(_, let reason) = session.phase else { return "" }
         switch reason {
-        case .checkmate: return "Checkmate"
-        case .stalemate: return "Stalemate"
-        case .resignation: return "By resignation"
-        case .fiftyMoveRule: return "Draw by the 50-move rule"
-        case .threefoldRepetition: return "Draw by threefold repetition"
-        case .insufficientMaterial: return "Draw by insufficient material"
-        case .drawAgreement: return "Draw by agreement"
-        case .timeout: return "On time"
-        case .abandoned: return "Opponent abandoned the game"
+        case .checkmate: return String(localized: "Checkmate", comment: "Reason the game ended")
+        case .stalemate: return String(localized: "Stalemate", comment: "Reason the game ended")
+        case .resignation: return String(localized: "By resignation", comment: "Reason the game ended")
+        case .fiftyMoveRule: return String(localized: "Draw by the 50-move rule", comment: "Reason the game ended")
+        case .threefoldRepetition: return String(localized: "Draw by threefold repetition", comment: "Reason the game ended")
+        case .insufficientMaterial: return String(localized: "Draw by insufficient material", comment: "Reason the game ended")
+        case .drawAgreement: return String(localized: "Draw by agreement", comment: "Reason the game ended")
+        case .timeout: return String(localized: "On time", comment: "Reason the game ended (ran out of clock)")
+        case .abandoned: return String(localized: "Opponent abandoned the game", comment: "Reason the online game ended")
         case nil: return ""
         }
     }

@@ -42,24 +42,42 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
     public var name: String { core.name }
     public var author: String { core.author }
 
+    /// Default upper bound on entries kept in the persistent table. Sized for
+    /// mobile: at roughly ~100 bytes per stored entry (the `UInt64` key plus
+    /// the `TTEntry` value and dictionary overhead) this caps the table near
+    /// ~25 MB, small enough to live alongside the app yet large enough that a
+    /// game's worth of searches stays warm.
+    public static let defaultMaxTableEntries = 1 << 18  // 262,144
+
     private let core: NegamaxEngine
     private let lock = NSLock()
     private let stopSignal = SearchStopSignal()
     /// The table carried between searches. Only touched while `lock` is held.
     private var table: [UInt64: Search.TTEntry] = [:]
+    /// Upper bound on `table.count`, enforced after each search. Configurable
+    /// so callers (and tests) can trade memory for warmth.
+    public let maxTableEntries: Int
+    /// Bumped once per public search/ponder so entries can be evicted oldest
+    /// first. Monotonic across the engine's lifetime; `clearTable` doesn't
+    /// reset it (an empty table makes the value moot).
+    private var generation: UInt32 = 0
 
     public init(
         name: String = "ChessKit-Negamax-TT",
         author: String = "ChessKit",
-        book: OpeningBook? = nil
+        book: OpeningBook? = nil,
+        maxTableEntries: Int = PersistentNegamaxEngine.defaultMaxTableEntries
     ) {
+        precondition(maxTableEntries > 0, "maxTableEntries must be positive")
         self.core = NegamaxEngine(name: name, author: author, book: book)
+        self.maxTableEntries = maxTableEntries
     }
 
     public func search(_ board: Board, limit: SearchLimit) -> SearchResult {
         lock.lock()
         defer { lock.unlock() }
         stopSignal.reset()
+        generation &+= 1
         return searchHoldingLock(board, limit: limit)
     }
 
@@ -78,6 +96,7 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         stopSignal.reset()
+        generation &+= 1
 
         // Pass 1: search the opponent's position to predict their move.
         guard let expected = searchHoldingLock(board, limit: limit).bestMove,
@@ -120,10 +139,33 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
     /// the duration of the search so the session mutates the dictionary's
     /// sole reference in place instead of triggering a copy-on-write clone.
     private func searchHoldingLock(_ board: Board, limit: SearchLimit) -> SearchResult {
-        let session = Search(limit: limit, table: table, stop: stopSignal)
+        let session = Search(limit: limit, table: table, stop: stopSignal, generation: generation)
         table = [:]
         let result = core.search(board, limit: limit, session: session)
         table = session.table
+        evictIfOverCap()
         return result
+    }
+
+    /// Enforces `maxTableEntries` after a search has grown the table. The most
+    /// disposable entries go first — oldest generation, then shallowest depth —
+    /// so the deep results this search just learned stay warm while stale
+    /// entries from earlier moves are shed. Prunes down to 7/8 of the cap so a
+    /// prune only recurs once the table has grown back, amortizing the sort
+    /// over many searches. `lock` must be held.
+    private func evictIfOverCap() {
+        guard table.count > maxTableEntries else { return }
+        let lowWater = maxTableEntries - maxTableEntries / 8
+        let removeCount = table.count - lowWater
+        guard removeCount > 0 else { return }
+
+        let victims = table
+            .sorted { lhs, rhs in
+                lhs.value.generation != rhs.value.generation
+                    ? lhs.value.generation < rhs.value.generation
+                    : lhs.value.depth < rhs.value.depth
+            }
+            .prefix(removeCount)
+        for (key, _) in victims { table[key] = nil }
     }
 }
