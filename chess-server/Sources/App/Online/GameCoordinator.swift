@@ -24,6 +24,26 @@ struct ClockConfig: Sendable {
     static let standard = ClockConfig(.default)
 }
 
+/// Matchmaking parameters: how far apart two Elo ratings may be to pair, and
+/// how that tolerance grows while a player waits. Windows are mutual — a pair
+/// forms only when each player's window covers the gap — so nobody is handed
+/// an opponent they wouldn't accept themselves.
+struct MatchmakingConfig: Sendable {
+    /// Elo distance a fresh entrant accepts.
+    var initialWindow: Double
+    /// Window growth per second waited. Uncapped, so any two waiting players
+    /// become compatible eventually — nobody starves.
+    var widenPerSecond: Double
+    /// How often pools are rescanned for pairs that widening enabled.
+    var sweepInterval: Duration
+
+    static let standard = MatchmakingConfig(
+        initialWindow: 100,
+        widenPerSecond: 10,
+        sweepInterval: .seconds(1)
+    )
+}
+
 /// Owns all realtime state: the matchmaking queue and live games. The server
 /// is authoritative — every move is validated with ChessKit before broadcast,
 /// and clocks/timeouts are enforced here. All mutation happens on this actor;
@@ -150,9 +170,25 @@ actor GameCoordinator {
     /// Test seam: when set, every game uses these clock parameters instead of
     /// its time control's (matchmaking pools are still per-control).
     private let clockOverride: ClockConfig?
+    /// A player waiting in a matchmaking pool.
+    private struct QueueEntry {
+        let seat: Seat
+        let joinedAt: ContinuousClock.Instant
+
+        /// The Elo distance this player accepts after waiting this long.
+        func window(at now: ContinuousClock.Instant, config: MatchmakingConfig) -> Double {
+            let waited = now - joinedAt
+            let seconds = Double(waited.components.seconds)
+                + Double(waited.components.attoseconds) / 1e18
+            return config.initialWindow + config.widenPerSecond * seconds
+        }
+    }
+
     /// One matchmaking pool per time control; players are only paired within
     /// the pool they asked for.
-    private var queues: [TimeControl: [Seat]] = [:]
+    private var queues: [TimeControl: [QueueEntry]] = [:]
+    /// Rescans pools while anyone is waiting; nil when all pools are empty.
+    private var sweepTask: Task<Void, Never>?
     private var gamesByID: [UUID: LiveGame] = [:]
     private var gameIDByUser: [UUID: UUID] = [:]
     private var socketsByUser: [UUID: WebSocket] = [:]
@@ -163,11 +199,19 @@ actor GameCoordinator {
     /// How long after a game ends a rematch can still be agreed; afterwards
     /// the slot expires and both players are told the offer is gone.
     private let rematchWindow: Duration
+    /// Rating-window pairing rules; tests inject fast-widening variants.
+    private let matchmaking: MatchmakingConfig
 
-    init(app: Application, clock: ClockConfig? = nil, rematchWindow: Duration = .seconds(60)) {
+    init(
+        app: Application,
+        clock: ClockConfig? = nil,
+        rematchWindow: Duration = .seconds(60),
+        matchmaking: MatchmakingConfig = .standard
+    ) {
         self.app = app
         self.clockOverride = clock
         self.rematchWindow = rematchWindow
+        self.matchmaking = matchmaking
     }
 
     private func clockConfig(for control: TimeControl) -> ClockConfig {
@@ -340,25 +384,110 @@ actor GameCoordinator {
         removeFromAllQueues(userID: userID)
         let seat = Seat(userID: userID, name: user.displayName, rating: user.rating, socket: socket)
 
-        // Only pair players who asked for the same time control.
-        if var pool = queues[timeControl], !pool.isEmpty {
-            let opponent = pool.removeFirst()
+        // Only pair players who asked for the same time control, and only
+        // within rating windows: the closest-rated compatible opponent wins,
+        // not the longest-waiting one.
+        let entry = QueueEntry(seat: seat, joinedAt: .now)
+        var pool = queues[timeControl, default: []]
+        if let index = closestCompatibleIndex(to: entry, in: pool, at: .now) {
+            let opponent = pool.remove(at: index)
             queues[timeControl] = pool
-            // Random colors: fair over time and resistant to queue sniping.
-            if Bool.random() {
-                startGame(white: opponent, black: seat, timeControl: timeControl)
-            } else {
-                startGame(white: seat, black: opponent, timeControl: timeControl)
-            }
+            startGameRandomColors(entry.seat, opponent.seat, timeControl: timeControl)
         } else {
-            queues[timeControl, default: []].append(seat)
+            pool.append(entry)
+            queues[timeControl] = pool
             send(.queued, to: socket)
+            ensureSweeping()
         }
     }
 
     private func removeFromAllQueues(userID: UUID) {
         for control in queues.keys {
-            queues[control]?.removeAll { $0.userID == userID }
+            queues[control]?.removeAll { $0.seat.userID == userID }
+        }
+    }
+
+    // MARK: - Rating-window matchmaking
+
+    /// Index of the compatible opponent with the smallest rating gap, if any.
+    private func closestCompatibleIndex(
+        to entry: QueueEntry,
+        in pool: [QueueEntry],
+        at now: ContinuousClock.Instant
+    ) -> Int? {
+        var best: (index: Int, gap: Int)?
+        for (index, candidate) in pool.enumerated() {
+            let gap = abs(candidate.seat.rating - entry.seat.rating)
+            guard Double(gap) <= min(candidate.window(at: now, config: matchmaking),
+                                     entry.window(at: now, config: matchmaking)),
+                  gap < (best?.gap ?? .max)
+            else { continue }
+            best = (index, gap)
+        }
+        return best?.index
+    }
+
+    /// Random colors: fair over time and resistant to queue sniping.
+    private func startGameRandomColors(_ a: Seat, _ b: Seat, timeControl: TimeControl) {
+        if Bool.random() {
+            startGame(white: a, black: b, timeControl: timeControl)
+        } else {
+            startGame(white: b, black: a, timeControl: timeControl)
+        }
+    }
+
+    /// Keeps a sweep loop alive while anyone is queued, pairing players whose
+    /// windows widen into compatibility. The next join restarts it after all
+    /// pools empty out.
+    private func ensureSweeping() {
+        guard sweepTask == nil else { return }
+        let interval = matchmaking.sweepInterval
+        sweepTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                guard let self, await self.sweepAndContinue() else { return }
+            }
+        }
+    }
+
+    /// One sweep tick; false ends the loop once every pool is empty.
+    private func sweepAndContinue() -> Bool {
+        sweepPools()
+        if queues.values.allSatisfy(\.isEmpty) {
+            sweepTask = nil
+            return false
+        }
+        return true
+    }
+
+    /// Pairs everyone whose windows have widened into compatibility, closest
+    /// gaps first. Pools are small, so the quadratic scan is fine.
+    private func sweepPools() {
+        let now = ContinuousClock.now
+        for control in queues.keys {
+            var pool = queues[control] ?? []
+            var paired: [(Seat, Seat)] = []
+            while pool.count >= 2 {
+                var best: (i: Int, j: Int, gap: Int)?
+                for i in pool.indices {
+                    for j in pool.indices where j > i {
+                        let gap = abs(pool[i].seat.rating - pool[j].seat.rating)
+                        guard Double(gap) <= min(pool[i].window(at: now, config: matchmaking),
+                                                 pool[j].window(at: now, config: matchmaking)),
+                              gap < (best?.gap ?? .max)
+                        else { continue }
+                        best = (i, j, gap)
+                    }
+                }
+                guard let match = best else { break }
+                let second = pool.remove(at: match.j)
+                let first = pool.remove(at: match.i)
+                paired.append((first.seat, second.seat))
+            }
+            queues[control] = pool
+            for (a, b) in paired {
+                startGameRandomColors(a, b, timeControl: control)
+            }
         }
     }
 

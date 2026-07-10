@@ -2,6 +2,7 @@
 import XCTVapor
 import WebSocketKit
 import NIOCore
+import Fluent
 import ChessOnline
 
 /// Full-stack integration tests: boots the server on an ephemeral port and
@@ -528,6 +529,87 @@ final class MatchFlowTests: XCTestCase {
 
         try await match.white.close()
         try await match.black.close()
+    }
+
+    // MARK: - Rating-window matchmaking (#43)
+
+    private func setRating(_ rating: Int, for auth: AuthResponse) async throws {
+        let found = try await User.find(auth.userID, on: app.db)
+        let user = try XCTUnwrap(found)
+        user.rating = rating
+        try await user.save(on: app.db)
+    }
+
+    private func queuedPlayer(rating: Int) async throws -> TestSocket {
+        let auth = try await register()
+        try await setRating(rating, for: auth)
+        let socket = try await TestSocket.connect(port: port, token: auth.accessToken, on: app.eventLoopGroup)
+        try await socket.send(.joinQueue(timeControl: .default))
+        return socket
+    }
+
+    func testPairsByRatingNotArrivalOrder() async throws {
+        // Windows never widen here: ±100 Elo, forever.
+        app.gameCoordinator = GameCoordinator(
+            app: app,
+            matchmaking: MatchmakingConfig(
+                initialWindow: 100, widenPerSecond: 0, sweepInterval: .milliseconds(50))
+        )
+
+        let low = try await queuedPlayer(rating: 900)
+        guard case .queued = try await low.next() else { return XCTFail("expected queued") }
+        // The FIFO head is 1000 Elo away and must NOT be paired…
+        let far = try await queuedPlayer(rating: 1900)
+        guard case .queued = try await far.next() else { return XCTFail("expected queued") }
+        // …while the late arrival 50 away pairs immediately.
+        let close = try await queuedPlayer(rating: 950)
+
+        guard case .gameStart(let start) = try await close.next() else {
+            return XCTFail("expected immediate close-rated pairing")
+        }
+        XCTAssertEqual(start.opponentRating, 900)
+        guard case .gameStart = try await low.next() else {
+            return XCTFail("expected the close-rated pair to start")
+        }
+
+        // The distant player keeps waiting under a non-widening window.
+        do {
+            let unexpected = try await far.next(timeoutSeconds: 0.5)
+            XCTFail("distant player should still be queued, got \(unexpected)")
+        } catch TestSocketError.timeout {}
+
+        try await low.close()
+        try await close.close()
+        try await far.close()
+    }
+
+    func testWindowWidensUntilLonePairMatches() async throws {
+        // ±100 at entry, widening fast: a 1000-Elo gap becomes compatible
+        // after ~0.45s and the sweep pairs the two lone players — the
+        // starvation-free guarantee.
+        app.gameCoordinator = GameCoordinator(
+            app: app,
+            matchmaking: MatchmakingConfig(
+                initialWindow: 100, widenPerSecond: 2000, sweepInterval: .milliseconds(50))
+        )
+
+        let a = try await queuedPlayer(rating: 900)
+        guard case .queued = try await a.next() else { return XCTFail("expected queued") }
+        let b = try await queuedPlayer(rating: 1900)
+        guard case .queued = try await b.next() else { return XCTFail("expected queued") }
+
+        guard case .gameStart(let startA) = try await a.next(timeoutSeconds: 5),
+              case .gameStart(let startB) = try await b.next(timeoutSeconds: 5)
+        else {
+            return XCTFail("expected widening windows to pair the lone players")
+        }
+        XCTAssertEqual(startA.gameID, startB.gameID)
+        // Color assignment stays random-and-complementary.
+        XCTAssertNotEqual(startA.yourColor, startB.yourColor)
+        XCTAssertEqual(startA.opponentRating, 1900)
+
+        try await a.close()
+        try await b.close()
     }
 
     func testUnauthenticatedSocketIsClosed() async throws {
