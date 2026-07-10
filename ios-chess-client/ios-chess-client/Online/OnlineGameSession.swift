@@ -41,6 +41,7 @@ final class OnlineGameSession: Identifiable {
     // Rematch state (valid while phase is .finished).
     private(set) var rematchRequested = false
     private(set) var rematchOfferedByOpponent = false
+    private(set) var rematchDeclined = false
     private(set) var rematchUnavailable = false
 
     private let account: AccountStore
@@ -106,6 +107,14 @@ final class OnlineGameSession: Identifiable {
         guard let client, case .finished = phase, !rematchUnavailable, !rematchRequested else { return }
         rematchRequested = true
         Task { try? await client.send(.requestRematch) }
+    }
+
+    /// Decline the opponent's rematch offer.
+    func declineRematch() {
+        guard let client, rematchOfferedByOpponent, !rematchDeclined else { return }
+        rematchDeclined = true
+        rematchOfferedByOpponent = false
+        Task { try? await client.send(.declineRematch) }
     }
 
     /// Remaining seconds for `color` as displayed at `date` (the active side
@@ -190,6 +199,7 @@ final class OnlineGameSession: Identifiable {
             ratingDelta = nil
             rematchRequested = false
             rematchOfferedByOpponent = false
+            rematchDeclined = false
             rematchUnavailable = false
             phase = .playing
 
@@ -234,6 +244,9 @@ final class OnlineGameSession: Identifiable {
 
         case .rematchOffered:
             rematchOfferedByOpponent = true
+
+        case .rematchDeclined:
+            rematchRequested = false
 
         case .rematchUnavailable:
             rematchUnavailable = true
