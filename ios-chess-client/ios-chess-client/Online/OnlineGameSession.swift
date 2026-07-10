@@ -181,6 +181,9 @@ final class OnlineGameSession: Identifiable {
         switch message {
         case .queued:
             phase = .queued
+            // Queued means the server has no game for us: drop any stale
+            // resume hint (e.g. a game that ended while the app was closed).
+            ActiveGameStore.shared.clear()
 
         case .gameStart(let start):
             playerColor = start.yourColor == "black" ? .black : .white
@@ -202,6 +205,8 @@ final class OnlineGameSession: Identifiable {
             rematchDeclined = false
             rematchUnavailable = false
             phase = .playing
+            // A live game exists: let the home screen offer to resume it.
+            ActiveGameStore.shared.begin(opponent: start.opponentName)
 
         case .movePlayed(let uci, let newClock):
             if let move = Move(uci: uci) {
@@ -232,6 +237,8 @@ final class OnlineGameSession: Identifiable {
             // The socket stays open: the rematch handshake happens on it, and
             // a fresh game_start flips the session back to .playing.
             phase = .finished(result: gameResult, reason: endReason)
+            // The game is over: nothing to resume from the home screen.
+            ActiveGameStore.shared.clear()
 
         case .drawOffered:
             incomingDrawOffer = true
