@@ -1,3 +1,4 @@
+import Foundation
 import ChessKit
 
 /// A minimal UCI (Universal Chess Interface) adapter around a ``ChessEngine``.
@@ -94,11 +95,12 @@ public final class UCIEngine {
         board = position
     }
 
-    /// Parses the subset of `go` we support (`depth`, `nodes`), searches, and
-    /// returns an `info` line followed by `bestmove`.
+    /// Parses the subset of `go` we support (`depth`, `nodes`, `movetime`),
+    /// searches, and returns an `info` line followed by `bestmove`.
     private func runGo(_ args: [String]) -> [String] {
         var depth = defaultDepth
         var maxNodes: Int?
+        var moveTime: TimeInterval?
 
         var i = 0
         while i < args.count {
@@ -107,13 +109,22 @@ public final class UCIEngine {
                 if i + 1 < args.count, let d = Int(args[i + 1]) { depth = d; i += 1 }
             case "nodes":
                 if i + 1 < args.count, let n = Int(args[i + 1]) { maxNodes = n; i += 1 }
+            case "movetime":
+                // UCI movetime is in milliseconds.
+                if i + 1 < args.count, let ms = Int(args[i + 1]) {
+                    moveTime = TimeInterval(ms) / 1000
+                    // A time-managed search deepens as far as the budget
+                    // allows; the explicit depth (if any) stays the ceiling.
+                    if !args.contains("depth") { depth = 64 }
+                    i += 1
+                }
             default:
                 break
             }
             i += 1
         }
 
-        let result = engine.search(board, limit: SearchLimit(depth: depth, maxNodes: maxNodes))
+        let result = engine.search(board, limit: SearchLimit(depth: depth, maxNodes: maxNodes, moveTime: moveTime))
 
         var lines: [String] = []
         lines.append(infoLine(for: result))

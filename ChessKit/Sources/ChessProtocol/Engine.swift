@@ -1,3 +1,4 @@
+import Foundation
 import ChessKit
 
 /// Constraints on a single search. Mirrors the subset of UCI `go` parameters
@@ -7,10 +8,15 @@ public struct SearchLimit: Sendable, Equatable {
     public var depth: Int
     /// Optional soft cap on nodes visited. `nil` means no node limit.
     public var maxNodes: Int?
+    /// Optional soft time budget in seconds. The engine finishes the depth-1
+    /// pass regardless, then stops deepening once the budget is spent, so it
+    /// always returns a fully searched move.
+    public var moveTime: TimeInterval?
 
-    public init(depth: Int, maxNodes: Int? = nil) {
+    public init(depth: Int, maxNodes: Int? = nil, moveTime: TimeInterval? = nil) {
         self.depth = depth
         self.maxNodes = maxNodes
+        self.moveTime = moveTime
     }
 
     public static let `default` = SearchLimit(depth: 4)

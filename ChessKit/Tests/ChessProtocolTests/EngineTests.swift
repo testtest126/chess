@@ -46,6 +46,40 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(a.nodes, b.nodes)
     }
 
+    func testQuiescenceAvoidsHorizonBlunder() {
+        // The e5 pawn is defended by d6. A pure depth-1 search would grab it
+        // (+100 at the horizon); quiescence sees the recapture and declines.
+        let board = Board(fen: "4k3/8/3p4/4p3/8/8/4Q3/4K3 w - - 0 1")!
+        let result = engine.search(board, limit: SearchLimit(depth: 1))
+        XCTAssertNotEqual(result.bestMove?.uci, "e2e5", "queen should not grab the defended pawn")
+    }
+
+    func testFindsMateInTwo() {
+        // Rook ladder: 1.Ra7 (confining the king) Kg8 2.Rb8# — or the mirror
+        // starting with Rb7. Either way it's mate in two (3 plies).
+        let board = Board(fen: "7k/8/8/8/8/8/R7/1R4K1 w - - 0 1")!
+        let result = engine.search(board, limit: SearchLimit(depth: 4))
+        XCTAssertEqual(result.mateInPlies, 3)
+    }
+
+    func testMoveTimeIsRespected() {
+        let board = Board(fen: "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4")!
+        let clock = ContinuousClock()
+        let elapsed = clock.measure {
+            let result = engine.search(board, limit: SearchLimit(depth: 64, moveTime: 0.1))
+            XCTAssertNotNil(result.bestMove)
+        }
+        // Soft budget: one pass may overshoot slightly, but not by much.
+        XCTAssertLessThan(elapsed, .seconds(2))
+    }
+
+    func testIterativeDeepeningReportsCompletedDepth() {
+        let board = Board()
+        let result = engine.search(board, limit: SearchLimit(depth: 3))
+        XCTAssertEqual(result.depth, 3)
+        XCTAssertNotNil(result.bestMove)
+    }
+
     func testMatePliesConversion() {
         // Scores near the mate bound decode to the right ply distance.
         XCTAssertEqual(NegamaxEngine.matePlies(from: NegamaxEngine.mateScore - 1), 1)
