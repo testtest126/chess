@@ -20,6 +20,9 @@ final class OnlineGameSession: Identifiable {
     let id = UUID()
     private(set) var phase: Phase = .connecting
     private(set) var game = Game()
+    /// The control chosen in the lobby; games are matched within it. Kept in
+    /// sync with the server's game_start echo (a resync is authoritative).
+    private(set) var timeControl: TimeControl
     private(set) var playerColor: PieceColor = .white
     private(set) var opponentName = "Opponent"
     private(set) var opponentRating: Int?
@@ -53,7 +56,8 @@ final class OnlineGameSession: Identifiable {
         phase == .playing && !game.isOver && board.sideToMove == playerColor
     }
 
-    init(account: AccountStore? = nil) {
+    init(timeControl: TimeControl = .default, account: AccountStore? = nil) {
+        self.timeControl = timeControl
         // Resolve the default inside the main-actor init body rather than as a
         // default argument, which would evaluate `.shared` in a nonisolated
         // context (a hard error under the Swift 6 language mode).
@@ -126,9 +130,10 @@ final class OnlineGameSession: Identifiable {
                 self.client = client
                 client.connect()
 
-                // Ask for a game: the server replies with `queued`, or with
-                // `game_start` (resync) if we're already in one.
-                try await client.send(.joinQueue)
+                // Ask for a game at the chosen control: the server replies
+                // with `queued`, or with `game_start` (resync) if we're
+                // already in one.
+                try await client.send(.joinQueue(timeControl: timeControl))
                 attempts = 0
 
                 for await message in client.messages {
@@ -170,6 +175,9 @@ final class OnlineGameSession: Identifiable {
 
         case .gameStart(let start):
             playerColor = start.yourColor == "black" ? .black : .white
+            if let control = start.timeControl {
+                timeControl = control // e.g. a rematch resync after reconnect
+            }
             opponentName = start.opponentName
             opponentRating = start.opponentRating
             opponentConnected = true

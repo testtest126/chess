@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import ChessKit
+import ChessOnline
 
 /// Root screen: start a new game against the engine, or revisit past games.
 struct HomeView: View {
@@ -9,6 +10,7 @@ struct HomeView: View {
 
     @State private var colorChoice: ColorChoice = .white
     @State private var difficulty: Difficulty = .casual
+    @State private var timeControl: TimeControl = .default
     @State private var activeSession: GameSession?
     @State private var onlineSession: OnlineGameSession?
     @State private var reviewTarget: SavedGame?
@@ -36,8 +38,15 @@ struct HomeView: View {
         NavigationStack {
             List {
                 Section("Play Online") {
+                    Picker("Time control", selection: $timeControl) {
+                        ForEach(TimeControl.allCases, id: \.self) { control in
+                            Text(control.displayName).tag(control)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
                     Button {
-                        onlineSession = OnlineGameSession()
+                        onlineSession = OnlineGameSession(timeControl: timeControl)
                     } label: {
                         Label("Play Online", systemImage: "globe")
                             .frame(maxWidth: .infinity)

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import ChessKit
+import ChessOnline
 
 /// The online match screen: matchmaking spinner, then the live board.
 struct OnlineGameView: View {
@@ -31,7 +32,7 @@ struct OnlineGameView: View {
                     failureView(message)
                 }
             }
-            .navigationTitle("Online")
+            .navigationTitle(session.timeControl.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -110,7 +111,10 @@ struct OnlineGameView: View {
                 .controlSize(.large)
             Text(session.phase == .queued ? "Finding an opponent…" : "Connecting…")
                 .font(.headline)
-            Text("You'll be matched with the next player in line.")
+            Label(session.timeControl.displayName, systemImage: "timer")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("You'll be matched with the next player who wants this time control.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button("Cancel") {

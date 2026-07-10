@@ -139,7 +139,8 @@ final class OpponentBot: @unchecked Sendable {
         self.socket = socket
         socket.resume()
 
-        try await send(.joinQueue)
+        // Queue at the app's default control so matchmaking pairs the two.
+        try await send(.joinQueue(timeControl: .default))
         // Wait for the queue acknowledgment before letting the app join, so
         // the bot is first in line (and thus plays White).
         while true {
