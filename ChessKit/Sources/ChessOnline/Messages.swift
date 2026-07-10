@@ -39,6 +39,8 @@ public enum ClientMessage: Sendable, Equatable {
     /// After a game ends: ask to play the same opponent again (colors
     /// swapped). The rematch starts when both players have asked.
     case requestRematch
+    /// Decline the opponent's pending rematch offer.
+    case declineRematch
 }
 
 extension ClientMessage: Codable {
