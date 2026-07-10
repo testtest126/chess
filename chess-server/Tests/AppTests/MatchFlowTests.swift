@@ -224,6 +224,36 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testLeaderboardRanksPlayersWithGames() async throws {
+        let match = try await startMatch()
+
+        // Before anyone finishes a game the leaderboard is empty.
+        let before = try await leaderboard(token: match.whiteAuth.accessToken)
+        XCTAssertTrue(before.isEmpty)
+
+        try await match.white.send(.resign)
+        _ = try await match.black.next() // game over
+
+        let entries = try await leaderboard(token: match.whiteAuth.accessToken)
+        XCTAssertEqual(entries.count, 2)
+        // Black won: ranked first with the higher rating.
+        XCTAssertEqual(entries[0].rating, 1216)
+        XCTAssertEqual(entries[1].rating, 1184)
+        XCTAssertEqual(entries[0].games, 1)
+        XCTAssertTrue(entries[0].rating > entries[1].rating)
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
+    func leaderboard(token: String) async throws -> [LeaderboardEntry] {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port!)/leaderboard")!)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        return try JSONDecoder().decode([LeaderboardEntry].self, from: data)
+    }
+
     func testUnauthenticatedSocketIsClosed() async throws {
         do {
             let socket = try await TestSocket.connect(port: port, token: "garbage", on: app.eventLoopGroup)

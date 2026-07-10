@@ -85,6 +85,18 @@ final class AccountStore {
 
     // MARK: - Requests
 
+    /// Top players by rating (requires an account; registers one if needed).
+    func fetchLeaderboard() async throws -> [LeaderboardEntry] {
+        let token = try await validAccessToken()
+        var request = URLRequest(url: ServerConfig.httpBase.appending(path: "leaderboard"))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AccountError.server(status: (response as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return try JSONDecoder().decode([LeaderboardEntry].self, from: data)
+    }
+
     private func register() async throws -> AuthResponse {
         try await post("auth/register", body: RegisterRequest())
     }
