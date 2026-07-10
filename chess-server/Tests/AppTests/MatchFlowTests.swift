@@ -254,6 +254,66 @@ final class MatchFlowTests: XCTestCase {
         return try JSONDecoder().decode([LeaderboardEntry].self, from: data)
     }
 
+    func testRematchSwapsColorsAndUsesUpdatedRatings() async throws {
+        let match = try await startMatch()
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        // One side asks; the other is notified, then agrees.
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+        try await match.black.send(.requestRematch)
+
+        guard case .gameStart(let startA) = try await match.white.next(),
+              case .gameStart(let startB) = try await match.black.next()
+        else {
+            return XCTFail("expected rematch game start")
+        }
+        // Colors swap: the previous White now plays Black.
+        XCTAssertEqual(startA.yourColor, "black")
+        XCTAssertEqual(startB.yourColor, "white")
+        XCTAssertTrue(startA.moves.isEmpty)
+        // Ratings reflect the finished game (previous White resigned: 1184).
+        XCTAssertEqual(startB.opponentRating, 1184)
+        XCTAssertEqual(startA.opponentRating, 1216)
+
+        // The new game is live: previous Black (now White) moves first.
+        try await match.black.send(.move(uci: "e2e4"))
+        guard case .movePlayed(let uci, _) = try await match.white.next() else {
+            return XCTFail("expected move in rematch game")
+        }
+        XCTAssertEqual(uci, "e2e4")
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
+    func testRematchUnavailableWhenOpponentQueuesElsewhere() async throws {
+        let match = try await startMatch()
+
+        try await match.white.send(.resign)
+        _ = try await match.white.next() // game over
+        _ = try await match.black.next() // game over
+
+        try await match.white.send(.requestRematch)
+        guard case .rematchOffered = try await match.black.next() else {
+            return XCTFail("expected rematch offer relay")
+        }
+
+        // The opponent moves on to a new opponent instead.
+        try await match.black.send(.joinQueue)
+        guard case .rematchUnavailable = try await match.white.next() else {
+            return XCTFail("expected rematch withdrawal notice")
+        }
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testUnauthenticatedSocketIsClosed() async throws {
         do {
             let socket = try await TestSocket.connect(port: port, token: "garbage", on: app.eventLoopGroup)

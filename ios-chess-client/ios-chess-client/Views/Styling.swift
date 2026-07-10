@@ -7,23 +7,36 @@ import SwiftUI
 extension View {
     /// Primary call-to-action style: Liquid Glass on iOS 26+, prominent
     /// bordered elsewhere. Always large.
+    ///
+    /// The `#if compiler` gate matters: `.glassProminent` only exists in the
+    /// iOS 26 SDK (Xcode 26 / Swift 6.2+). `#available` is a runtime check,
+    /// so without the compile-time gate this file fails to build on older
+    /// toolchains — such as CI runners still on Xcode 16.
     @ViewBuilder
     func primaryActionButtonStyle() -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.buttonStyle(.glassProminent).controlSize(.large)
         } else {
             self.buttonStyle(.borderedProminent).controlSize(.large)
         }
+        #else
+        self.buttonStyle(.borderedProminent).controlSize(.large)
+        #endif
     }
 
     /// Secondary action style: Liquid Glass on iOS 26+, bordered elsewhere.
     @ViewBuilder
     func secondaryActionButtonStyle() -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.buttonStyle(.glass).controlSize(.large)
         } else {
             self.buttonStyle(.bordered).controlSize(.large)
         }
+        #else
+        self.buttonStyle(.bordered).controlSize(.large)
+        #endif
     }
 
     /// Card backdrop for player bars and summary blocks — a thin material so

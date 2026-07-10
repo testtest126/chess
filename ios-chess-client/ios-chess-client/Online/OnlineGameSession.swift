@@ -35,6 +35,11 @@ final class OnlineGameSession: Identifiable {
     /// The player's own Elo change, once the game is over.
     private(set) var ratingDelta: Int?
 
+    // Rematch state (valid while phase is .finished).
+    private(set) var rematchRequested = false
+    private(set) var rematchOfferedByOpponent = false
+    private(set) var rematchUnavailable = false
+
     private let account: AccountStore
     private var client: OnlineGameClient?
     private var messageLoop: Task<Void, Never>?
@@ -48,8 +53,11 @@ final class OnlineGameSession: Identifiable {
         phase == .playing && !game.isOver && board.sideToMove == playerColor
     }
 
-    init(account: AccountStore = .shared) {
-        self.account = account
+    init(account: AccountStore? = nil) {
+        // Resolve the default inside the main-actor init body rather than as a
+        // default argument, which would evaluate `.shared` in a nonisolated
+        // context (a hard error under the Swift 6 language mode).
+        self.account = account ?? .shared
     }
 
     func start() {
@@ -86,6 +94,14 @@ final class OnlineGameSession: Identifiable {
         guard let client, incomingDrawOffer else { return }
         incomingDrawOffer = false
         Task { try? await client.send(accept ? .acceptDraw : .declineDraw) }
+    }
+
+    /// Ask to play the same opponent again. The rematch starts (a fresh
+    /// game_start arrives, colors swapped) once both players have asked.
+    func requestRematch() {
+        guard let client, case .finished = phase, !rematchUnavailable, !rematchRequested else { return }
+        rematchRequested = true
+        Task { try? await client.send(.requestRematch) }
     }
 
     /// Remaining seconds for `color` as displayed at `date` (the active side
@@ -125,6 +141,14 @@ final class OnlineGameSession: Identifiable {
 
             guard !isTerminal, !Task.isCancelled else { return }
 
+            // After a finished game the socket only serves the rematch
+            // handshake — if it drops, the rematch is simply off; never
+            // reconnect (that would re-queue the player).
+            if case .finished = phase {
+                rematchUnavailable = true
+                return
+            }
+
             // The socket dropped mid-session. Retry a few times, then give up.
             attempts += 1
             if attempts > 5 {
@@ -152,13 +176,20 @@ final class OnlineGameSession: Identifiable {
             game = (try? Game.from(uciMoves: start.moves)) ?? Game()
             clock = start.clock
             clockSyncedAt = Date()
+            // Fresh game (first match or an accepted rematch): clear per-game state.
+            incomingDrawOffer = false
+            outgoingDrawOffer = false
+            ratingDelta = nil
+            rematchRequested = false
+            rematchOfferedByOpponent = false
+            rematchUnavailable = false
             phase = .playing
 
         case .movePlayed(let uci, let newClock):
             if let move = Move(uci: uci) {
                 SoundPlayer.playMove(move, on: board)
             }
-            try? game.play(uci: uci)
+            _ = try? game.play(uci: uci) // server is authoritative; ignore local apply failures
             if let newClock {
                 clock = newClock
                 clockSyncedAt = Date()
@@ -180,9 +211,9 @@ final class OnlineGameSession: Identifiable {
                 account.applyRatingDelta(delta)
             }
             SoundPlayer.play(.gameEnd)
+            // The socket stays open: the rematch handshake happens on it, and
+            // a fresh game_start flips the session back to .playing.
             phase = .finished(result: gameResult, reason: endReason)
-            isTerminal = true
-            client?.close()
 
         case .drawOffered:
             incomingDrawOffer = true
@@ -192,6 +223,13 @@ final class OnlineGameSession: Identifiable {
 
         case .opponentStatus(let connected):
             opponentConnected = connected
+
+        case .rematchOffered:
+            rematchOfferedByOpponent = true
+
+        case .rematchUnavailable:
+            rematchUnavailable = true
+            rematchOfferedByOpponent = false
 
         case .errorMessage:
             // Server rejected something (e.g. an illegal move race); the

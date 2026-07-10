@@ -1,0 +1,51 @@
+name: iOS
+
+# Simulator jobs are slow, so this only runs when app-facing code changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios-chess-client/**"
+      - "ChessKit/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios-chess-client/**"
+      - "ChessKit/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-tests:
+    name: App build & UI tests
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 -E "iPhone" | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+          if [ -z "$UDID" ]; then
+            echo "No iPhone simulator available"; xcrun simctl list devices; exit 1
+          fi
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run UI tests
+        # OnlineMatchUITests skips itself when no server is listening on
+        # 127.0.0.1:8080, so this covers the offline flows.
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:ios-chess-clientUITests/GameFlowUITests \
+            -only-testing:ios-chess-clientUITests/OnlineMatchUITests \
+            | tail -100
