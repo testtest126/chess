@@ -3,7 +3,15 @@ import ChessKit
 import ChessProtocol
 import ChessOnline
 
-/// End-to-end online play against a real server on 127.0.0.1:8080.
+/// The server the whole E2E talks to — the app under test, the bot, and the
+/// health probe. Set the CHESS_SERVER_URL environment variable
+/// (TEST_RUNNER_CHESS_SERVER_URL via xcodebuild) to point the suite at
+/// another server, e.g. a spare port when 8080 is already in use.
+private let serverBase = URL(string:
+    ProcessInfo.processInfo.environment["CHESS_SERVER_URL"] ?? "http://127.0.0.1:8080"
+)!
+
+/// End-to-end online play against a real server, `serverBase`.
 ///
 /// The test process doubles as the opponent: it registers its own guest
 /// account, joins the matchmaking queue over a WebSocket, and answers with
@@ -23,19 +31,34 @@ final class OnlineMatchUITests: XCTestCase {
 
         // The opponent bot queues first; color assignment is random.
         let bot = OpponentBot()
-        try await bot.registerAndQueue()
+        try await bot.registerAndQueue(timeControl: .bullet)
 
         let app = XCUIApplication()
+        app.launchArguments += ["-server_base_url", serverBase.absoluteString]
         app.launch()
+
+        // Choose bullet in the lobby picker: this covers the picker → session
+        // → join_queue wiring, not just the protocol default.
+        app.buttons["Bullet 1+0"].tap()
         app.buttons["Play Online"].tap()
 
         // Match forms as soon as the app joins the queue.
         let board = app.descendants(matching: .any)["square_e2"]
         XCTAssertTrue(board.waitForExistence(timeout: 15), "board should appear once matched")
 
-        // Clocks are shown for both sides.
+        // Clocks are shown for both sides, and the game is really played at
+        // the chosen control: bullet clocks start from 1:00, so anything at
+        // or under a minute proves we didn't fall back to blitz's 5:00.
         XCTAssertTrue(app.staticTexts["clock_white"].waitForExistence(timeout: 5), "white clock should render")
         XCTAssertTrue(app.staticTexts["clock_black"].exists, "black clock should render")
+        XCTAssertTrue(app.navigationBars["Bullet 1+0"].exists, "in-game title should name the chosen control")
+        for clockID in ["clock_white", "clock_black"] {
+            let label = app.staticTexts[clockID].label
+            XCTAssertTrue(
+                label == "1:00" || label.hasPrefix("0:"),
+                "\(clockID) should start from bullet's 1:00, got \(label)"
+            )
+        }
 
         // If the bot got White it opens 1. e4 immediately; otherwise we're
         // White and open ourselves. Either way we make exactly one move.
@@ -67,6 +90,7 @@ final class OnlineMatchUITests: XCTestCase {
             waitUntilGone(app.staticTexts["You Lost"], timeout: 10),
             "rematch should start a fresh game and dismiss the sheet"
         )
+        XCTAssertTrue(app.navigationBars["Bullet 1+0"].exists, "rematch should stay at the original control")
 
         // Play one move in the rematch, colors reversed from game one.
         if app.staticTexts["e4"].waitForExistence(timeout: 8) {
@@ -110,7 +134,15 @@ final class OnlineMatchUITests: XCTestCase {
 
 /// A scripted opponent speaking the real wire protocol.
 final class OpponentBot: @unchecked Sendable {
-    private static let base = URL(string: "http://127.0.0.1:8080")!
+    private static let base = serverBase
+
+    /// The /play WebSocket endpoint, derived from `base` (http → ws).
+    private static var playSocketURL: URL {
+        var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
+        components.scheme = components.scheme == "https" ? "wss" : "ws"
+        components.path = "/play"
+        return components.url!
+    }
 
     private var socket: URLSessionWebSocketTask?
     private var game = Game()
@@ -124,7 +156,7 @@ final class OpponentBot: @unchecked Sendable {
         return (try? await URLSession.shared.data(for: request)) != nil
     }
 
-    func registerAndQueue() async throws {
+    func registerAndQueue(timeControl: TimeControl = .default) async throws {
         var request = URLRequest(url: Self.base.appending(path: "auth/register"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -133,16 +165,17 @@ final class OpponentBot: @unchecked Sendable {
         let auth = try JSONDecoder().decode(AuthResponse.self, from: data)
         displayName = auth.displayName
 
-        var wsRequest = URLRequest(url: URL(string: "ws://127.0.0.1:8080/play")!)
+        var wsRequest = URLRequest(url: Self.playSocketURL)
         wsRequest.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
         let socket = URLSession.shared.webSocketTask(with: wsRequest)
         self.socket = socket
         socket.resume()
 
-        // Queue at the app's default control so matchmaking pairs the two.
-        try await send(.joinQueue(timeControl: .default))
+        // Queue at the same control the UI test picks in the lobby, so
+        // matchmaking pairs the bot with the app.
+        try await send(.joinQueue(timeControl: timeControl))
         // Wait for the queue acknowledgment before letting the app join, so
-        // the bot is first in line (and thus plays White).
+        // the bot is already waiting when the app queues (colors are random).
         while true {
             if case .queued = try await receive() { break }
         }
