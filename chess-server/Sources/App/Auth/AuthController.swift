@@ -72,10 +72,21 @@ struct AuthController: RouteCollection {
             throw Abort(.unauthorized, reason: "invalid Apple identity token")
         }
 
+        // A presented bearer must be valid: silently treating an expired or
+        // forged bearer as "anonymous" would turn a guest's linking attempt
+        // into a fresh account permanently bound to their Apple ID,
+        // stranding their history.
+        let currentUser: User?
+        if req.headers.bearerAuthorization != nil {
+            currentUser = try await req.authenticatedUser()
+        } else {
+            currentUser = nil
+        }
+
         let user = try await Self.resolveAppleUser(
             subject: subject,
             requestedName: body.displayName,
-            currentUser: try? await req.authenticatedUser(),
+            currentUser: currentUser,
             on: req.db
         )
         return try await issueTokens(for: user, on: req)
@@ -100,6 +111,12 @@ struct AuthController: RouteCollection {
         }
 
         if let currentUser {
+            // Never overwrite an existing link: a stolen bearer must not be
+            // able to rebind the account to the attacker's Apple ID (which
+            // would lock the victim's own Apple sign-in out of recovery).
+            guard currentUser.appleUserID == nil || currentUser.appleUserID == subject else {
+                throw Abort(.conflict, reason: "account is already linked to a different Apple ID")
+            }
             currentUser.appleUserID = subject
             try await currentUser.save(on: db)
             return currentUser
