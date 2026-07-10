@@ -43,6 +43,12 @@ jobs:
       - name: Build and run UI tests
         # OnlineMatchUITests skips itself when no server is listening on
         # 127.0.0.1:8080, so this covers the offline flows.
+        #
+        # -retry-tests-on-failure absorbs runner-infrastructure flakes (stuck
+        # simulator clones, xctrunner launch RequestDenied) that have caused
+        # most of this lane's red runs; genuinely broken tests still fail all
+        # repetitions. The tail is sized so assertion messages survive — at
+        # 100 lines they were getting cut, leaving red runs undiagnosable.
         run: |
           set -o pipefail
           xcodebuild test \
@@ -50,13 +56,16 @@ jobs:
             -scheme ios-chess-client \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -resultBundlePath TestResults.xcresult \
+            -retry-tests-on-failure \
+            -test-iterations 3 \
+            -test-repetition-relaunch-enabled YES \
             -only-testing:ios-chess-clientUITests/GameFlowUITests \
             -only-testing:ios-chess-clientUITests/OnlineMatchUITests \
-            | tail -100
+            | tail -400
 
       - name: Upload result bundle on failure
-        # The tail above keeps the step log short, which also hides assertion
-        # details when a test fails; the xcresult has them plus screenshots.
+        # The tail above keeps the step log scannable; the xcresult has the
+        # full assertion details plus screenshots when a test fails.
         if: failure()
         uses: actions/upload-artifact@v4
         with:
