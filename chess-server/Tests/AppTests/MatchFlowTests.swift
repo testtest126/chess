@@ -641,11 +641,11 @@ enum TestSocketError: Error {
 /// Minimal async wrapper around a WebSocketKit client connection.
 actor TestSocket {
     private let ws: WebSocket
-    private var iterator: AsyncStream<ServerMessage>.Iterator
+    private let stream: AsyncStream<ServerMessage>
 
     private init(ws: WebSocket, stream: AsyncStream<ServerMessage>) {
         self.ws = ws
-        self.iterator = stream.makeAsyncIterator()
+        self.stream = stream
     }
 
     static func connect(port: Int, token: String, on group: any EventLoopGroup) async throws -> TestSocket {
@@ -699,12 +699,12 @@ actor TestSocket {
     }
 
     private func nextMessage() async -> ServerMessage? {
-        // AsyncStream iterators box shared storage, so consuming through a
-        // local copy (to satisfy actor isolation) still advances the stream.
-        var localIterator = iterator
-        let value = await localIterator.next()
-        iterator = localIterator
-        return value
+        // A fresh iterator per call: born in a disconnected region, it may
+        // legally be sent by the nonisolated next() (a stored one may not,
+        // which Swift 6 flags). Iterators share the stream's storage, so
+        // consecutive ones still consume in order.
+        for await value in stream { return value }
+        return nil
     }
 
     func close() async throws {
