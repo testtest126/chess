@@ -1,0 +1,48 @@
+# SwiftFormat configuration (issue #100).
+#
+# Tuned to match the style already used across ChessKit/, chess-server/, and
+# ios-chess-client/ — the goal is consistency enforcement, not a restyle.
+# Rules that would fight deliberate existing style, or that rewrite
+# semantics/API surface, are disabled below with reasons.
+
+--swiftversion 6.0
+
+# Paths: skip build products. (No generated/vendored Swift sources exist today;
+# add them here if any appear.)
+--exclude **/.build
+
+# Options matching the existing style
+--indent 4
+--patternlet inline # `case .move(let san)` everywhere; never `case let .move(san)`
+--ranges no-space # `0..<64`, `chars[0...1]`
+--ifdef no-indent # `#if` bodies keep the surrounding scope's indentation
+
+# --- Disabled: would restyle deliberate existing conventions ---
+--disable andOperator # `&&` in conditions is used deliberately
+--disable conditionalAssignment # keep if/else assignment; no if-expressions rewrite
+--disable consecutiveSpaces # preserves aligned trailing comments (FEN tables etc.)
+--disable docComments # don't reclassify // vs ///
+--disable hoistAwait # `await` kept at the call site
+--disable hoistTry # `try` kept at the call site
+--disable numberFormatting # numeric literals stay exactly as written
+--disable redundantReturn # explicit `return` is the house style
+--disable redundantSelf # keep current explicit-self usage
+--disable redundantType # `let x: Board = Board()` stays as written, no `.init()`
+--disable sortImports # imports are grouped by framework, not alphabetized
+--disable wrapFunctionBodies # single-line bodies are idiomatic here...
+--disable wrapIfExpressionBodies
+--disable wrapIfStatementBodies # ...e.g. `if isEmpty { return "-" }`
+--disable wrapLoopBodies
+--disable wrapMultilineStatementBraces
+--disable wrapPropertyBodies
+
+# --- Disabled: semantic / API-surface rewrites don't belong in a format pass ---
+--disable extensionAccessControl
+--disable noForceTryInTests
+--disable noForceUnwrapInTests
+--disable opaqueGenericParameters
+--disable preferKeyPath
+--disable redundantAsync
+--disable redundantFileprivate
+--disable redundantThrows
+--disable unusedArguments
