@@ -17,7 +17,9 @@
 ---
 
 <p align="center">
-  <img src="docs/screenshot-home.png" width="280" alt="Home screen">
+  <img src="docs/screenshots/screenshot-game.png" width="280" alt="Playing the engine">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/screenshot-review.png" width="280" alt="Post-game review">
 </p>
 
 ## What you can do

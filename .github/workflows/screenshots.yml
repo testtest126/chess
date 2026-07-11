@@ -13,13 +13,6 @@ on:
         description: "Commit captured PNGs to docs/screenshots/ on this branch"
         type: boolean
         default: true
-  # TEMPORARY (remove before merge): GitHub only indexes new workflows lazily,
-  # and a dispatch-only workflow that exists on no other branch 404s on
-  # dispatch until then. This scoped push trigger registers the workflow and
-  # fires the first capture; dispatch takes over afterwards.
-  push:
-    branches: [claude/smiley-face-1xzfkz-screens]
-    paths: [".github/workflows/screenshots.yml"]
 
 permissions:
   contents: write
@@ -126,9 +119,7 @@ jobs:
           if-no-files-found: error
 
       - name: Commit screenshots to the invoking branch
-        # Push-triggered runs (the temporary registration trigger) always
-        # commit; dispatches honor their input.
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.commit }}
+        if: ${{ inputs.commit }}
         run: |
           mkdir -p docs/screenshots
           cp shots/*.png docs/screenshots/
