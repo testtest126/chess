@@ -47,7 +47,11 @@ swift run --package-path chess-server App serve --hostname 127.0.0.1 --port 8080
 - **The server is authoritative** for online play. Never trust the client
   with legality, clocks, or results.
 - **CI** runs both package suites on every PR; it must be green.
-- Match the style around you; keep comments for things the code can't say.
+- Match the style around you; `swiftformat .` enforces it mechanically
+  (config in `.swiftformat`), and a small curated SwiftLint rule set
+  (`.swiftlint.yml`, warnings-only) flags force-unwraps and similar in
+  production code. CI's `Lint` job runs both in check mode. Keep comments
+  for things the code can't say.
 
 ## Finding something to work on
 

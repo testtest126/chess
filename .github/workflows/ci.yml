@@ -45,3 +45,33 @@ jobs:
           restore-keys: server-spm-${{ runner.os }}-
       - name: Run server tests
         run: swift test --package-path chess-server
+
+  # Fast, cheap style gate (issue #100). Runs on ubuntu with pinned prebuilt
+  # binaries — no toolchain build, finishes in well under two minutes.
+  # NOT a required check: flipping it to enforcing is the orchestrator's call
+  # (issue #100, step 3).
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Pin both tools: rule defaults change between releases, and an
+      # unpinned lint job starts failing on unrelated PRs after upstream
+      # updates. Keep local installs on the same versions.
+      SWIFTFORMAT_VERSION: 0.62.1
+      SWIFTLINT_VERSION: 0.65.0
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned SwiftFormat and SwiftLint (prebuilt Linux binaries)
+        run: |
+          curl -fsSL -o /tmp/swiftformat.zip \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat_linux.zip"
+          unzip -q -o /tmp/swiftformat.zip -d /tmp/tools
+          curl -fsSL -o /tmp/swiftlint.zip \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/swiftlint_linux_amd64.zip"
+          unzip -q -o /tmp/swiftlint.zip -d /tmp/tools
+          chmod +x /tmp/tools/swiftformat_linux /tmp/tools/swiftlint-static
+      - name: SwiftFormat (check only)
+        run: /tmp/tools/swiftformat_linux --lint .
+      - name: SwiftLint (curated rules, warnings-only)
+        run: /tmp/tools/swiftlint-static lint --reporter github-actions-logging
