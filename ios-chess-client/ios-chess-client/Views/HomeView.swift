@@ -248,6 +248,35 @@ struct HomeView: View {
                         }
                     }
                     .pickerStyle(.menu)
+
+                    // Visual half of the picker (#117): the same selection,
+                    // as tappable board tiles.
+                    HStack(spacing: 12) {
+                        ForEach(BoardTheme.allCases) { theme in
+                            let isSelected = theme.rawValue == boardThemeRaw
+                            Button {
+                                boardThemeRaw = theme.rawValue
+                            } label: {
+                                VStack(spacing: 5) {
+                                    ThemeSwatchGrid(theme: theme)
+                                        .frame(width: 52, height: 52)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+                                        }
+                                    Text(theme.label)
+                                        .font(.caption2.weight(isSelected ? .semibold : .regular))
+                                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(theme.label)
+                            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
 
                 Section("Past Games") {
@@ -270,6 +299,10 @@ struct HomeView: View {
                     }
                 }
             }
+            // Warm-classic surface (#117): cream in light, deep walnut in
+            // dark. Rows keep their system card background on top of it.
+            .scrollContentBackground(.hidden)
+            .background(Color("WarmBackground"))
             .navigationTitle("MateMate")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -484,11 +517,28 @@ struct SavedGameRow: View {
         return base + Text(verbatim: " · \(control.label)")
     }
 
+    /// Outcome tint from the player's perspective; the dot is decorative
+    /// (the headline already says it), so no new accessibility text.
+    private var outcomeTint: Color {
+        switch saved.result {
+        case .draw, .ongoing: return .secondary
+        case .whiteWins: return saved.playerColor == .white ? .green : .red
+        case .blackWins: return saved.playerColor == .black ? .green : .red
+        }
+    }
+
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
+            FinalPositionThumbnail(saved: saved)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(saved.playerOutcome) \(saved.endReasonDescription)")
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(outcomeTint)
+                        .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                    Text("\(saved.playerOutcome) \(saved.endReasonDescription)")
+                        .font(.headline)
+                }
                 detail
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -499,6 +549,29 @@ struct SavedGameRow: View {
                 .foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// Final-position miniature for a history row (#117). Rebuilding the game
+/// costs a UCI replay per on-screen row — cheap next to ReviewView's full
+/// engine pass, and List only materializes visible rows.
+private struct FinalPositionThumbnail: View {
+    let saved: SavedGame
+    @AppStorage(BoardTheme.storageKey) private var themeRaw = BoardTheme.classic.rawValue
+
+    var body: some View {
+        let theme = BoardTheme(rawValue: themeRaw) ?? .classic
+        Group {
+            if let board = (try? Game.from(uciMoves: saved.moves))?.positions.last {
+                MiniBoard(board: board, theme: theme)
+            } else {
+                // Unparseable rows (never expected) still get a tile.
+                ThemeSwatchGrid(theme: theme)
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 
