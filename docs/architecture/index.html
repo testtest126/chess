@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MateMate — Architecture</title>
+<style>body{margin:0;padding:0}img{max-width:100%}</style>
+</head>
+<body>
+
+<style>
+:root{
+  --green:#2C6E52; --green-deep:#1C4A37; --green-hero:#173D2E;
+  --buff:#E7D3A4; --buff-soft:#EFE2C0;
+  --bg:#F3F4EE; --surface:#FCFCF8; --surface-2:#EEEFE6;
+  --ink:#1C231F; --ink-soft:#5B665F; --line:#D9DCCF; --line-soft:#E6E8DD;
+  --accent:#2C6E52; --accent-ink:#F1E9D2;
+  --sq-light:#E9D6A8; --sq-dark:#5A8971;
+  --j-best:#1E7A46; --j-good:#71992F; --j-inac:#C2951C; --j-mist:#CF7118; --j-blun:#BB3A2C;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --serif:"Iowan Old Style",Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F1512; --surface:#161E19; --surface-2:#1C2620;
+    --ink:#E8EBE3; --ink-soft:#98A59B; --line:#2A362E; --line-soft:#222D26;
+    --accent:#82CBA6; --accent-ink:#0F1512;
+    --buff:#D9C186; --buff-soft:#3A3323;
+    --sq-light:#CBB584; --sq-dark:#42664F;
+    --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
+  }
+}
+:root[data-theme="light"]{
+  --green:#2C6E52; --buff:#E7D3A4; --buff-soft:#EFE2C0;
+  --bg:#F3F4EE; --surface:#FCFCF8; --surface-2:#EEEFE6;
+  --ink:#1C231F; --ink-soft:#5B665F; --line:#D9DCCF; --line-soft:#E6E8DD;
+  --accent:#2C6E52; --accent-ink:#F1E9D2;
+  --sq-light:#E9D6A8; --sq-dark:#5A8971;
+  --j-best:#1E7A46; --j-good:#71992F; --j-inac:#C2951C; --j-mist:#CF7118; --j-blun:#BB3A2C;
+}
+:root[data-theme="dark"]{
+  --bg:#0F1512; --surface:#161E19; --surface-2:#1C2620;
+  --ink:#E8EBE3; --ink-soft:#98A59B; --line:#2A362E; --line-soft:#222D26;
+  --accent:#82CBA6; --accent-ink:#0F1512;
+  --buff:#D9C186; --buff-soft:#3A3323;
+  --sq-light:#CBB584; --sq-dark:#42664F;
+  --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
+}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);line-height:1.6;margin:0;
+  font-size:17px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{text-wrap:balance;margin:0}
+a{color:var(--accent)}
+button{font-family:var(--sans);cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* ---------- nav ---------- */
+nav{position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line-soft)}
+nav .wrap{display:flex;align-items:baseline;gap:22px;padding-top:11px;padding-bottom:11px;overflow-x:auto}
+nav .brand{font-family:var(--serif);font-weight:700;font-size:16px;white-space:nowrap;color:var(--ink);text-decoration:none}
+nav .brand .kn{color:var(--accent)}
+nav a.sec{font-family:var(--sans);font-size:12.5px;letter-spacing:.04em;text-decoration:none;
+  color:var(--ink-soft);white-space:nowrap}
+nav a.sec:hover{color:var(--accent)}
+
+/* ---------- hero (deliberately green in both themes) ---------- */
+header.hero{background:linear-gradient(168deg,#1B4736 0%,#143527 58%,#102B20 100%);color:#EFE9D6;position:relative;overflow:hidden}
+header.hero::before{content:"";position:absolute;inset:0;opacity:.10;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 72px, #E7D3A4 72px 73px),
+    repeating-linear-gradient(90deg, transparent 0 72px, #E7D3A4 72px 73px)}
+.hero .wrap{position:relative;padding-top:84px;padding-bottom:64px}
+.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#CBB98A}
+.hero h1{font-size:clamp(38px,6vw,60px);line-height:1.08;font-weight:700;margin:14px 0 0;max-width:14em}
+.hero h1 em{font-style:italic;color:#E7D3A4}
+.hero p.lede{font-size:clamp(17px,2.2vw,20px);max-width:34em;color:#D8DCC9;margin:20px 0 0}
+.wireline{margin:44px 0 8px;position:relative;height:56px;max-width:640px}
+.wireline .rail{position:absolute;left:34px;right:34px;top:27px;border-top:2px dotted #4E7A63}
+.wireline .end{position:absolute;top:0;width:56px;height:56px;border:1.5px solid #4E7A63;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:26px;background:#123023}
+.wireline .end.a{left:0}
+.wireline .end.b{right:0}
+.wireline .packet{position:absolute;top:15px;left:56px;font-family:var(--mono);font-size:11.5px;
+  background:#E7D3A4;color:#173D2E;padding:3px 9px;border-radius:99px;white-space:nowrap;
+  animation:travel 5.5s ease-in-out infinite}
+@keyframes travel{
+  0%,8%{left:9%;opacity:0}
+  16%{opacity:1}
+  44%,56%{left:calc(88% - 215px)}
+  60%{opacity:1}
+  64%,100%{left:calc(88% - 215px);opacity:0}
+}
+.hero .stats{display:flex;flex-wrap:wrap;gap:12px 36px;margin-top:40px;font-family:var(--sans)}
+.hero .stat b{display:block;font-size:21px;font-weight:650;color:#F2ECD9;font-variant-numeric:tabular-nums}
+.hero .stat span{font-size:12.5px;color:#A9BCA6;letter-spacing:.03em}
+
+/* ---------- sections ---------- */
+section{padding:72px 0 12px}
+.sec-eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:600}
+section h2{font-size:clamp(27px,3.6vw,36px);margin-top:10px;font-weight:700}
+section p.intro{max-width:38em;color:var(--ink-soft);font-size:17.5px;margin:14px 0 34px}
+.rule{border:0;border-top:1px solid var(--line);margin:64px 0 0}
+
+/* ---------- system map ---------- */
+.map{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 14px 14px}
+.col h3{font-family:var(--sans);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+  padding:0 6px 12px;display:flex;justify-content:space-between;align-items:baseline;font-weight:600}
+.col h3 .env{font-size:11px;letter-spacing:.02em;text-transform:none;color:var(--accent);font-weight:500}
+.mods{display:flex;flex-direction:column;gap:8px}
+.mod{display:block;width:100%;text-align:left;background:var(--surface-2);border:1.5px solid transparent;
+  border-radius:8px;padding:10px 12px;color:var(--ink);transition:border-color .15s,background .15s}
+.mod:hover{border-color:var(--line)}
+.mod.sel{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 10%, var(--surface))}
+.mod.rel{border-color:color-mix(in srgb, var(--accent) 45%, transparent);border-style:dashed}
+.mod b{font-size:14.5px;font-weight:650;display:block}
+.mod small{font-size:12px;color:var(--ink-soft);display:block;margin-top:1px;line-height:1.45}
+.inspector{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:10px;padding:22px 26px;min-height:120px}
+.inspector h4{font-size:20px;font-weight:700}
+.inspector .path{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+.inspector p{margin:10px 0 0;max-width:44em;font-size:16px}
+.inspector .files{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.filechip{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line-soft);
+  border-radius:6px;padding:3px 8px;color:var(--ink-soft)}
+.filechip b{color:var(--ink);font-weight:600}
+.linkrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;font-family:var(--sans);align-items:center}
+.linkrow .lbl{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+.depchip{font-family:var(--sans);font-size:12.5px;border:1px solid var(--accent);color:var(--accent);
+  background:transparent;border-radius:99px;padding:2px 11px}
+.depchip:hover{background:color-mix(in srgb, var(--accent) 12%, transparent)}
+
+/* ---------- life of a move ---------- */
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px;font-family:var(--sans)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:8px 14px;font-size:13px;color:var(--ink-soft)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.dots{display:flex;gap:6px;margin-left:auto}
+.dots button{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--ink-soft);background:transparent;padding:0}
+.dots button[aria-current="step"]{background:var(--accent);border-color:var(--accent)}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 22px 6px;overflow:hidden}
+.track{position:relative;height:40px;margin:0 6px 14px}
+.track .rail{position:absolute;left:8%;right:8%;top:19px;border-top:2px dotted var(--line)}
+.chip{position:absolute;top:6px;left:0;transform:translateX(-50%);font-family:var(--mono);font-size:11px;
+  background:var(--buff);color:#173D2E;padding:4px 10px;border-radius:99px;white-space:nowrap;
+  transition:left .7s cubic-bezier(.4,0,.2,1),opacity .4s;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+:root[data-theme="dark"] .chip{color:#141B12}
+.chip.err{background:var(--j-blun);color:#fff}
+.chip.hidden{opacity:0}
+.lanes{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:start}
+.lane{text-align:center}
+.lane .who{font-family:var(--sans);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.lane .role{font-family:var(--mono);font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+.lane.active .who{color:var(--accent)}
+.board{display:grid;grid-template-columns:repeat(8,1fr);width:min(100%,216px);margin:12px auto 6px;
+  border:2px solid var(--green-deep);border-radius:4px;overflow:hidden;aspect-ratio:1}
+:root[data-theme="dark"] .board{border-color:#000}
+.sq{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:clamp(13px,2.2vw,19px);line-height:1}
+.sq.l{background:var(--sq-light)}.sq.d{background:var(--sq-dark)}
+.sq.hl{box-shadow:inset 0 0 0 100px color-mix(in srgb, var(--j-inac) 45%, transparent)}
+.sq .w{color:#FBF7EA;text-shadow:0 1px 1px rgba(0,0,0,.55)}
+.sq .b{color:#15120C;text-shadow:0 1px 0 rgba(255,255,255,.22)}
+.clock{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.clock b{color:var(--ink);font-weight:600}
+.clock .inc{color:var(--j-best);font-weight:600}
+.servercard{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:10px;padding:14px 16px;margin-top:12px;text-align:left}
+.servercard .actor{font-family:var(--mono);font-size:11px;color:var(--ink-soft);display:block;margin-bottom:8px}
+.check{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:13px;padding:3.5px 0;color:var(--ink-soft)}
+.check .st{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--line);display:inline-flex;
+  align-items:center;justify-content:center;font-size:11px;flex:none;background:var(--surface);color:transparent;transition:all .25s}
+.check.pass{color:var(--ink)}
+.check.pass .st{background:var(--j-best);border-color:var(--j-best);color:#fff}
+.check.fail{color:var(--j-blun);font-weight:600}
+.check.fail .st{background:var(--j-blun);border-color:var(--j-blun);color:#fff}
+.stepdesc{margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 24px}
+.stepdesc .n{font-family:var(--sans);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.stepdesc h4{font-size:20px;margin-top:4px}
+.stepdesc p{margin:8px 0 0;max-width:46em;font-size:16px}
+.stepdesc p code, .inspector p code, .exp p code{font-family:var(--mono);font-size:.85em;background:var(--surface-2);
+  border:1px solid var(--line-soft);border-radius:4px;padding:0 4px}
+.json{font-family:var(--mono);font-size:13px;background:#143527;color:#D9E6D6;border-radius:8px;
+  padding:12px 16px;margin-top:14px;overflow-x:auto;white-space:pre}
+.json .k{color:#9CC9AC}.json .s{color:#E7D3A4}.json .n{color:#E0A46B}
+.json.err .s{color:#F0A99E}
+
+/* ---------- protocol ---------- */
+.tabs{display:flex;gap:8px;margin-bottom:16px;font-family:var(--sans);flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 16px;font-size:13px;color:var(--ink-soft)}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.msg{border:1px solid var(--line);border-radius:9px;background:var(--surface);margin-bottom:8px;overflow:hidden}
+.msg > button{width:100%;display:flex;align-items:baseline;gap:14px;background:transparent;border:0;
+  padding:12px 16px;text-align:left;font-family:var(--sans)}
+.msg .type{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);white-space:nowrap;min-width:12.5em}
+.msg .doc{font-size:13.5px;color:var(--ink-soft);flex:1;line-height:1.45}
+.msg .caret{color:var(--ink-soft);font-size:11px;transition:transform .2s}
+.msg.open .caret{transform:rotate(90deg)}
+.msg .exp{display:none;padding:2px 16px 16px;border-top:1px dashed var(--line-soft)}
+.msg.open .exp{display:block}
+.msg .exp p{font-family:var(--serif);font-size:15px;margin:12px 0 0;max-width:46em;color:var(--ink)}
+.msg .exp .json{margin-top:12px}
+.verb{font-family:var(--mono);font-size:11px;font-weight:700;border-radius:5px;padding:1px 7px;margin-right:8px}
+.verb.get{background:color-mix(in srgb, var(--j-best) 16%, transparent);color:var(--j-best)}
+.verb.post{background:color-mix(in srgb, var(--j-inac) 20%, transparent);color:var(--j-mist)}
+.verb.ws{background:color-mix(in srgb, var(--accent) 16%, transparent);color:var(--accent)}
+
+/* ---------- engine ---------- */
+.engine-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:start}
+.pipe{list-style:none;margin:0;padding:0;counter-reset:stop}
+.pipe li{border-left:2px solid var(--line);margin-left:9px;padding:0 0 6px 22px;position:relative}
+.pipe li:last-child{border-left-color:transparent}
+.pipe li::before{counter-increment:stop;content:counter(stop);position:absolute;left:-11px;top:2px;
+  width:20px;height:20px;border-radius:50%;background:var(--surface);border:1.5px solid var(--line);
+  font-family:var(--sans);font-size:10.5px;font-weight:700;color:var(--ink-soft);
+  display:flex;align-items:center;justify-content:center}
+.pipe li.open::before{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pipe li > button{display:block;width:100%;text-align:left;background:transparent;border:0;padding:2px 0 10px;color:var(--ink)}
+.pipe li b{font-family:var(--sans);font-size:15px;font-weight:650}
+.pipe li .more{display:none;font-size:15px;color:var(--ink-soft);margin:-4px 0 14px;max-width:36em}
+.pipe li.open .more{display:block}
+.judge{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 24px;position:sticky;top:70px}
+.judge h4{font-family:var(--sans);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.scale{display:flex;height:14px;border-radius:99px;overflow:hidden;margin:18px 0 4px}
+.scale span{height:100%}
+.scale-labels{display:flex;font-family:var(--sans);font-size:10.5px;color:var(--ink-soft);letter-spacing:.02em}
+.scale-labels span{overflow:hidden;white-space:nowrap}
+.judge input[type=range]{width:100%;margin:18px 0 6px;accent-color:var(--accent)}
+.verdict{display:flex;align-items:center;gap:14px;margin-top:10px}
+.verdict .glyph{font-size:34px;line-height:1}
+.verdict .word{font-family:var(--sans);font-size:19px;font-weight:700}
+.verdict .cp{font-family:var(--mono);font-size:13px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.judge p.note{font-size:14px;color:var(--ink-soft);margin:16px 0 0}
+
+/* ---------- decisions ---------- */
+.decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.dec{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px 24px 26px}
+.dec .glyph{font-size:30px;color:var(--accent)}
+.dec h3{font-size:19px;margin:10px 0 8px;font-weight:700}
+.dec p{font-size:15px;color:var(--ink-soft);margin:0}
+.dec p code{font-family:var(--mono);font-size:.85em}
+
+/* ---------- footer ---------- */
+footer{margin-top:80px;border-top:1px solid var(--line);padding:36px 0 56px;font-family:var(--sans)}
+footer .tree{font-family:var(--mono);font-size:13px;line-height:1.9;color:var(--ink-soft)}
+footer .tree b{color:var(--ink);font-weight:600}
+footer .prov{font-size:12.5px;color:var(--ink-soft);margin-top:22px}
+
+@media (max-width:840px){
+  .map{grid-template-columns:1fr}
+  .engine-grid{grid-template-columns:1fr}
+  .judge{position:static}
+  .decisions{grid-template-columns:1fr}
+  .lanes{grid-template-columns:1fr 1fr}
+  .lane.srv{grid-column:1/-1;order:3}
+  .track{display:none}
+  .msg .type{min-width:0}
+  .msg > button{flex-wrap:wrap;gap:4px 14px}
+}
+</style>
+
+<nav aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="kn">♞</span> MateMate · Architecture</a>
+    <a class="sec" href="#map">System map</a>
+    <a class="sec" href="#move">Life of a move</a>
+    <a class="sec" href="#wire">The wire</a>
+    <a class="sec" href="#engine">The engine</a>
+    <a class="sec" href="#decisions">Decisions</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">MateMate · An all-Swift chess stack</div>
+    <h1>Every move answers to <em>the server</em>.</h1>
+    <p class="lede">A SwiftUI iPhone app, a hand-written engine, and a Vapor multiplayer backend —
+      three programs sharing one Swift package, so the client, the server, and the wire
+      can never disagree about what chess is.</p>
+    <div class="wireline" aria-hidden="true">
+      <div class="end a">♙</div>
+      <div class="rail"></div>
+      <div class="packet">{"type":"move","uci":"e2e4"}</div>
+      <div class="end b">♚</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>3</b><span>build products, one package</span></div>
+      <div class="stat"><b>9 + 11</b><span>wire messages, client / server</span></div>
+      <div class="stat"><b>±100 Elo</b><span>pairing window, widening 10/s</span></div>
+      <div class="stat"><b>60 s</b><span>grace before abandonment</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="map">
+  <div class="sec-eyebrow">System map</div>
+  <h2>Three programs, one vocabulary</h2>
+  <p class="intro">Everything is Swift. The app and the server both link <code>ChessKit</code>, so
+    “is this move legal?” has exactly one answer on both sides of the socket.
+    Select a module to inspect it; its dependencies light up dashed.</p>
+  <div class="map" id="mapCols"></div>
+  <div class="inspector" id="inspector" aria-live="polite"></div>
+</section>
+
+<hr class="rule">
+
+<section id="move">
+  <div class="sec-eyebrow">Life of a move</div>
+  <h2>1. e4 — traced end to end</h2>
+  <p class="intro">The client never moves its own pieces. It sends a frame, the
+    <code>GameCoordinator</code> actor rules on it, and the board only changes when the verdict
+    comes back. Step through the honest case — then flip the toggle and watch the server
+    swat away an injected illegal move.</p>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Scenario">
+      <button id="modeLegal" aria-pressed="true">♙ e2–e4 · legal</button>
+      <button id="modeIllegal" aria-pressed="false">✗ e2–e5 · injected</button>
+    </div>
+    <button class="btn" id="prevBtn">← Back</button>
+    <button class="btn primary" id="nextBtn">Next →</button>
+    <button class="btn" id="playBtn">▸ Autoplay</button>
+    <div class="dots" id="dots" role="group" aria-label="Steps"></div>
+  </div>
+
+  <div class="stage">
+    <div class="track" aria-hidden="true">
+      <div class="rail"></div>
+      <div class="chip" id="chipA">{"type":"move","uci":"e2e4"}</div>
+      <div class="chip hidden" id="chipB"></div>
+    </div>
+    <div class="lanes">
+      <div class="lane" id="laneA">
+        <div class="who">Client A · White</div>
+        <span class="role">OnlineGameSession → WebSocket /play</span>
+        <div class="board" id="boardA"></div>
+        <div class="clock" id="clockA"></div>
+      </div>
+      <div class="lane srv" id="laneS">
+        <div class="who">chess-server</div>
+        <span class="role">routes.swift → GameCoordinator</span>
+        <div class="servercard">
+          <span class="actor">actor GameCoordinator — all realtime state lives here</span>
+          <div id="checks"></div>
+        </div>
+      </div>
+      <div class="lane" id="laneB">
+        <div class="who">Client B · Black</div>
+        <span class="role">local ChessKit mirror</span>
+        <div class="board" id="boardB"></div>
+        <div class="clock" id="clockB"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stepdesc">
+    <div class="n" id="stepN"></div>
+    <h4 id="stepTitle"></h4>
+    <p id="stepBody"></p>
+    <div class="json" id="stepJson"></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section id="wire">
+  <div class="sec-eyebrow">The wire</div>
+  <h2>One protocol, compiled twice</h2>
+  <p class="intro">The <code>ChessOnline</code> target is the single source of truth for every
+    message — linked by the app <em>and</em> the server, so the schema cannot drift. Each frame is
+    self-describing JSON with a <code>"type"</code> discriminator. It deliberately depends on
+    nothing, not even ChessKit: strings and UUIDs only, so the protocol stays stable while
+    engine types evolve.</p>
+  <div class="tabs" role="tablist" id="wireTabs">
+    <button role="tab" aria-selected="true" data-tab="c2s">Client → Server · 9</button>
+    <button role="tab" aria-selected="false" data-tab="s2c">Server → Client · 11</button>
+    <button role="tab" aria-selected="false" data-tab="http">HTTP + auth · 9</button>
+  </div>
+  <div id="wireList"></div>
+</section>
+
+<hr class="rule">
+
+<section id="engine">
+  <div class="sec-eyebrow">The engine</div>
+  <h2>A negamax you can test to the node</h2>
+  <p class="intro"><code>NegamaxEngine</code> is 465 lines of alpha-beta search over ChessKit’s
+    evaluation. Fixed-seed Zobrist hashing and zero randomness (unless an opening book is attached)
+    make it deterministic — regression tests pin exact node counts, not vibes. A search visits
+    these stations in order:</p>
+  <div class="engine-grid">
+    <ol class="pipe" id="pipe"></ol>
+    <div class="judge">
+      <h4>GameReview · move judgment</h4>
+      <div class="scale" aria-hidden="true">
+        <span style="width:8.4%;background:var(--j-best)"></span>
+        <span style="width:11.6%;background:var(--j-good)"></span>
+        <span style="width:20%;background:var(--j-inac)"></span>
+        <span style="width:43.3%;background:var(--j-mist)"></span>
+        <span style="width:16.7%;background:var(--j-blun)"></span>
+      </div>
+      <div class="scale-labels" aria-hidden="true">
+        <span style="width:8.4%">0</span>
+        <span style="width:11.6%">25</span>
+        <span style="width:20%">60</span>
+        <span style="width:43.3%">120</span>
+        <span style="width:16.7%">250+</span>
+      </div>
+      <label for="cpl" style="font-family:var(--sans);font-size:13px;color:var(--ink-soft)">
+        Drag: centipawns given up vs. the best available move</label>
+      <input type="range" id="cpl" min="0" max="300" value="87" step="1">
+      <div class="verdict">
+        <div class="glyph" id="jGlyph">♘</div>
+        <div>
+          <div class="word" id="jWord">Inaccuracy</div>
+          <div class="cp" id="jCp">87 cp loss</div>
+        </div>
+      </div>
+      <p class="note">Exactly the thresholds in <code>GameReview.swift</code> —
+        &lt;25 best · &lt;60 good · &lt;120 inaccuracy · &lt;250 mistake · else blunder.
+        The evaluator is pluggable: the default is a cheap one-ply lookahead; the app’s
+        ReviewView plugs in the real engine for trustworthy numbers. Works identically for
+        engine games and online games.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section id="decisions">
+  <div class="sec-eyebrow">Design decisions</div>
+  <h2>Three rules the whole system leans on</h2>
+  <p class="intro"></p>
+  <div class="decisions">
+    <div class="dec">
+      <div class="glyph">♔</div>
+      <h3>The server is authoritative</h3>
+      <p>Clients mirror the game locally for SAN and highlights, but every online move is
+        legality-checked server-side with the same ChessKit before it’s broadcast. Clocks,
+        timeouts, draw offers, Elo, and results are all enforced inside one actor —
+        clients are mirrors, not referees.</p>
+    </div>
+    <div class="dec">
+      <div class="glyph">♖</div>
+      <h3>One wire protocol, compiled twice</h3>
+      <p>The <code>ChessOnline</code> target is linked by both the app and the server, so
+        client/server messages have a single definition and no JSON drift. It depends on
+        nothing — strings and UUIDs only — so the wire stays stable as engine types evolve.</p>
+    </div>
+    <div class="dec">
+      <div class="glyph">♘</div>
+      <h3>The engine is deterministic</h3>
+      <p>Fixed-seed Zobrist hashing, no randomness unless an opening book is attached.
+        Search behavior is testable down to exact node counts, which is how blunder-detection
+        and search regressions stay pinned in CI.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="tree">
+<b>ChessKit/</b>        Swift package — ChessKit (rules) · ChessProtocol (engine) · ChessOnline (wire)<br>
+<b>ios-chess-client/</b> SwiftUI app, iOS 17+ — offline play, online play, review, leaderboard<br>
+<b>chess-server/</b>     Vapor backend — guest auth, matchmaking, realtime games, clocks, Elo, history
+  </div>
+  <p class="prov">Every fact on this page — file names, line counts, thresholds, wire strings — is read
+    from the repository at <span style="font-family:var(--mono)">main @ e910231</span>, July 2026.
+    Postgres in production, SQLite for development, JWT-secured throughout.</p>
+</footer>
+
+</main>
+
+<script>
+/* ================= system map ================= */
+const MODULES = [
+  // column 0: iOS app
+  {id:"views", col:0, name:"Views", sub:"SwiftUI · board, game, review, leaderboard",
+   desc:"Nine SwiftUI views: HomeView routes into engine or online play; BoardView renders the board with drag-and-tap moves; ReviewView plays back any finished game with per-move judgments and an evaluation graph; LeaderboardView and PlayerProfileView surface ratings. BoardTheme and Styling keep the look in one place.",
+   files:[["HomeView.swift"],["GameView.swift"],["OnlineGameView.swift"],["BoardView.swift"],["ReviewView.swift"],["LeaderboardView.swift"],["PlayerProfileView.swift"],["BoardTheme.swift"],["Styling.swift"]],
+   deps:["gamesession","onlinestack","chesskit"], path:"ios-chess-client/Views/"},
+  {id:"gamesession", col:0, name:"GameSession", sub:"offline play vs. the engine",
+   desc:"Drives a local game against NegamaxEngine at four strengths from Beginner to Expert — hints, takebacks, and sounds included. Entirely offline: no server, no account, no network. Finished games are saved for review.",
+   files:[["GameSession.swift"],["SoundPlayer.swift"],["SavedGame.swift"]],
+   deps:["chesskit","chessprotocol"], path:"ios-chess-client/Game/"},
+  {id:"onlinestack", col:0, name:"Online stack", sub:"transport, session, accounts, sync",
+   desc:"OnlineGameClient speaks REST and the /play WebSocket; OnlineGameSession is the client-side state machine that mirrors the server's game — it never applies a move until the server echoes it back. AccountStore + KeychainStore keep the silent guest account's credentials in the iOS Keychain; GameHistorySync pulls server-side history so past online games appear from any device. Debug builds point at 127.0.0.1:8080 automatically via ServerConfig.",
+   files:[["OnlineGameClient.swift"],["OnlineGameSession.swift"],["AccountStore.swift"],["KeychainStore.swift"],["ActiveGameStore.swift"],["GameHistorySync.swift"],["ServerConfig.swift"]],
+   deps:["chessonline","chesskit"], path:"ios-chess-client/Online/"},
+  // column 1: package
+  {id:"chesskit", col:1, name:"ChessKit", sub:"the rules · board, SAN/FEN/PGN, review",
+   desc:"The rules of chess as a library: legal move generation, check/mate/stalemate, SAN, FEN and PGN, repetition and fifty-move tracking, and Game — the append-only state both the phone and the server trust. GameReview classifies every move of a finished game (best → blunder) through a pluggable evaluator.",
+   files:[["Board.swift","623 loc"],["Core.swift","185 loc"],["Game.swift","169 loc"],["GameReview.swift","171 loc"]],
+   deps:[], usedBy:["chessprotocol","views","gamesession","onlinestack","coordinator"], path:"ChessKit/Sources/ChessKit/"},
+  {id:"chessprotocol", col:1, name:"ChessProtocol", sub:"the engine · negamax, book, UCI",
+   desc:"The playing strength. NegamaxEngine implements the full search pipeline (see below); PersistentNegamaxEngine keeps the transposition table alive between moves for the app; OpeningBook answers known positions instantly; UCI.swift adapts the engine to the standard protocol so it can talk to any chess GUI; Zobrist provides fixed-seed position hashing.",
+   files:[["NegamaxEngine.swift","465 loc"],["PersistentNegamaxEngine.swift","171 loc"],["UCI.swift","150 loc"],["Engine.swift","87 loc"],["OpeningBook.swift","69 loc"],["Zobrist.swift","63 loc"]],
+   deps:["chesskit"], usedBy:["gamesession","views"], path:"ChessKit/Sources/ChessProtocol/"},
+  {id:"chessonline", col:1, name:"ChessOnline", sub:"the wire · messages + DTOs, zero deps",
+   desc:"The shared vocabulary: ClientMessage and ServerMessage enums for the WebSocket (self-describing JSON with a \"type\" discriminator) and the REST DTOs for auth, history, and profiles. Deliberately independent of ChessKit — everything on the wire is strings and UUIDs, so the protocol stays stable while engine types evolve. Compiled into both the app and the server: schema drift is a build error, not a runtime surprise.",
+   files:[["Messages.swift"],["DTOs.swift"]],
+   deps:[], usedBy:["onlinestack","routes","coordinator"], path:"ChessKit/Sources/ChessOnline/"},
+  // column 2: server
+  {id:"routes", col:2, name:"routes.swift", sub:"HTTP surface + /play upgrade gate",
+   desc:"Registers the REST controllers and guards the WebSocket. The JWT is verified inside shouldUpgrade — before the 101 response — so no client frame can ever arrive ahead of authentication; an invalid token still upgrades and is then closed with a policy violation, so the request never dangles. Unparseable frames are logged and dropped.",
+   files:[["routes.swift"],["configure.swift"],["entrypoint.swift"]],
+   deps:["chessonline","coordinator"], path:"chess-server/Sources/App/"},
+  {id:"auth", col:2, name:"Auth", sub:"guest accounts, Apple, rate limits",
+   desc:"Register creates a guest account with no sign-up; refresh tokens rotate on every use. AppleTokenVerifier checks Sign-in-with-Apple identity tokens against Apple's JWKS to make guest accounts recoverable. AuthRateLimiter throttles the auth endpoints; GuestAccountCleanup reaps abandoned guests. All security-sensitive changes here go through a mandatory review gate.",
+   files:[["AuthController.swift"],["AppleTokenVerifier.swift"],["AuthRateLimiter.swift"],["GuestAccountCleanup.swift"],["UserToken.swift"]],
+   deps:["chessonline"], path:"chess-server/Sources/App/Auth/"},
+  {id:"coordinator", col:2, name:"GameCoordinator", sub:"actor · 750 loc · all realtime state",
+   desc:"One actor owns the matchmaking queue and every live game — sockets are only written from inside it, so there are no data races by construction. Pairing starts at ±100 Elo and widens 10 points per second, mutually, with a 1-second sweep — any two waiting players become compatible eventually, so nobody starves. It validates every move with ChessKit, charges thinking time before checking legality (a move that lands after the flag fell loses on time), enforces timeouts and the 60-second abandonment grace period, and settles draws, rematches, and Elo.",
+   files:[["GameCoordinator.swift","750 loc"]],
+   deps:["chesskit","chessonline"], path:"chess-server/Sources/App/Online/"},
+  {id:"persistence", col:2, name:"Controllers + Fluent", sub:"history, leaderboard, Postgres",
+   desc:"UsersController (/me), GamesController (server-side game history), LeaderboardController, and PlayersController read and write through Fluent models — User, GameRecord, RefreshToken — with six migrations. Postgres in production, on-disk SQLite in development, in-memory SQLite for tests.",
+   files:[["GamesController.swift"],["LeaderboardController.swift"],["PlayersController.swift"],["UsersController.swift"],["User.swift"],["GameRecord.swift"],["RefreshToken.swift"],["Migrations.swift"]],
+   deps:["chessonline"], path:"chess-server/Sources/App/"},
+];
+const COLS = [
+  {name:"ios-chess-client", env:"SwiftUI · iOS 17+"},
+  {name:"ChessKit package", env:"shared · 3 libraries"},
+  {name:"chess-server", env:"Vapor · Postgres"},
+];
+const mapCols = document.getElementById("mapCols");
+const colEls = COLS.map((c)=>{
+  const d=document.createElement("div"); d.className="col";
+  d.innerHTML=`<h3>${c.name} <span class="env">${c.env}</span></h3><div class="mods"></div>`;
+  mapCols.appendChild(d); return d.querySelector(".mods");
+});
+const modBtn={};
+MODULES.forEach(m=>{
+  const b=document.createElement("button"); b.className="mod"; b.id="mod-"+m.id;
+  b.innerHTML=`<b>${m.name}</b><small>${m.sub}</small>`;
+  b.addEventListener("click",()=>selectMod(m.id));
+  colEls[m.col].appendChild(b); modBtn[m.id]=b;
+});
+const inspector=document.getElementById("inspector");
+function selectMod(id){
+  const m=MODULES.find(x=>x.id===id);
+  MODULES.forEach(x=>{modBtn[x.id].classList.remove("sel","rel")});
+  modBtn[id].classList.add("sel");
+  const rel=new Set([...(m.deps||[]),...(m.usedBy||[])]);
+  MODULES.forEach(x=>{
+    if(x.id!==id && (rel.has(x.id) || (x.deps||[]).includes(id))) modBtn[x.id].classList.add("rel");
+  });
+  const usedBy=MODULES.filter(x=>(x.deps||[]).includes(id)).map(x=>x.id);
+  const chip=(xid)=>{const x=MODULES.find(y=>y.id===xid);return `<button class="depchip" onclick="selectMod('${xid}')">${x.name}</button>`};
+  inspector.innerHTML=`
+    <h4>${m.name}</h4><div class="path">${m.path}</div>
+    <p>${m.desc}</p>
+    <div class="files">${m.files.map(f=>`<span class="filechip"><b>${f[0]}</b>${f[1]?" · "+f[1]:""}</span>`).join("")}</div>
+    ${(m.deps&&m.deps.length)?`<div class="linkrow"><span class="lbl">Depends on</span>${m.deps.map(chip).join("")}</div>`:""}
+    ${usedBy.length?`<div class="linkrow"><span class="lbl">Used by</span>${usedBy.map(chip).join("")}</div>`:""}`;
+}
+selectMod("chessonline");
+
+/* ================= mini boards ================= */
+const GLYPH={p:"♟",r:"♜",n:"♞",b:"♝",q:"♛",k:"♚"};
+function fenRows(fen){ // returns 8 rows of 8 (piece char or null), rank 8 first
+  return fen.split("/").map(row=>{
+    const out=[];
+    for(const ch of row){ if(/\d/.test(ch)) for(let i=0;i<+ch;i++) out.push(null); else out.push(ch); }
+    return out;
+  });
+}
+const START="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+const AFTER_E4="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR";
+function renderBoard(el, fen, hl){
+  const rows=fenRows(fen); el.innerHTML="";
+  rows.forEach((row,r)=>row.forEach((pc,c)=>{
+    const sq=document.createElement("div");
+    const name="abcdefgh"[c]+(8-r);
+    sq.className="sq "+((r+c)%2? "d":"l")+((hl&&hl.includes(name))?" hl":"");
+    if(pc){const s=document.createElement("span");
+      s.className=(pc===pc.toUpperCase())?"w":"b";
+      s.textContent=GLYPH[pc.toLowerCase()]; sq.appendChild(s);}
+    el.appendChild(sq);
+  }));
+}
+const boardA=document.getElementById("boardA"), boardB=document.getElementById("boardB");
+const clockA=document.getElementById("clockA"), clockB=document.getElementById("clockB");
+
+/* ================= life of a move ================= */
+const J=(s)=>s // tiny JSON colorizer
+  .replace(/"([^"]+)":/g,'<span class="k">"$1"</span>:')
+  .replace(/: ?"([^"]*)"/g,': <span class="s">"$1"</span>')
+  .replace(/: ?([\d.]+)/g,': <span class="n">$1</span>');
+const MOVE_JSON='{"type":"move","uci":"e2e4"}';
+const BAD_JSON='{"type":"move","uci":"e2e5"}';
+const ECHO_JSON='{"type":"move_played","uci":"e2e4",\n "clock":{"whiteSeconds":290.8,"blackSeconds":300}}';
+const ERR_JSON='{"type":"error","message":"illegal move"}';
+const CHECKS=["socket authenticated (JWT, pre-upgrade)","this is your active game","it is your turn","clock charged — flag hasn’t fallen","legal, replayed with ChessKit"];
+const CLK0={a:"<b>5:00.0</b>",b:"<b>5:00.0</b>"};
+const CLK1={a:"<b>4:50.8</b> <span class='inc'>+3s</span>",b:"<b>5:00.0</b>"};
+
+const LEGAL=[
+ {t:"The tap",b:"White drags the king’s pawn two squares. <code>OnlineGameSession.playMove</code> doesn’t touch the board — its own comment says why: “the move applies when the server echoes it back; on a local network the round trip is imperceptible and the server stays authoritative.” It encodes a <code>ClientMessage</code> and ships the frame. The pieces wait.",
+  json:MOVE_JSON, chip:{pos:8,txt:MOVE_JSON}, active:"A", checks:[], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The gate",b:"This socket only exists because the upgrade request carried a valid bearer token — <code>routes.swift</code> verifies the JWT <em>before</em> the 101 response, so no frame can arrive ahead of authentication. <code>ws.onText</code> decodes the text into a <code>ClientMessage</code>; unparseable frames are logged and dropped. The decoded message is handed to the coordinator.",
+  json:MOVE_JSON, chip:{pos:50,txt:MOVE_JSON}, active:"S", checks:[1], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The ruling",b:"Inside the <code>GameCoordinator</code> actor: is this your game, and is it your turn? Then — deliberately <em>before</em> legality — thinking time is charged, so a move that arrives after the flag fell loses on time even if the timeout task hasn’t fired yet. Finally the move is replayed against the server’s own <code>Game</code>: ChessKit says e2e4 is legal.",
+  json:MOVE_JSON, chip:{pos:50,txt:MOVE_JSON}, active:"S", checks:[1,1,1,1,1], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The clock",b:"White thought for 12.2 seconds: that’s deducted, the blitz increment (+3 s) is added back, and any pending draw offer is swept off the table. A fresh timeout task is scheduled for Black — if Black’s flag falls before their move arrives, the server ends the game itself. Nobody’s client is trusted with time.",
+  json:MOVE_JSON, chip:{pos:50,txt:MOVE_JSON}, active:"S", checks:[1,1,1,1,1], boards:[START,START], hlA:["e2"], clk:CLK1},
+ {t:"The broadcast",b:"The validated move goes to <em>both</em> seats as <code>move_played</code>, carrying the authoritative clock. Sockets are only ever written from inside the actor, so broadcasts can’t interleave. Between messages each client just ticks the active side’s clock locally.",
+  json:ECHO_JSON, chip:{pos:8,txt:'{"type":"move_played",…}'}, chip2:{pos:92,txt:'{"type":"move_played",…}'}, active:"S", checks:[1,1,1,1,1], boards:[START,START], hlA:["e2"], clk:CLK1},
+ {t:"The mirror",b:"Only now does the pawn move — on <em>both</em> phones at once. Each client applies the echoed move to its local ChessKit mirror, which exists for SAN, highlights, and instant feel. The mirror renders the game; the server <em>is</em> the game.",
+  json:ECHO_JSON, chip:null, active:"AB", checks:[1,1,1,1,1], boards:[AFTER_E4,AFTER_E4], hlA:["e2","e4"], hlB:["e2","e4"], clk:CLK1},
+];
+const ILLEGAL=[
+ {t:"The injection",b:"The real app can’t produce this frame — <code>BoardView</code> only offers legal moves. So imagine a modified client hand-rolling one: a pawn leaping three squares. This is precisely the case the whole design exists for. The frame goes out looking perfectly respectable.",
+  json:BAD_JSON, err:true, chip:{pos:8,txt:BAD_JSON,err:true}, active:"A", checks:[], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The gate",b:"Parsing is not the defense. The frame is well-formed JSON with a known <code>\"type\"</code>, so it decodes into <code>ClientMessage.move(uci: \"e2e5\")</code> without complaint and reaches the coordinator like any other message.",
+  json:BAD_JSON, err:true, chip:{pos:50,txt:BAD_JSON,err:true}, active:"S", checks:[1], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The ruling",b:"Your game ✓, your turn ✓, clock charged ✓ — and then the server replays “e2e5” against its own board. <code>game.play(uci:)</code> throws. There is no code path in which an illegal move reaches the game state; the check isn’t a validation layer bolted on, it <em>is</em> the same ChessKit move generator the phone uses.",
+  json:BAD_JSON, err:true, chip:{pos:50,txt:BAD_JSON,err:true}, active:"S", checks:[1,1,1,1,-1], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The verdict",b:"One frame goes back — to the offender only: <code>{\"type\":\"error\",\"message\":\"illegal move\"}</code>. No broadcast, no state change, no new timeout. The sender still owes a move.",
+  json:ERR_JSON, err:true, chip:{pos:8,txt:ERR_JSON,err:true}, active:"A", checks:[1,1,1,1,-1], boards:[START,START], hlA:["e2"], clk:CLK0},
+ {t:"The non-event",b:"Black’s phone never hears a thing. Nothing to un-render, nothing to roll back, no desync to reconcile — because clients never speculate, an invalid move is simply an event that never happened anywhere except the attacker’s log.",
+  json:ERR_JSON, err:true, chip:null, active:"B", checks:[1,1,1,1,-1], boards:[START,START], hlA:["e2"], clk:CLK0},
+];
+let mode="legal", step=0, timer=null;
+const chipA=document.getElementById("chipA"), chipB=document.getElementById("chipB");
+const checksEl=document.getElementById("checks"), dotsEl=document.getElementById("dots");
+function steps(){return mode==="legal"?LEGAL:ILLEGAL}
+function renderDots(){
+  dotsEl.innerHTML="";
+  steps().forEach((s,i)=>{
+    const b=document.createElement("button");
+    b.setAttribute("aria-label","Step "+(i+1)+": "+s.t);
+    if(i===step)b.setAttribute("aria-current","step");
+    b.addEventListener("click",()=>{stopPlay();go(i)});
+    dotsEl.appendChild(b);
+  });
+}
+function setChip(el,cfg){
+  if(!cfg){el.classList.add("hidden");return}
+  el.classList.remove("hidden");
+  el.classList.toggle("err",!!cfg.err);
+  el.textContent=cfg.txt;
+  el.style.left=cfg.pos+"%";
+}
+function go(i){
+  step=i; const s=steps()[i];
+  document.getElementById("stepN").textContent="Step "+(i+1)+" of "+steps().length;
+  document.getElementById("stepTitle").textContent=s.t;
+  document.getElementById("stepBody").innerHTML=s.b;
+  const jn=document.getElementById("stepJson");
+  jn.innerHTML=J(s.json); jn.classList.toggle("err",!!s.err);
+  setChip(chipA,s.chip); setChip(chipB,s.chip2);
+  renderBoard(boardA,s.boards[0],s.hlA); renderBoard(boardB,s.boards[1],s.hlB);
+  clockA.innerHTML="W "+s.clk.a+" · B <b>5:00.0</b>";
+  clockB.innerHTML="W "+s.clk.a+" · B "+s.clk.b;
+  ["A","S","B"].forEach(k=>document.getElementById("lane"+k).classList.toggle("active",s.active.includes(k)));
+  checksEl.innerHTML=CHECKS.map((c,ci)=>{
+    const v=s.checks[ci];
+    const cls=v===1?"pass":v===-1?"fail":"";
+    const mk=v===1?"✓":v===-1?"✗":"";
+    return `<div class="check ${cls}"><span class="st">${mk}</span>${v===-1?c.replace("legal, replayed","<b>illegal</b> — replayed"):c}</div>`;
+  }).join("");
+  renderDots();
+}
+function stopPlay(){if(timer){clearInterval(timer);timer=null;document.getElementById("playBtn").textContent="▸ Autoplay"}}
+document.getElementById("prevBtn").addEventListener("click",()=>{stopPlay();go(Math.max(0,step-1))});
+document.getElementById("nextBtn").addEventListener("click",()=>{stopPlay();go((step+1)%steps().length)});
+document.getElementById("playBtn").addEventListener("click",function(){
+  if(timer){stopPlay();return}
+  this.textContent="⏸ Pause";
+  timer=setInterval(()=>{ if(step>=steps().length-1){stopPlay();return} go(step+1); },2600);
+});
+function setMode(m){
+  mode=m; stopPlay();
+  document.getElementById("modeLegal").setAttribute("aria-pressed",m==="legal");
+  document.getElementById("modeIllegal").setAttribute("aria-pressed",m==="illegal");
+  go(0);
+}
+document.getElementById("modeLegal").addEventListener("click",()=>setMode("legal"));
+document.getElementById("modeIllegal").addEventListener("click",()=>setMode("illegal"));
+go(0);
+
+/* ================= wire protocol ================= */
+const C2S=[
+ ["join_queue",'{"type":"join_queue","timeControl":"blitz"}',"Enter matchmaking for one named time control.",
+  "Three controls exist: bullet 1+0, blitz 5+3 (the default), rapid 10+5. Only players waiting for the same control are paired. Your rating window starts at ±100 Elo and widens by 10 per second waited — and windows are mutual, so a pair forms only when each player’s window covers the gap. Nobody is handed an opponent they wouldn’t accept themselves; nobody starves either, since windows grow without bound."],
+ ["leave_queue",'{"type":"leave_queue"}',"Leave the pool before a match is found.",
+  "Cancelling the matchmaking screen sends this; the coordinator forgets you immediately."],
+ ["move",'{"type":"move","uci":"g8f6"}',"Play a move in your active game, in coordinate (UCI) form.",
+  "The server replays it against its own board before anyone else hears about it — see “Life of a move” above for the full round trip, including the rejection path."],
+ ["resign",'{"type":"resign"}',"Resign the active game.",
+  "The server ends the game with reason “resignation” and settles Elo; both seats get a game_over."],
+ ["offer_draw",'{"type":"offer_draw"}',"Offer the opponent a draw — valid until they move.",
+  "Any move sweeps a pending offer off the table, so a stale offer can never be accepted after the position has changed."],
+ ["accept_draw",'{"type":"accept_draw"}',"Accept the opponent’s pending draw offer.",
+  "Ends the game ½–½ with reason “drawAgreement”."],
+ ["decline_draw",'{"type":"decline_draw"}',"Decline the pending draw offer.",
+  "The offerer gets a draw_declined; the game continues."],
+ ["request_rematch",'{"type":"request_rematch"}',"After a game: play the same opponent again, colors swapped.",
+  "The rematch starts only when both players have asked — a fresh game_start arrives with colors reversed. If the opponent has left, the server answers with rematch_unavailable."],
+ ["decline_rematch",'{"type":"decline_rematch"}',"Decline the opponent’s rematch request.",
+  "The requester gets a rematch_declined and can head back to the queue."],
+];
+const S2C=[
+ ["queued",'{"type":"queued"}',"You’re in the pool.",
+  "The coordinator rescans the pool every second for pairs that window-widening has newly enabled."],
+ ["game_start",'{"type":"game_start","gameID":"5D2A…","yourColor":"white",\n "opponentName":"Quiet Rook","opponentRating":1512,"moves":[],\n "clock":{"whiteSeconds":300,"blackSeconds":300},"timeControl":"blitz"}',"A match was made — or you reconnected into one.",
+  "Sent to both seats. The moves array is empty for a fresh game; on reconnection it carries the full history so your local mirror replays back to truth. Peers that predate time controls always played 5+3, so blitz is assumed when the field is absent."],
+ ["move_played",'{"type":"move_played","uci":"e2e4",\n "clock":{"whiteSeconds":290.8,"blackSeconds":300}}',"A validated move — the only way pieces ever move.",
+  "Carries the authoritative clock as of the send. The receiver ticks the active side locally between messages; the server’s number always wins on arrival."],
+ ["game_over",'{"type":"game_over","result":"1-0","reason":"timeout",\n "ratingDeltaWhite":8,"ratingDeltaBlack":-8}',"The game ended; Elo deltas ride along.",
+  "Result comes in PGN notation (1-0, 0-1, 1/2-1/2). Reasons: checkmate, stalemate, resignation, timeout, drawAgreement, fiftyMoveRule, threefoldRepetition, insufficientMaterial, abandoned."],
+ ["draw_offered",'{"type":"draw_offered"}',"Your opponent offers a draw.",""],
+ ["draw_declined",'{"type":"draw_declined"}',"Your draw offer was declined.",""],
+ ["rematch_offered",'{"type":"rematch_offered"}',"Your opponent wants a rematch.",""],
+ ["rematch_declined",'{"type":"rematch_declined"}',"Your rematch request was declined.",""],
+ ["rematch_unavailable",'{"type":"rematch_unavailable"}',"The opponent can no longer rematch.",
+  "They left the post-game screen or disconnected; the pairing is gone."],
+ ["opponent_status",'{"type":"opponent_status","connected":false}',"The opponent’s connection dropped — or came back.",
+  "A disconnected player has 60 seconds to return before the game is forfeited as abandoned. Reconnecting cancels the countdown and replays the game via game_start."],
+ ["error",'{"type":"error","message":"illegal move"}',"Something you sent was rejected — sent to you alone.",
+  "Raised for “no active game”, “not your turn”, “illegal move”, and unavailable rematches. Your opponent never sees it."],
+];
+const HTTP=[
+ ["GET","/health","Liveness probe — returns “ok”.",""],
+ ["POST","/auth/register","Silent guest account creation — no sign-up screen exists.",
+  "Rate-limited. The app calls this on first online play, stores the credentials in the iOS Keychain, and the player just… plays. Returns an access token plus a refresh token that rotates on every use. Guests that never come back are reaped by a cleanup job."],
+ ["POST","/auth/refresh","Trade a refresh token for a fresh pair.",
+  "Rotation means a stolen refresh token dies the moment either party uses it — the old token is deleted on every refresh."],
+ ["POST","/auth/apple","Sign in with Apple — or make a guest account recoverable.",
+  "Verifies the identity token from AuthenticationServices against Apple’s JWKS, then links it to the current guest account so rating and history survive a lost phone. Auth code is security-gated: every change requires an explicit review verdict before merge."],
+ ["GET","/me","Your profile and rating.","Bearer-authenticated."],
+ ["GET","/games · /games/:id","Server-side game history.",
+  "Past online games from any device — the record lives with the account, not the phone."],
+ ["GET","/leaderboard","Top players by Elo.",""],
+ ["GET","/players/:id","Anyone’s public profile.",""],
+ ["WS","/play","The realtime channel everything above rides on.",
+  "The JWT is verified before the WebSocket upgrade completes, so an unauthenticated socket never exists long enough to speak."],
+];
+const wireList=document.getElementById("wireList");
+function renderWire(tab){
+  wireList.innerHTML="";
+  const rows= tab==="c2s"?C2S : tab==="s2c"?S2C : null;
+  if(rows){
+    rows.forEach(([name,json,doc,more])=>{
+      const d=document.createElement("div"); d.className="msg";
+      d.innerHTML=`<button aria-expanded="false"><span class="type">${name}</span><span class="doc">${doc}</span><span class="caret">▶</span></button>
+        <div class="exp">${more?`<p>${more}</p>`:""}<div class="json">${J(json)}</div></div>`;
+      d.querySelector("button").addEventListener("click",()=>{
+        const open=d.classList.toggle("open");
+        d.querySelector("button").setAttribute("aria-expanded",open);
+      });
+      wireList.appendChild(d);
+    });
+  } else {
+    HTTP.forEach(([verb,path,doc,more])=>{
+      const d=document.createElement("div"); d.className="msg";
+      const vcls=verb==="GET"?"get":verb==="WS"?"ws":"post";
+      d.innerHTML=`<button aria-expanded="false"><span class="type"><span class="verb ${vcls}">${verb}</span>${path}</span><span class="doc">${doc}</span><span class="caret">▶</span></button>
+        <div class="exp"><p>${more||doc}</p></div>`;
+      d.querySelector("button").addEventListener("click",()=>{
+        const open=d.classList.toggle("open");
+        d.querySelector("button").setAttribute("aria-expanded",open);
+      });
+      wireList.appendChild(d);
+    });
+  }
+}
+document.getElementById("wireTabs").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.querySelectorAll("#wireTabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  renderWire(b.dataset.tab);
+});
+renderWire("c2s");
+
+/* ================= engine pipeline ================= */
+const PIPE=[
+ ["Opening book probe","A position found in the book is answered instantly with a uniformly random book move — the only randomness the engine is ever allowed. Detach the book and the search is fully deterministic."],
+ ["Iterative deepening","Search to depth 1, then 2, then 3… until the node or time limit. Each completed pass seeds the next one’s move ordering, so deeper searches start smart."],
+ ["Aspiration windows","Each new depth opens with a narrow score window around the previous result. Most searches fit; a miss triggers a re-search with a wider window."],
+ ["Transposition table","Positions reached by different move orders are recognized via Zobrist hashing (fixed-seed) and their results reused. PersistentNegamaxEngine keeps the table alive between moves in the app."],
+ ["Move ordering","Captures sorted by MVV-LVA (most valuable victim, least valuable attacker); quiet moves ranked by killer and history heuristics. Good ordering is what makes alpha-beta actually prune."],
+ ["Null-move pruning","Hand the opponent a free move; if the position is still winning after that insult, the full search is skipped. A cheap way to prove a branch irrelevant."],
+ ["Check extensions","Forcing sequences get searched one ply deeper, so the engine doesn’t stop counting in the middle of a mating attack."],
+ ["Quiescence search","At the leaves, keep resolving captures until the position is calm — the evaluation is never read mid-exchange, which is where one-ply engines hang their queens."],
+];
+const pipeEl=document.getElementById("pipe");
+PIPE.forEach(([name,more],i)=>{
+  const li=document.createElement("li");
+  li.innerHTML=`<button aria-expanded="false"><b>${name}</b></button><div class="more">${more}</div>`;
+  li.querySelector("button").addEventListener("click",()=>{
+    const was=li.classList.contains("open");
+    pipeEl.querySelectorAll("li").forEach(x=>{x.classList.remove("open");x.querySelector("button").setAttribute("aria-expanded","false")});
+    if(!was){li.classList.add("open");li.querySelector("button").setAttribute("aria-expanded","true")}
+  });
+  pipeEl.appendChild(li);
+});
+pipeEl.children[3].classList.add("open");
+pipeEl.children[3].querySelector("button").setAttribute("aria-expanded","true");
+
+/* ================= judgment slider ================= */
+const cpl=document.getElementById("cpl");
+function judge(v){
+  if(v<25)return["Best","♛","--j-best"];
+  if(v<60)return["Good","♝","--j-good"];
+  if(v<120)return["Inaccuracy","♘","--j-inac"];
+  if(v<250)return["Mistake","♞","--j-mist"];
+  return["Blunder","♟","--j-blun"];
+}
+function updateJudge(){
+  const v=+cpl.value; const[w,g,c]=judge(v);
+  document.getElementById("jWord").textContent=w;
+  document.getElementById("jGlyph").textContent=g;
+  document.getElementById("jWord").style.color=`var(${c})`;
+  document.getElementById("jGlyph").style.color=`var(${c})`;
+  document.getElementById("jCp").textContent=(v>=300?"300+":v)+" cp loss";
+}
+cpl.addEventListener("input",updateJudge); updateJudge();
+</script>
+
+
+</body>
+</html>
