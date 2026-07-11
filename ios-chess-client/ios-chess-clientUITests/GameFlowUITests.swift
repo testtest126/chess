@@ -97,11 +97,18 @@ final class GameFlowUITests: XCTestCase {
             XCTAssertTrue(waitUntilGone(thinking, timeout: 60), "engine should finish thinking")
         }
         tapWhenReady(app.buttons["Resign"].firstMatch, "resign toolbar button")
-        XCTAssertTrue(
-            app.buttons["Cancel"].waitForExistence(timeout: Self.ciTimeout),
-            "resign confirmation should appear"
+        // The confirmation dialog adds a second "Resign" (its destructive
+        // button). Wait on that, not on the auto-added "Cancel": iOS 26's
+        // confirmationDialog no longer exposes a button labelled "Cancel" to
+        // the accessibility tree, so keying on the dialog's own button is the
+        // portable readiness signal across SDKs.
+        let resignButtons = app.buttons.matching(NSPredicate(format: "label == 'Resign'"))
+        let dialogOpen = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "count >= 2"), object: resignButtons
         )
-        app.buttons.matching(NSPredicate(format: "label == 'Resign'")).allElementsBoundByIndex.last?.tap()
+        XCTAssertEqual(XCTWaiter().wait(for: [dialogOpen], timeout: Self.ciTimeout), .completed,
+                       "resign confirmation dialog should appear")
+        resignButtons.allElementsBoundByIndex.last?.tap()
         XCTAssertTrue(
             app.staticTexts["You Lost"].waitForExistence(timeout: Self.ciTimeout),
             "game over sheet should appear"

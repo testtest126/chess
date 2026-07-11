@@ -25,7 +25,12 @@ concurrency:
 jobs:
   ui-tests:
     name: App build & UI tests
-    runs-on: macos-15
+    # macos-26 ships Xcode 26.x (default 26.5) with the iOS 26 SDK, so the
+    # Liquid Glass code paths behind `#if compiler(>=6.2)` are compiled and
+    # exercised here instead of silently skipped (#44). The gate itself stays
+    # for contributors on older local toolchains. Package jobs (ci.yml) don't
+    # need the newer SDK and stay on macos-15.
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -40,6 +45,18 @@ jobs:
           echo "Using simulator $UDID"
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
+      - name: Boot the simulator before xcodebuild touches it
+        # Letting `xcodebuild test` cold-boot the simulator hung the whole
+        # job on macos-26 (run 29091523169: 40 min of silence after
+        # IDELaunchParametersSnapshot, no test suite ever started). Booting
+        # explicitly and waiting via `bootstatus -b` makes the launch
+        # deterministic — and a boot problem now fails *this* step in
+        # minutes with its own log, instead of an opaque job timeout.
+        timeout-minutes: 10
+        run: |
+          xcrun simctl boot "${{ steps.sim.outputs.udid }}" || true  # "already booted" is fine
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
+
       - name: Build and run UI tests
         # OnlineMatchUITests skips itself when no server is listening on
         # 127.0.0.1:8080, so this covers the offline flows.
@@ -49,6 +66,11 @@ jobs:
         # most of this lane's red runs; genuinely broken tests still fail all
         # repetitions. The tail is sized so assertion messages survive — at
         # 100 lines they were getting cut, leaving red runs undiagnosable.
+        #
+        # The step-level timeout (vs only the job's) matters: a step timeout
+        # is a *failure*, so the xcresult upload below still runs; a job
+        # timeout is a cancellation, which skips it and leaves no evidence.
+        timeout-minutes: 30
         run: |
           set -o pipefail
           xcodebuild test \
