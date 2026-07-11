@@ -2,7 +2,6 @@ import XCTest
 @testable import ChessKit
 
 final class SANTests: XCTestCase {
-
     private func san(_ fen: String, _ uci: String) -> String {
         let board = Board(fen: fen)!
         let move = Move(uci: uci)!

@@ -49,7 +49,7 @@ struct BoardAccessibilityTests {
         // last move (e.g. re-capturing on the same square).
         let last = Move(from: a1, to: e4)
         #expect(value(square: e4, selected: e2, legalTargets: [e4], lastMove: last)
-                == "possible move, last move")
+            == "possible move, last move")
     }
 
     @Test func hintMarksSuggestedSquares() {

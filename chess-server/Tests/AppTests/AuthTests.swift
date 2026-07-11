@@ -95,6 +95,7 @@ final class AuthTests: XCTestCase {
     }
 
     // MARK: - Sign in with Apple
+
     //
     // Genuine Apple signatures can't be minted offline, so these tests stub
     // the verifier (the seam the live JWKS implementation plugs into) and
@@ -107,6 +108,7 @@ final class AuthTests: XCTestCase {
         var current: String?
         func set(_ value: String?) { current = value }
     }
+
     private let nonceEcho = NonceEcho()
 
     /// Configures SIWA with a stub verifier that accepts `validTokens`, maps

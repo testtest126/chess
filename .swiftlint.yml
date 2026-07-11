@@ -1,0 +1,38 @@
+# Curated SwiftLint configuration (issue #100).
+#
+# Deliberately small and high-signal: bug-catching rules only. Style is owned
+# by SwiftFormat (see .swiftformat) — no style-war rules here. Analyzer rules
+# (which need full compilation logs) are intentionally not enabled.
+#
+# Everything is warning severity for now: the CI lint job runs non-strict, so
+# findings annotate PRs without blocking. Flipping to enforcing is a separate,
+# deliberate step (issue #100, step 3).
+
+only_rules:
+  # Force-* in production code (test targets are excluded below, matching the
+  # issue's "production targets" scoping — tests legitimately use try!/!).
+  - force_cast
+  - force_try
+  - force_unwrapping
+  # Bug catchers
+  - discouraged_direct_init
+  - duplicated_key_in_dictionary_literal
+  - identical_operands
+  - overridden_super_call
+  - prohibited_super_call
+  - self_in_property_initialization
+  - unused_setter_value
+  # Doc-comment hygiene with real signal (a /// not attached to a declaration)
+  - orphaned_doc_comment
+
+excluded:
+  - "**/.build"
+  - ChessKit/Tests
+  - chess-server/Tests
+  - ios-chess-client/ios-chess-clientTests
+  - ios-chess-client/ios-chess-clientUITests
+
+# force_cast and force_try default to error; keep everything warnings-only
+# until the job is flipped to enforcing.
+force_cast: warning
+force_try: warning

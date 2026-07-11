@@ -558,7 +558,8 @@ final class MatchFlowTests: XCTestCase {
         app.gameCoordinator = GameCoordinator(
             app: app,
             matchmaking: MatchmakingConfig(
-                initialWindow: 100, widenPerSecond: 0, sweepInterval: .milliseconds(50))
+                initialWindow: 100, widenPerSecond: 0, sweepInterval: .milliseconds(50)
+            )
         )
 
         let low = try await queuedPlayer(rating: 900)
@@ -595,7 +596,8 @@ final class MatchFlowTests: XCTestCase {
         app.gameCoordinator = GameCoordinator(
             app: app,
             matchmaking: MatchmakingConfig(
-                initialWindow: 100, widenPerSecond: 2000, sweepInterval: .milliseconds(50))
+                initialWindow: 100, widenPerSecond: 2000, sweepInterval: .milliseconds(50)
+            )
         )
 
         let a = try await queuedPlayer(rating: 900)

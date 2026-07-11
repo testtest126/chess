@@ -222,8 +222,10 @@ public struct Board: Equatable, Hashable, Sendable {
 
             case .bishop:
                 slide(&moves, from: from, dirs: Board.bishopDirs)
+
             case .rook:
                 slide(&moves, from: from, dirs: Board.rookDirs)
+
             case .queen:
                 slide(&moves, from: from, dirs: Board.bishopDirs + Board.rookDirs)
 

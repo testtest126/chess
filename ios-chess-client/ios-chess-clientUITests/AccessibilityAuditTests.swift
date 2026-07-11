@@ -12,7 +12,6 @@ import XCTest
 /// Skips itself otherwise, and CI's -only-testing selection never includes
 /// it — findings are point-in-time evidence, not pass/fail regressions.
 final class AccessibilityAuditTests: XCTestCase {
-
     private var report = ""
 
     @MainActor

@@ -55,9 +55,9 @@ struct AddUserAppleID: AsyncMigration {
         // Postgres (NULLs — unlinked accounts — are excluded by design).
         if let sql = database as? SQLDatabase {
             try await sql.raw("""
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_user_id
-                ON users (apple_user_id) WHERE apple_user_id IS NOT NULL
-                """).run()
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_user_id
+            ON users (apple_user_id) WHERE apple_user_id IS NOT NULL
+            """).run()
         }
     }
 

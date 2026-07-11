@@ -6,7 +6,6 @@ import XCTest
 /// pins, en passant, castling legality, promotions, discovered checks — so a
 /// single mismatch is a strong signal that move generation is wrong.
 final class PerftTests: XCTestCase {
-
     /// Uses `@testable` access to `apply` so nodes don't pay for the redundant
     /// legality re-check that `making(_:)` performs.
     private func perft(_ board: Board, depth: Int) -> Int {

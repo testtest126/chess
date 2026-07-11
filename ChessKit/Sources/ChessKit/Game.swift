@@ -48,6 +48,7 @@ public struct Game: Sendable {
         // so we track it explicitly.
         _initialBoard
     }
+
     private var _initialBoard: Board = Board()
 
     public init(fen: String) throws {

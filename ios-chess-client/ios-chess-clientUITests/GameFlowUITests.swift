@@ -11,7 +11,6 @@ import XCTest
 /// 130+ seconds on cold runners); long waits cost nothing on fast machines
 /// because every wait returns the moment its condition holds.
 final class GameFlowUITests: XCTestCase {
-
     /// Existence/hittability budget scaled for cold CI simulators.
     private static let ciTimeout: TimeInterval = 30
 

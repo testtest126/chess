@@ -6,7 +6,6 @@ import ChessKit
 /// the mover, the piece, and the outcome rather than SAN shorthand.
 @MainActor
 struct MoveAnnouncerTests {
-
     private func lastEntry(after uciMoves: [String]) throws -> Game.HistoryEntry {
         let game = try Game.from(uciMoves: uciMoves)
         return try #require(game.history.last)
@@ -45,6 +44,6 @@ struct MoveAnnouncerTests {
             "a2a4", "b7b5", "a4b5", "a7a6", "b5a6", "c8b7", "a6b7", "b8c6", "b7a8q",
         ])
         #expect(MoveAnnouncer.spokenDescription(of: entry)
-                == "White: pawn takes and promotes to Queen on a8")
+            == "White: pawn takes and promotes to Queen on a8")
     }
 }

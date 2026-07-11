@@ -2,7 +2,6 @@ import XCTest
 @testable import ChessKit
 
 final class FENTests: XCTestCase {
-
     func testStartingPositionRoundTrip() {
         let board = Board()
         XCTAssertEqual(board.fen, Board.startingFEN)

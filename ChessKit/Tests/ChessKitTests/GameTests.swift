@@ -2,7 +2,6 @@ import XCTest
 @testable import ChessKit
 
 final class GameTests: XCTestCase {
-
     func testIllegalMoveThrows() {
         var game = Game()
         XCTAssertThrowsError(try game.play(uci: "e2e5")) { error in

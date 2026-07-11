@@ -60,6 +60,7 @@ final class SavedGame {
         }
         return String(localized: "Opponent", comment: "Fallback name shown until the opponent's real name arrives")
     }
+
     var result: Game.Result { Game.Result(rawValue: resultRaw) ?? .ongoing }
     var endReason: Game.EndReason? { endReasonRaw.flatMap(Game.EndReason.init(rawValue:)) }
     var moves: [String] { uciMoves.split(separator: " ").map(String.init) }

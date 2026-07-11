@@ -420,7 +420,7 @@ actor GameCoordinator {
             let gap = abs(candidate.seat.rating - entry.seat.rating)
             guard Double(gap) <= min(candidate.window(at: now, config: matchmaking),
                                      entry.window(at: now, config: matchmaking)),
-                  gap < (best?.gap ?? .max)
+                gap < (best?.gap ?? .max)
             else { continue }
             best = (index, gap)
         }
@@ -474,7 +474,7 @@ actor GameCoordinator {
                         let gap = abs(pool[i].seat.rating - pool[j].seat.rating)
                         guard Double(gap) <= min(pool[i].window(at: now, config: matchmaking),
                                                  pool[j].window(at: now, config: matchmaking)),
-                              gap < (best?.gap ?? .max)
+                            gap < (best?.gap ?? .max)
                         else { continue }
                         best = (i, j, gap)
                     }

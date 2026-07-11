@@ -3,7 +3,6 @@ import ChessKit
 @testable import ChessProtocol
 
 final class UCITests: XCTestCase {
-
     private func makeAdapter() -> UCIEngine {
         UCIEngine(engine: NegamaxEngine(name: "TestEngine", author: "Tester"), defaultDepth: 2)
     }

@@ -147,10 +147,10 @@ struct AuthController: RouteCollection {
             throw Abort(.internalServerError, reason: "nonce store requires an SQL database")
         }
         let consumed = try await sql.raw("""
-            DELETE FROM apple_nonces
-            WHERE nonce_hash = \(bind: hash) AND expires_at > \(bind: Date())
-            RETURNING nonce_hash
-            """).first(decoding: Consumed.self)
+        DELETE FROM apple_nonces
+        WHERE nonce_hash = \(bind: hash) AND expires_at > \(bind: Date())
+        RETURNING nonce_hash
+        """).first(decoding: Consumed.self)
         return consumed != nil
     }
 
