@@ -3,7 +3,7 @@ name: Screenshots
 # On-demand README/marketing capture (issue #118). Boots chess-server so
 # ScreenshotCaptureTests can stage its scripted online showcase game (live
 # clocks, a real Past Games row), runs the capture in light AND dark
-# appearance, records the light run into a sped-up demo GIF, then exports
+# appearance, records the dark run into a sped-up demo GIF, then exports
 # the attached PNGs and commits everything to docs/screenshots/ on the
 # branch it was dispatched from — which lets sessions without a Mac produce
 # and consume real device media entirely through CI. Never runs
@@ -104,16 +104,17 @@ jobs:
           done
           echo "::warning::chess-server did not become healthy — captures use the engine fallback"
 
-      - name: Capture screenshots (light) with demo recording
-        # The simulator recording spans the whole light run: lobby →
-        # matchmaking → the scripted line with live clocks → the win →
-        # review. Sped up afterwards it becomes the README demo.
+      - name: Capture screenshots (dark) with demo recording
+        # Dark is the primary pass — it's the README's hero look. The
+        # simulator recording spans the whole run: lobby → matchmaking →
+        # the scripted line with live clocks → the win → review. Sped up
+        # afterwards it becomes the README demo.
         timeout-minutes: 25
         env:
           TEST_RUNNER_CAPTURE_SCREENSHOTS: "1"
         run: |
           set -o pipefail
-          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance light || true
+          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance dark || true
           xcrun simctl io "${{ steps.sim.outputs.udid }}" recordVideo --codec h264 --force demo.mov &
           echo $! > recorder.pid
           sleep 2
@@ -130,27 +131,28 @@ jobs:
           sleep 5  # let the recorder finalize the mov
           exit $STATUS
 
-      - name: Capture screenshots (dark)
-        # Second pass in dark appearance; the showcase stages a fresh game.
-        # Best-effort — a dark-pass failure must not cost the light results.
+      - name: Capture screenshots (light)
+        # Second pass in light appearance for the -light variants; the
+        # showcase stages a fresh game. Best-effort — a light-pass failure
+        # must not cost the dark results.
         continue-on-error: true
         timeout-minutes: 25
         env:
           TEST_RUNNER_CAPTURE_SCREENSHOTS: "1"
         run: |
           set -o pipefail
-          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance dark
+          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance light
           xcodebuild test-without-building \
             -project ios-chess-client/ios-chess-client.xcodeproj \
             -scheme ios-chess-client \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
-            -resultBundlePath ScreenshotsDark.xcresult \
+            -resultBundlePath ScreenshotsLight.xcresult \
             -parallel-testing-enabled NO \
             -only-testing:ios-chess-clientUITests/ScreenshotCaptureTests \
             | tail -60
 
       - name: Render the demo GIF
-        # Timelapse the whole light run into a ~20s, README-friendly GIF
+        # Timelapse the whole dark run into a ~20s, README-friendly GIF
         # (GitHub inlines GIFs; committed .mp4s don't render in READMEs).
         # Best-effort: no demo must never mean no screenshots.
         continue-on-error: true
@@ -186,7 +188,7 @@ jobs:
             fi
           }
           export_bundle Screenshots.xcresult ""
-          export_bundle ScreenshotsDark.xcresult "-dark"
+          export_bundle ScreenshotsLight.xcresult "-light"
           if ! ls shots/*.png >/dev/null 2>&1; then
             echo "manifest mapping found nothing; exporting every PNG as-is"
             [ -d Screenshots.xcresult ] && xcrun xcresulttool export attachments --path Screenshots.xcresult --output-path raw && find raw -name '*.png' -exec cp {} shots/ \;
@@ -223,6 +225,6 @@ jobs:
           name: Screenshots.xcresult
           path: |
             Screenshots.xcresult
-            ScreenshotsDark.xcresult
+            ScreenshotsLight.xcresult
             chess-server/server.log
           retention-days: 7
