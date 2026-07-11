@@ -81,12 +81,11 @@ struct HomeView: View {
                     // Bare speed names: three notated segments ("Blitz 5+3")
                     // truncate on narrow phones. The notation shows up on the
                     // matchmaking screen and the in-game title instead.
-                    Picker("Time control", selection: $timeControlRaw) {
+                    AdaptiveSegmentedPicker(title: "Time control", selection: $timeControlRaw) {
                         ForEach(TimeControl.allCases, id: \.rawValue) { control in
                             Text(control.label).tag(control.rawValue)
                         }
                     }
-                    .pickerStyle(.segmented)
 
                     // Guest-first: online play never requires signing in.
                     Button {
@@ -171,6 +170,9 @@ struct HomeView: View {
                                  : "Keeps your rating safe if you lose this device.")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                // Guarantee wrapping at large type sizes;
+                                // the audit flags this row as clippable (#83).
+                                .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity)
                                 .listRowBackground(Color.clear)
                         }
@@ -178,17 +180,21 @@ struct HomeView: View {
                 }
 
                 Section("Play the Engine") {
-                    Picker("Play as", selection: $colorChoice) {
+                    AdaptiveSegmentedPicker(title: "Play as", selection: $colorChoice) {
                         ForEach(ColorChoice.allCases) { choice in
                             Text(choice.label).tag(choice)
                         }
                     }
-                    .pickerStyle(.segmented)
 
-                    Picker("Engine strength", selection: $difficultyRaw) {
+                    Picker(selection: $difficultyRaw) {
                         ForEach(Difficulty.allCases) { level in
                             Text(level.label).tag(level.rawValue)
                         }
+                    } label: {
+                        // Wrap instead of clipping at accessibility type
+                        // sizes — the audit flags the one-line label (#83).
+                        Text("Engine strength")
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Button {
@@ -370,6 +376,27 @@ extension HomeView {
         }
         .frame(width: 24, height: 12)
         .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+}
+
+/// Segmented picker that falls back to the default menu style at
+/// accessibility type sizes: UISegmentedControl never scales its labels with
+/// Dynamic Type, so the segments become unreadable exactly when the user has
+/// asked for bigger text (#83, audit item 5).
+private struct AdaptiveSegmentedPicker<SelectionValue: Hashable, Options: View>: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    let title: LocalizedStringKey
+    @Binding var selection: SelectionValue
+    @ViewBuilder var options: Options
+
+    var body: some View {
+        let picker = Picker(title, selection: $selection) { options }
+        if typeSize.isAccessibilitySize {
+            picker
+        } else {
+            picker.pickerStyle(.segmented)
+        }
     }
 }
 
