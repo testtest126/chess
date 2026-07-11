@@ -8,6 +8,9 @@ import UIKit
 /// label color. Mid-tone dark squares mathematically cannot reach 4.5:1
 /// with any text color, so they use white — asserted here at >= 3.0:1
 /// (the AA large-text floor) — plus a halo shadow in the board view.
+/// @MainActor: BoardTheme inherits the app target's MainActor default
+/// isolation under Swift 6; the test target's default is nonisolated.
+@MainActor
 struct BoardThemeContrastTests {
 
     private func rgb(_ color: Color) -> (Double, Double, Double) {
