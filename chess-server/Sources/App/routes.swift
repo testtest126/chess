@@ -35,6 +35,11 @@ func routes(_ app: Application) throws {
             return
         }
 
+        // Fly-style proxies cut idle connections after ~a minute; a player
+        // thinking that long would lose the socket mid-game. Pings keep the
+        // connection open (and surface dead peers) without protocol traffic.
+        ws.pingInterval = .seconds(25)
+
         let coordinator = req.application.gameCoordinator
         let logger = req.logger
 

@@ -2,7 +2,18 @@ import XCTest
 
 /// End-to-end smoke test: start a game, make a move, get an engine reply,
 /// resign, and open the game review.
+///
+/// Two layers of CI defense, from two investigations of the same red lane:
+/// the causal fixes (scroll to "Start Game" below the fold; end the game so
+/// a pondering engine can't block termination) and defense-in-depth against
+/// slow runners — readiness-gated taps and generous timeouts. CI simulators
+/// run an order of magnitude slower than dev machines (this suite has taken
+/// 130+ seconds on cold runners); long waits cost nothing on fast machines
+/// because every wait returns the moment its condition holds.
 final class GameFlowUITests: XCTestCase {
+
+    /// Existence/hittability budget scaled for cold CI simulators.
+    private static let ciTimeout: TimeInterval = 30
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -16,33 +27,25 @@ final class GameFlowUITests: XCTestCase {
         tapStartGame(in: app)
 
         // Play 1. e4 by tapping the pawn's square, then the target square.
-        let e2 = app.descendants(matching: .any)["square_e2"]
-        XCTAssertTrue(e2.waitForExistence(timeout: 5), "board should appear")
-        e2.tap()
-        app.descendants(matching: .any)["square_e4"].tap()
+        tapWhenReady(app.descendants(matching: .any)["square_e2"], "e2 square")
+        tapWhenReady(app.descendants(matching: .any)["square_e4"], "e4 square")
 
         // Our move shows up in the move list.
-        XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 5), "player move should be recorded")
-
-        // The engine (Black) answers with some move; the pawn we moved stays put
-        // and a second SAN entry appears. Wait for the move list to grow.
-        let engineReplied = NSPredicate(format: "count >= 2")
-        let sanTexts = app.staticTexts.matching(NSPredicate(format: "identifier == '' AND label MATCHES %@", "^[KQRBNa-h].*"))
-        _ = sanTexts // SAN matching is brittle; instead wait for thinking to finish.
-        let thinking = app.activityIndicators.firstMatch
-        if thinking.exists {
-            XCTAssertTrue(waitUntilGone(thinking, timeout: 20), "engine should finish thinking")
-        } else {
-            // Engine may already have replied within the polling window.
-            _ = engineReplied
-        }
+        XCTAssertTrue(
+            app.staticTexts["e4"].waitForExistence(timeout: Self.ciTimeout),
+            "player move should be recorded"
+        )
 
         endGame(in: app)
 
-        // Open the review and wait for analysis to finish.
-        app.buttons["Review Game"].tap()
-        XCTAssertTrue(app.staticTexts["White"].waitForExistence(timeout: 30), "review summary should appear")
-        app.buttons["Done"].firstMatch.tap()
+        // Open the review and wait for analysis to finish (engine-backed, so
+        // slow runners need real headroom).
+        tapWhenReady(app.buttons["Review Game"], "review button")
+        XCTAssertTrue(
+            app.staticTexts["White"].waitForExistence(timeout: 90),
+            "review summary should appear"
+        )
+        tapWhenReady(app.buttons["Done"].firstMatch, "review done button")
 
         app.terminate()
     }
@@ -55,16 +58,12 @@ final class GameFlowUITests: XCTestCase {
         tapStartGame(in: app)
 
         let e2 = app.descendants(matching: .any)["square_e2"]
-        XCTAssertTrue(e2.waitForExistence(timeout: 5), "board should appear")
+        XCTAssertTrue(e2.waitForExistence(timeout: Self.ciTimeout), "board should appear")
 
         // Wait until the square is actually hittable: on slow CI simulators
         // the board can still be laying out when it first reports existence,
         // and a drag aimed at a moving frame misses.
-        let hittable = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "isHittable == true"), object: e2
-        )
-        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 5), .completed,
-                       "square should become hittable")
+        XCTAssertTrue(waitUntilHittable(e2, timeout: Self.ciTimeout), "square should become hittable")
 
         // Drag the e2 pawn to e4 instead of tapping. The long press and slow
         // velocity matter: the fast default delivers too few intermediate
@@ -72,7 +71,10 @@ final class GameFlowUITests: XCTestCase {
         let e4 = app.descendants(matching: .any)["square_e4"]
         e2.press(forDuration: 0.5, thenDragTo: e4, withVelocity: .slow, thenHoldForDuration: 0.2)
 
-        XCTAssertTrue(app.staticTexts["e4"].waitForExistence(timeout: 10), "dragged move should be played")
+        XCTAssertTrue(
+            app.staticTexts["e4"].waitForExistence(timeout: Self.ciTimeout),
+            "dragged move should be played"
+        )
 
         // End the game before finishing. Leaving a live game keeps the engine
         // searching (and pondering) in the background, and on a slow CI VM
@@ -82,11 +84,7 @@ final class GameFlowUITests: XCTestCase {
         app.terminate()
     }
 
-    private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        let predicate = NSPredicate(format: "exists == false")
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
-    }
+    // MARK: - Helpers
 
     /// Resigns the current game and waits for the game-over sheet, so the
     /// test never abandons a live game with the engine still searching.
@@ -96,12 +94,18 @@ final class GameFlowUITests: XCTestCase {
     private func endGame(in app: XCUIApplication) {
         let thinking = app.activityIndicators.firstMatch
         if thinking.exists {
-            XCTAssertTrue(waitUntilGone(thinking, timeout: 20), "engine should finish thinking")
+            XCTAssertTrue(waitUntilGone(thinking, timeout: 60), "engine should finish thinking")
         }
-        app.buttons["Resign"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5), "resign confirmation should appear")
+        tapWhenReady(app.buttons["Resign"].firstMatch, "resign toolbar button")
+        XCTAssertTrue(
+            app.buttons["Cancel"].waitForExistence(timeout: Self.ciTimeout),
+            "resign confirmation should appear"
+        )
         app.buttons.matching(NSPredicate(format: "label == 'Resign'")).allElementsBoundByIndex.last?.tap()
-        XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 10), "game over sheet should appear")
+        XCTAssertTrue(
+            app.staticTexts["You Lost"].waitForExistence(timeout: Self.ciTimeout),
+            "game over sheet should appear"
+        )
     }
 
     /// The home screen's List has grown past one screenful (time controls,
@@ -111,7 +115,7 @@ final class GameFlowUITests: XCTestCase {
     @MainActor
     private func tapStartGame(in app: XCUIApplication) {
         let button = app.buttons["Start Game"]
-        XCTAssertTrue(button.waitForExistence(timeout: 5), "home screen should show Start Game")
+        XCTAssertTrue(button.waitForExistence(timeout: Self.ciTimeout), "home screen should show Start Game")
         var swipes = 0
         while !button.isHittable && swipes < 5 {
             app.swipeUp()
@@ -119,5 +123,33 @@ final class GameFlowUITests: XCTestCase {
         }
         XCTAssertTrue(button.isHittable, "Start Game should be reachable by scrolling")
         button.tap()
+    }
+
+    /// Waits for the element to exist and be hittable, then taps it. A bare
+    /// `tap()` right after a transition can race layout on cold simulators.
+    private func tapWhenReady(
+        _ element: XCUIElement, _ what: String,
+        timeout: TimeInterval = GameFlowUITests.ciTimeout,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertTrue(element.waitForExistence(timeout: timeout),
+                      "\(what) should exist", file: file, line: line)
+        XCTAssertTrue(waitUntilHittable(element, timeout: timeout),
+                      "\(what) should be hittable", file: file, line: line)
+        element.tap()
+    }
+
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isHittable == true"), object: element
+        )
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: element
+        )
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 }
