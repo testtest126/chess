@@ -63,6 +63,10 @@ deployment (Postgres, JWT secret, Docker, TLS) see the
 
 ## How it's put together
 
+The short version is below. For the full story — an interactive module map,
+a single move traced end to end, the wire protocol, and the engine pipeline —
+see the **[architecture overview](https://testtest126.github.io/chess/architecture/)**.
+
 | Directory | What it is |
 | --- | --- |
 | [`ChessKit/`](ChessKit) | Swift package, three libraries: **ChessKit** (board, legal moves, SAN/FEN/PGN, game state, review), **ChessProtocol** (engine, opening book, UCI adapter), **ChessOnline** (wire protocol shared by app & server) |
