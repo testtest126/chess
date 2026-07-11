@@ -21,17 +21,22 @@ struct UserPayload: JWTPayload {
 }
 
 extension Request {
-    /// Verifies the bearer token and loads the authenticated user's ID.
+    /// Verifies the bearer token, confirms the account still exists, and
+    /// returns its ID. The existence check is deliberate: access tokens are
+    /// stateless JWTs with a one-hour life, and account deletion (#108) must
+    /// invalidate them immediately — a signature check alone would let a
+    /// deleted account keep using /games, /leaderboard, and /play until the
+    /// token expired.
     func authenticatedUserID() async throws -> UUID {
+        try await authenticatedUser().requireID()
+    }
+
+    /// Verifies the bearer token and loads the authenticated user.
+    func authenticatedUser() async throws -> User {
         let payload = try await jwt.verify(as: UserPayload.self)
         guard let id = payload.userID else {
             throw Abort(.unauthorized, reason: "malformed subject claim")
         }
-        return id
-    }
-
-    func authenticatedUser() async throws -> User {
-        let id = try await authenticatedUserID()
         guard let user = try await User.find(id, on: db) else {
             throw Abort(.unauthorized, reason: "unknown user")
         }

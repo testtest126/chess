@@ -11,6 +11,7 @@ authoritative — every move is validated with ChessKit before it is accepted.
 | `POST /auth/register` | Create a guest account, returns access + refresh tokens |
 | `POST /auth/refresh` | Rotate the refresh token, mint a new access token |
 | `GET /me`, `PATCH /me` | Fetch / rename the authenticated user |
+| `DELETE /me` | Delete the account: user + refresh tokens removed, game records anonymized |
 | `GET /games`, `GET /games/:id` | The caller's finished games |
 | `GET /leaderboard` | Top 50 players by Elo (players with at least one finished game) |
 | `WS /play` | Realtime protocol (see `ChessOnline` target in ../ChessKit) |

@@ -22,6 +22,9 @@ struct HomeView: View {
     @State private var renameError: String?
     @State private var signInError: String?
     @State private var isSigningInWithApple = false
+    @State private var showDeleteAccountConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
     /// Prefetched single-use nonce for Sign in with Apple; its SHA-256 is
     /// bound into the authorization request for replay protection.
     @State private var pendingAppleNonce: String?
@@ -179,6 +182,28 @@ struct HomeView: View {
                     }
                 }
 
+                // The account area (App Review 5.1.1(v) wants deletion
+                // findable here). Only shown once an account exists —
+                // there is nothing to delete before the first online game.
+                if AccountStore.shared.userID != nil {
+                    Section("Account") {
+                        Button(role: .destructive) {
+                            showDeleteAccountConfirmation = true
+                        } label: {
+                            if isDeletingAccount {
+                                HStack(spacing: 12) {
+                                    ProgressView()
+                                        .scaleEffect(0.9)
+                                    Text("Deleting Account…")
+                                }
+                            } else {
+                                Label("Delete Account", systemImage: "trash")
+                            }
+                        }
+                        .disabled(isDeletingAccount)
+                    }
+                }
+
                 Section("Play the Engine") {
                     AdaptiveSegmentedPicker(title: "Play as", selection: $colorChoice) {
                         ForEach(ColorChoice.allCases) { choice in
@@ -298,6 +323,34 @@ struct HomeView: View {
         } message: {
             Text(signInError ?? "")
         }
+        // Explicit confirmation before the irreversible step, as Apple's
+        // account-deletion guidance asks. Note for UI tests: on iOS 26 this
+        // renders as a popover whose Cancel button is not exposed to the
+        // accessibility tree — key on the destructive button instead.
+        .confirmationDialog(
+            "Delete your account?",
+            isPresented: $showDeleteAccountConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) {
+                deleteAccount()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("""
+            Your online identity, rating, and sign-in are permanently erased; \
+            finished games are kept anonymized for your opponents' history. \
+            This cannot be undone.
+            """)
+        }
+        .alert("Couldn't Delete Account", isPresented: Binding(
+            get: { deleteAccountError != nil },
+            set: { if !$0 { deleteAccountError = nil } }
+        )) {
+            Button("OK") { deleteAccountError = nil }
+        } message: {
+            Text(deleteAccountError ?? "")
+        }
         .fullScreenCover(item: $activeSession) { session in
             GameView(session: session)
         }
@@ -310,6 +363,24 @@ struct HomeView: View {
                 playerColor: saved.playerColor,
                 title: saved.date.formatted(date: .abbreviated, time: .omitted)
             )
+        }
+    }
+
+    /// Runs the deletion; `AccountStore` wipes the Keychain credential and
+    /// resets local account state on success. The section disappears on its
+    /// own once `userID` becomes nil.
+    private func deleteAccount() {
+        isDeletingAccount = true
+        Task {
+            do {
+                try await AccountStore.shared.deleteAccount()
+            } catch {
+                deleteAccountError = String(
+                    localized: "Couldn't reach the server. Your account was not deleted — try again later.",
+                    comment: "Account deletion network/server failure"
+                )
+            }
+            isDeletingAccount = false
         }
     }
 

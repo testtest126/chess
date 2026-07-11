@@ -116,6 +116,69 @@ final class AccountStore {
         UserDefaults.standard.set(user.displayName, forKey: Self.displayNameKey)
     }
 
+    /// Permanently deletes the account (App Review 5.1.1(v) / GDPR erasure):
+    /// the server removes the user and every refresh token and anonymizes
+    /// finished games, then local state resets to just-installed — the next
+    /// online game starts over as a brand-new guest.
+    ///
+    /// Throws without touching local state when the server can't be reached:
+    /// wiping the only credential while the account still exists server-side
+    /// would silently break the erasure promise *and* the ability to retry.
+    func deleteAccount() async throws {
+        if let token = try await accessTokenIfAccountStillExists() {
+            var request = URLRequest(url: ServerConfig.httpBase.appending(path: "me"))
+            request.httpMethod = "DELETE"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw AccountError.invalidResponse
+            }
+            // 401/404 mean the account is already gone server-side (deleted
+            // from another device, or reaped) — finish the local wipe.
+            guard [204, 401, 404].contains(http.statusCode) else {
+                throw AccountError.server(status: http.statusCode)
+            }
+        }
+        resetLocalState()
+    }
+
+    /// A bearer for the deletion request, or nil when nothing exists
+    /// server-side anymore. Unlike `validAccessToken()`, never registers —
+    /// creating an account just to delete it would be absurd — and unlike
+    /// `existingAccessToken()`, only maps a definitive 401 (credential
+    /// already revoked/reaped) to nil; transport errors propagate so the
+    /// caller doesn't mistake "unreachable" for "already deleted".
+    private func accessTokenIfAccountStillExists() async throws -> String? {
+        if let token = accessToken, accessTokenExpiry > Date().addingTimeInterval(60) {
+            return token
+        }
+        guard let refreshToken = KeychainStore.string(for: Self.refreshTokenKey) else {
+            return nil
+        }
+        do {
+            return adopt(try await refresh(with: refreshToken))
+        } catch AccountError.server(let status) where status == 401 {
+            return nil
+        }
+    }
+
+    /// Back to the just-installed state: no credential, no cached identity.
+    private func resetLocalState() {
+        KeychainStore.delete(Self.refreshTokenKey)
+        UserDefaults.standard.removeObject(forKey: Self.userIDKey)
+        UserDefaults.standard.removeObject(forKey: Self.displayNameKey)
+        UserDefaults.standard.removeObject(forKey: Self.ratingKey)
+        UserDefaults.standard.removeObject(forKey: Self.appleLinkedKey)
+        userID = nil
+        displayName = nil
+        rating = nil
+        appleLinked = false
+        accessToken = nil
+        accessTokenExpiry = .distantPast
+        // Any remembered live online game belonged to the deleted account.
+        ActiveGameStore.shared.clear()
+    }
+
     /// Top players by rating (requires an account; registers one if needed).
     func fetchLeaderboard() async throws -> [LeaderboardEntry] {
         let token = try await validAccessToken()
