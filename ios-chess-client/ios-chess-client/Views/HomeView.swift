@@ -8,6 +8,7 @@ import CryptoKit
 /// Root screen: start a new game against the engine, or revisit past games.
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Query(sort: \SavedGame.date, order: .reverse) private var savedGames: [SavedGame]
 
     @State private var colorChoice: ColorChoice = .white
@@ -96,13 +97,7 @@ struct HomeView: View {
                             timeControl: TimeControl(rawValue: timeControlRaw) ?? .default
                         )
                     } label: {
-                        Label("Play Online", systemImage: "globe")
-                            // Wrap instead of truncating at accessibility
-                            // type sizes (same fix as the Engine strength
-                            // label and account caption, #83 audit item 5).
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity)
-                            .fontWeight(.semibold)
+                        primaryActionLabel("Play Online", systemImage: "globe")
                     }
                     .primaryActionButtonStyle()
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -232,13 +227,7 @@ struct HomeView: View {
                             difficulty: Difficulty(rawValue: difficultyRaw) ?? .casual
                         )
                     } label: {
-                        Label("Start Game", systemImage: "play.fill")
-                            // Wrap instead of truncating at accessibility
-                            // type sizes (same fix as the Engine strength
-                            // label and account caption, #83 audit item 5).
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity)
-                            .fontWeight(.semibold)
+                        primaryActionLabel("Start Game", systemImage: "play.fill")
                     }
                     .primaryActionButtonStyle()
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -488,6 +477,26 @@ extension HomeView {
         }
         .frame(width: 24, height: 12)
         .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+
+    /// Label for the "Play Online" / "Start Game" primary CTAs. At
+    /// accessibility Dynamic Type sizes the SF Symbol icon scales up enough
+    /// to leave the title almost no width, so the prominent button style's
+    /// 2-line cap truncates it with an ellipsis (e.g. "Play Onli…", the
+    /// trailing "ne" lost) — modifiers like lineLimit/fixedSize/
+    /// minimumScaleFactor on the label don't override that cap. Title-only
+    /// at accessibility sizes keeps the text fully legible; the icon is
+    /// decorative next to a title this short, so dropping it costs nothing.
+    fileprivate func primaryActionLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                Text(title)
+            } else {
+                Label(title, systemImage: systemImage)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .fontWeight(.semibold)
     }
 }
 
