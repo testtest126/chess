@@ -97,6 +97,10 @@ struct HomeView: View {
                         )
                     } label: {
                         Label("Play Online", systemImage: "globe")
+                            // Wrap instead of truncating at accessibility
+                            // type sizes (same fix as the Engine strength
+                            // label and account caption, #83 audit item 5).
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity)
                             .fontWeight(.semibold)
                     }
@@ -229,6 +233,10 @@ struct HomeView: View {
                         )
                     } label: {
                         Label("Start Game", systemImage: "play.fill")
+                            // Wrap instead of truncating at accessibility
+                            // type sizes (same fix as the Engine strength
+                            // label and account caption, #83 audit item 5).
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity)
                             .fontWeight(.semibold)
                     }
