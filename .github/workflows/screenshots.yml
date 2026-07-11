@@ -119,7 +119,7 @@ jobs:
           if-no-files-found: error
 
       - name: Commit screenshots to the invoking branch
-        if: ${{ inputs.commit }}
+        if: ${{ inputs.commit && github.ref_name != 'main' }}
         run: |
           mkdir -p docs/screenshots
           cp shots/*.png docs/screenshots/
@@ -131,6 +131,7 @@ jobs:
             exit 0
           fi
           git commit -m "Screenshots: refresh simulator captures (screenshots.yml)"
+          echo "Committing screenshots to branch: ${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Upload result bundle on failure
