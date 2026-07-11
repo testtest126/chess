@@ -61,18 +61,27 @@ struct AuthRateLimitMiddleware: AsyncMiddleware {
         return try await next.respond(to: request)
     }
 
-    /// The socket's peer address, unless TRUST_PROXY_HEADERS is set — then the
-    /// last X-Forwarded-For entry, which is the one appended by our own proxy.
-    /// Earlier entries are client-controlled and must never be trusted, and
-    /// without a trusted proxy the whole header is forgeable, hence the opt-in.
-    /// A request with no resolvable address shares one bucket rather than
-    /// bypassing the limit.
+    /// The socket's peer address, unless TRUST_PROXY_HEADERS is set — then
+    /// what the trusted proxy says. Fly-Client-IP wins when present: Fly's
+    /// proxy overwrites it with the real client address, whereas Fly's
+    /// X-Forwarded-For puts the *app's own IP* rightmost, which would fold
+    /// every client into a single bucket. The last-XFF fallback stays for
+    /// conventional proxies (nginx et al.) that append the peer they saw.
+    /// Earlier XFF entries are client-controlled and must never be trusted,
+    /// and without a trusted proxy every header is forgeable, hence the
+    /// opt-in. A request with no resolvable address shares one bucket rather
+    /// than bypassing the limit.
     private func clientKey(for request: Request) -> String {
-        if request.application.environment.isTrustingProxyHeaders,
-           let forwarded = request.headers[.xForwardedFor].first {
-            let entries = forwarded.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            if let closest = entries.last, !closest.isEmpty {
-                return closest
+        if request.application.environment.isTrustingProxyHeaders {
+            if let flyClient = request.headers.first(name: "Fly-Client-IP"),
+               !flyClient.isEmpty {
+                return flyClient
+            }
+            if let forwarded = request.headers[.xForwardedFor].first {
+                let entries = forwarded.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                if let closest = entries.last, !closest.isEmpty {
+                    return closest
+                }
             }
         }
         return request.remoteAddress?.ipAddress ?? "unknown"
