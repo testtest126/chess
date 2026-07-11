@@ -77,6 +77,30 @@ Auth, token verification, crypto, account linking, session management:
   signs its fixtures with the same key the code trusts proves nothing —
   that exact pattern shipped a token-forgery hole once (PR #50).
 
+## GitHub surface conventions
+
+Decided in #123 (owner-acked 2026-07-11): what to use each of GitHub's
+secondary surfaces for, so they don't drift into competing sources of truth.
+
+- **Tags & releases** — adopt at the next natural milestone, don't retrofit
+  history. Server: tag the deployed state (`server-vN` or the deploy SHA) at
+  each Fly deploy. iOS: tag every TestFlight submission (`ios-v1.0-b1` style)
+  so any build in a user's hands has a checkable source commit. ChessKit
+  stays untagged — it's a local path dependency; semver there is ceremony.
+  Tagging is an **owner/orchestrator act**, done at deploy/submission time —
+  not something a worker session does unprompted.
+- **Milestones, not Projects** — the "TestFlight 1.0" milestone tracks issues
+  gating the first submission. A Projects board would be a second board to
+  keep in sync for a backlog this small and fast-moving; revisit only if the
+  open-issue count regularly runs 15–20+ or more humans join.
+- **Wiki** — stays empty. Docs live in `docs/`: reviewed, versioned with the
+  code, cloned into every worktree. A wiki page forks documentation away from
+  all three.
+- **Discussions** — the direction log for questions that aren't yet
+  actionable (engine direction, 1.0 scope). One habit: when a thread reaches
+  a decision, distill it into an issue or a `docs/` note and link back, so
+  the decision doesn't stay buried in conversation.
+
 ## Incident ledger (why each rule exists)
 
 | Incident | Lesson encoded |
