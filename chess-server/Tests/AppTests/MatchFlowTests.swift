@@ -619,6 +619,88 @@ final class MatchFlowTests: XCTestCase {
         try await b.close()
     }
 
+    func testClockIncrementIsAddedAfterEachMove() async throws {
+        // Blitz = 5+3 default. Use a custom clock with a clear increment to
+        // isolate the behaviour: 10s initial, 2s increment.
+        app.gameCoordinator = GameCoordinator(
+            app: app,
+            clock: ClockConfig(initialSeconds: 10, incrementSeconds: 2)
+        )
+
+        let match = try await startMatch()
+
+        // White plays immediately; the clock should show ~10s + 2s increment
+        // minus negligible think time for white, and ~10s for black.
+        try await match.white.send(.move(uci: "e2e4"))
+        guard case .movePlayed(_, let clock1W) = try await match.white.next(),
+              case .movePlayed(_, let clock1B) = try await match.black.next()
+        else {
+            return XCTFail("expected move broadcast")
+        }
+        let afterWhiteMove = try XCTUnwrap(clock1W)
+        // White spent nearly 0s thinking, got +2s increment → ~12s.
+        XCTAssertGreaterThan(afterWhiteMove.whiteSeconds, 11, "white should have gained the 2s increment")
+        XCTAssertEqual(afterWhiteMove.blackSeconds, 10, accuracy: 1)
+
+        // Black replies immediately; black should also gain the increment.
+        try await match.black.send(.move(uci: "e7e5"))
+        guard case .movePlayed(_, let clock2W) = try await match.white.next(),
+              case .movePlayed(_, _) = try await match.black.next()
+        else {
+            return XCTFail("expected move broadcast")
+        }
+        let afterBlackMove = try XCTUnwrap(clock2W)
+        XCTAssertGreaterThan(afterBlackMove.blackSeconds, 11, "black should have gained the 2s increment")
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
+    func testDisconnectAndReconnectResumesGame() async throws {
+        let match = try await startMatch()
+
+        // White plays a move.
+        try await match.white.send(.move(uci: "e2e4"))
+        _ = try await match.white.next() // movePlayed
+        _ = try await match.black.next() // movePlayed
+
+        // White disconnects. Black should be told the opponent went offline.
+        try await match.white.close()
+        guard case .opponentStatus(let connected) = try await match.black.next() else {
+            return XCTFail("expected opponent status update after disconnect")
+        }
+        XCTAssertFalse(connected)
+
+        // White reconnects with a fresh socket.
+        let reconnected = try await TestSocket.connect(
+            port: port, token: match.whiteAuth.accessToken, on: app.eventLoopGroup
+        )
+        // Rejoining the queue should replay the game state (gameStart with the
+        // existing moves) instead of creating a new game.
+        try await reconnected.send(.joinQueue(timeControl: .default))
+        guard case .gameStart(let restart) = try await reconnected.next() else {
+            return XCTFail("expected gameStart on reconnection")
+        }
+        XCTAssertEqual(restart.moves, ["e2e4"], "reconnect should replay existing moves")
+
+        // Black should be told the opponent is back.
+        guard case .opponentStatus(let reconnectedStatus) = try await match.black.next() else {
+            return XCTFail("expected opponent reconnected status")
+        }
+        XCTAssertTrue(reconnectedStatus)
+
+        // The game continues: black can still move.
+        try await match.black.send(.move(uci: "e7e5"))
+        guard case .movePlayed(let uci, _) = try await reconnected.next() else {
+            return XCTFail("expected move broadcast to reconnected player")
+        }
+        XCTAssertEqual(uci, "e7e5")
+        _ = try await match.black.next() // movePlayed echo
+
+        try await reconnected.close()
+        try await match.black.close()
+    }
+
     func testUnauthenticatedSocketIsClosed() async throws {
         do {
             let socket = try await TestSocket.connect(port: port, token: "garbage", on: app.eventLoopGroup)
