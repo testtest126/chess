@@ -28,7 +28,7 @@ needed to spin the fleet back up and continue development at any time.
   (`send_message` has standing user approval). The orchestrator session owns
   merging; nobody else merges, ever. Security-sensitive diffs need a
   "Security review: APPROVE @ <head>" comment from the root agent session.
-- **Hosting:** Fly.io (org ykovalsky-up-gmail-com, billing configured).
+- **Hosting:** Fly.io (personal org, billing configured).
   App `matemate-chess`. Zero-spend posture is user policy — see
   `deployment-runbook.md`. Every fly mutation gets logged as a comment on
   issue #28 with the exact command and expected monthly cost.

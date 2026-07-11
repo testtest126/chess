@@ -14,7 +14,7 @@ cost. This substitutes for the orchestrator's spend gate (agreed terms).
 
 ```bash
 cd /Users/yk/dev/chess && git pull --ff-only origin main   # fly.toml + fixed Dockerfile arrive tracked
-fly auth whoami                                            # expect ykovalsky.up@gmail.com
+fly auth whoami                                            # expect your Fly account email
 fly apps list                                              # expect matemate-chess only, no machines
 fly secrets set "JWT_SECRET=$(openssl rand -hex 32)" -a matemate-chess   # rotation (on record)
 fly volumes create matemate_data --size 1 --region waw -a matemate-chess # +$0.15/mo — log on #28
