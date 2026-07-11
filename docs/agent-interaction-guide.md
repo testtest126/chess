@@ -89,6 +89,38 @@ Auth, token verification, crypto, account linking, session management:
 | #60 merged via auto-merge armed by a non-orchestrator | Arming auto-merge counts as merging |
 | Red iOS lane ignored because it is not a required check (#68) | Manual iOS-lane gate for app-touching PRs (rule 4c) |
 
+## Conventions
+
+### Tags & releases
+
+- **Server:** tag the deployed state (`server-vN`) at each Fly deploy. Gives
+  rollback anchors and makes prod state a checkable fact.
+- **iOS:** tag every TestFlight submission (`ios-v1.0-bN` style) so the exact
+  source of any build in users' hands is traceable.
+- **ChessKit:** no tags — it is a local path dependency; semver would be
+  ceremony with no consumer.
+- **Tag creation is an owner/orchestrator act.** Worker sessions never create
+  tags unprompted.
+
+### Milestones over Projects
+
+Use milestones for tracking (e.g. "TestFlight 1.0"). A Projects board would be
+a second source of truth to keep synced, and this repo's queue is small and
+fast-moving with an orchestrator-owned assignment map. Revisit Projects only if
+the backlog regularly holds 15–20+ open items or more humans join.
+
+### Wiki
+
+Keep empty / disabled. Docs belong in `docs/` — reviewed, versioned with code,
+cloned by every session. The wiki forks documentation away from all three
+properties.
+
+### Discussions
+
+Keep as the direction log for open questions that are not yet actionable. When
+a thread reaches a decision, **distill it into an issue or a `docs/` note and
+link back** so decisions don't stay buried in conversation.
+
 ## Tooling
 
 Project skills live in `.claude/skills/` and encode the above mechanically.
