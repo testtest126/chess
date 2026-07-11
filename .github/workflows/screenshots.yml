@@ -1,0 +1,142 @@
+name: Screenshots
+
+# On-demand README/marketing screenshot capture (issue #118). Runs
+# ScreenshotCaptureTests on a simulator with a normalized status bar,
+# exports the attached PNGs from the xcresult, uploads them as an artifact
+# and (by default) commits them to docs/screenshots/ on the branch it was
+# dispatched from — which lets sessions without a Mac produce and consume
+# real device screenshots entirely through CI. Never runs automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit captured PNGs to docs/screenshots/ on this branch"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    name: Capture app screenshots
+    # macos-26 for the same reason as ios.yml: it ships the iOS 26 SDK, so
+    # captures show the Liquid Glass styling users on current iOS see.
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pick an iPhone simulator
+        id: sim
+        # Prefer a Pro model for consistent README framing across captures;
+        # fall back to any iPhone like ios.yml does.
+        run: |
+          LIST=$(xcrun simctl list devices available)
+          UDID=$(echo "$LIST" | grep -m1 -E "iPhone.*Pro" | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}" || true)
+          if [ -z "$UDID" ]; then
+            UDID=$(echo "$LIST" | grep -m1 -E "iPhone" | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+          fi
+          if [ -z "$UDID" ]; then
+            echo "No iPhone simulator available"; xcrun simctl list devices; exit 1
+          fi
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Boot the simulator before xcodebuild touches it
+        # Same determinism fix as ios.yml — cold boots inside xcodebuild have
+        # hung whole jobs on macos-26.
+        timeout-minutes: 10
+        run: |
+          xcrun simctl boot "${{ steps.sim.outputs.udid }}" || true  # "already booted" is fine
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
+
+      - name: Normalize the status bar
+        # The Apple-conventional 9:41, full signal, full battery — keeps
+        # every capture consistent with docs/screenshot-home.png.
+        run: |
+          xcrun simctl status_bar "${{ steps.sim.outputs.udid }}" override \
+            --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --cellularMode active --cellularBars 4 \
+            --batteryState charged --batteryLevel 100
+
+      - name: Build app and UI tests
+        timeout-minutes: 25
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            | tail -30
+
+      - name: Capture screenshots
+        # The engine game is offline, so no chess-server is needed. Serial
+        # testing for the same reason as ios.yml (no simulator clones).
+        timeout-minutes: 20
+        env:
+          TEST_RUNNER_CAPTURE_SCREENSHOTS: "1"
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath Screenshots.xcresult \
+            -parallel-testing-enabled NO \
+            -only-testing:ios-chess-clientUITests/ScreenshotCaptureTests \
+            | tail -100
+
+      - name: Export attachments from the result bundle
+        # xcresulttool gives exported files opaque names; manifest.json maps
+        # them back to the XCTAttachment names, which we translate to the
+        # stable docs/ filenames. The find fallback keeps the artifact useful
+        # even if a future Xcode changes the manifest shape.
+        run: |
+          xcrun xcresulttool export attachments --path Screenshots.xcresult --output-path exported
+          mkdir -p shots
+          if [ -f exported/manifest.json ]; then
+            jq -r '.. | objects | select(has("exportedFileName") and has("suggestedHumanReadableName")) | [.exportedFileName, .suggestedHumanReadableName] | @tsv' exported/manifest.json \
+            | while IFS=$'\t' read -r file name; do
+                case "$name" in
+                  readme-home*)   cp "exported/$file" shots/screenshot-home.png ;;
+                  readme-game*)   cp "exported/$file" shots/screenshot-game.png ;;
+                  readme-review*) cp "exported/$file" shots/screenshot-review.png ;;
+                esac
+              done
+          fi
+          if [ -z "$(ls -A shots)" ]; then
+            echo "manifest mapping found nothing; exporting every PNG as-is"
+            find exported -name '*.png' -exec cp {} shots/ \;
+          fi
+          ls -la shots
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-screenshots
+          path: shots
+          if-no-files-found: error
+
+      - name: Commit screenshots to the invoking branch
+        if: ${{ inputs.commit }}
+        run: |
+          mkdir -p docs/screenshots
+          cp shots/*.png docs/screenshots/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          if git diff --cached --quiet; then
+            echo "captures identical to what's committed; nothing to do"
+            exit 0
+          fi
+          git commit -m "Screenshots: refresh simulator captures (screenshots.yml)"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Upload result bundle on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Screenshots.xcresult
+          path: Screenshots.xcresult
+          retention-days: 7
