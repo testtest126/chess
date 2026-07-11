@@ -1,0 +1,206 @@
+name: Nightly
+
+# Flake-telemetry lane (#121). The PR lanes absorb flakes so merges aren't
+# blocked (-retry-tests-on-failure in ios.yml); this lane exists to MEASURE
+# them instead: the full matrix runs on a schedule with retries off and
+# repetitions on, so a test that passes 2 of 3 iterations fails here and
+# gets counted. Never a required check; never gates merging.
+#
+# Sessions: before hardening or quarantining a "flaky" test, check the
+# rolling issue this lane maintains ("Nightly flake telemetry (rolling)") —
+# it records which tests failed on which nights.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+# A slow night must not stack onto the next one.
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  package-tests:
+    name: Package suites
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache SwiftPM builds
+        uses: actions/cache@v6
+        with:
+          path: |
+            ChessKit/.build
+            chess-server/.build
+          key: nightly-spm-${{ runner.os }}-${{ hashFiles('ChessKit/Package.swift', 'ChessKit/Package.resolved', 'chess-server/Package.swift', 'chess-server/Package.resolved') }}
+          restore-keys: nightly-spm-${{ runner.os }}-
+
+      - name: ChessKit tests
+        run: swift test --package-path ChessKit
+
+      - name: Server tests
+        # Runs even when ChessKit failed: one broken suite must not hide
+        # the other's flake data for the night.
+        if: success() || failure()
+        run: swift test --package-path chess-server
+
+  ios-repetitions:
+    name: iOS suite ×3 (no retries)
+    # Mirrors ios.yml's build/boot hardening; the difference is the test
+    # invocation: -test-iterations WITHOUT -retry-tests-on-failure, so every
+    # test runs three times and any non-3/3 result fails the job.
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache SwiftPM build (server)
+        uses: actions/cache@v6
+        with:
+          path: chess-server/.build
+          key: server-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift', 'chess-server/Package.resolved') }}
+          restore-keys: server-spm-${{ runner.os }}-
+
+      - name: Build chess-server
+        run: swift build --package-path chess-server
+
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 -E "iPhone" | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+          if [ -z "$UDID" ]; then
+            echo "No iPhone simulator available"; xcrun simctl list devices; exit 1
+          fi
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Boot the simulator before xcodebuild touches it
+        # Same hang defense as ios.yml.
+        timeout-minutes: 10
+        run: |
+          xcrun simctl boot "${{ steps.sim.outputs.udid }}" || true  # "already booted" is fine
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
+
+      - name: Build app and UI tests
+        timeout-minutes: 25
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            | tail -30
+
+      - name: Start chess-server
+        # Same watchdog as ios.yml so the online E2E — the flakiest and most
+        # informative suite — is measured, not skipped.
+        run: |
+          (cd chess-server && nohup bash -c \
+            'while true; do .build/debug/App serve --hostname 127.0.0.1 --port 8080 >> server.log 2>&1; echo "[watchdog] server exited ($?), restarting" >> server.log; sleep 1; done' \
+            > /dev/null 2>&1 &)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+              echo "chess-server is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::chess-server did not become healthy within 30s"
+          tail -50 chess-server/server.log
+          exit 1
+
+      - name: Run every suite three times, no retry absorption
+        timeout-minutes: 55
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath Nightly.xcresult \
+            -test-iterations 3 \
+            -test-repetition-relaunch-enabled YES \
+            -parallel-testing-enabled NO \
+            -only-testing:ios-chess-clientTests \
+            -only-testing:ios-chess-clientUITests/GameFlowUITests \
+            -only-testing:ios-chess-clientUITests/OnlineMatchUITests \
+            | tee nightly-tests.log | tail -400
+
+      - name: Summarize per-test failures
+        # Runs on failure only — the artifact is what the report job (and
+        # humans) read for per-test counts across the three iterations.
+        if: failure()
+        run: |
+          mkdir -p flake-summary
+          {
+            echo "Failing test cases (count = failed iterations of 3):"
+            grep -E "^Test [Cc]ase .*(failed|passed)" nightly-tests.log \
+              | grep -i failed | sed -E "s/ \([0-9.]+ seconds\)//" | sort | uniq -c | sort -rn \
+              || echo "(no per-test lines captured — see the xcresult)"
+          } | tee flake-summary/failures.txt
+
+      - name: Upload flake summary
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: flake-summary
+          path: flake-summary
+          if-no-files-found: ignore
+
+      - name: Upload result bundle on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Nightly.xcresult
+          path: Nightly.xcresult
+          retention-days: 7
+
+  report:
+    name: Update rolling telemetry issue
+    # One rolling issue, appended only on non-green nights — never an issue
+    # per run. All-green nights post nothing anywhere.
+    needs: [package-tests, ios-repetitions]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Download flake summary if present
+        uses: actions/download-artifact@v7
+        with:
+          name: flake-summary
+          path: flake-summary
+        continue-on-error: true
+
+      - name: Append to the rolling issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Nightly flake telemetry (rolling)"
+        run: |
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --search "in:title \"$TITLE\"" --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+          if [ -z "$NUM" ]; then
+            NUM=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --body "Rolling record of non-green nightly runs (#121). Newest results arrive as comments; close freely — the lane reopens it when something fails again." \
+              | grep -oE "[0-9]+$")
+          else
+            gh issue reopen "$NUM" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          fi
+          {
+            echo "**$(date -u +%F) run:** ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo ""
+            echo "- Package suites: ${{ needs.package-tests.result }}"
+            echo "- iOS ×3 (no retries): ${{ needs.ios-repetitions.result }}"
+            if [ -s flake-summary/failures.txt ]; then
+              echo ""
+              echo '```'
+              cat flake-summary/failures.txt
+              echo '```'
+            fi
+          } > comment.md
+          gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body-file comment.md
