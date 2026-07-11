@@ -91,10 +91,15 @@ Auth, token verification, crypto, account linking, session management:
 
 ## Conventions
 
+Decided in #123 (owner-acked 2026-07-11): what to use each of GitHub's
+secondary surfaces for, so they don't drift into competing sources of truth.
+
 ### Tags & releases
 
-- **Server:** tag the deployed state (`server-vN`) at each Fly deploy. Gives
-  rollback anchors and makes prod state a checkable fact.
+Adopt at the next natural milestones — don't retrofit history.
+
+- **Server:** tag the deployed state (`server-vN` or the deploy SHA) at each
+  Fly deploy. Gives rollback anchors and makes prod state a checkable fact.
 - **iOS:** tag every TestFlight submission (`ios-v1.0-bN` style) so the exact
   source of any build in users' hands is traceable.
 - **ChessKit:** no tags — it is a local path dependency; semver would be
@@ -111,9 +116,11 @@ the backlog regularly holds 15–20+ open items or more humans join.
 
 ### Wiki
 
-Keep empty / disabled. Docs belong in `docs/` — reviewed, versioned with code,
+Unused by convention. Docs belong in `docs/` — reviewed, versioned with code,
 cloned by every session. The wiki forks documentation away from all three
-properties.
+properties, so nothing gets written there whether or not the tab is visible.
+Disabling the tab is an owner-only settings act (tracked in #137) — no agent
+session touches repo settings.
 
 ### Discussions
 
