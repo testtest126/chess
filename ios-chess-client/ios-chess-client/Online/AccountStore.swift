@@ -167,13 +167,33 @@ final class AccountStore {
         try await post("auth/refresh", body: RefreshRequest(refreshToken: token))
     }
 
+    /// Fetches a fresh single-use nonce for Sign in with Apple. Its SHA-256
+    /// hex goes on the authorization request; the raw value comes back to
+    /// `signInWithApple` so the server can verify the token is bound to it.
+    func fetchAppleNonce() async throws -> String {
+        var request = URLRequest(url: ServerConfig.httpBase.appending(path: "auth/apple/nonce"))
+        request.httpMethod = "POST"
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AccountError.server(status: (response as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return try JSONDecoder().decode(AppleNonceResponse.self, from: data).nonce
+    }
+
     /// Signs in with an Apple identity credential from AuthenticationServices.
     /// The server resolves the account with recovery first: an account already
     /// linked to this Apple ID is returned (any rating/history restored);
     /// otherwise the current guest account is linked in place — which is why
     /// this request carries our bearer token when we have an account — and
     /// only failing both is a fresh account created.
-    func signInWithApple(_ credential: ASAuthorizationAppleIDCredential, displayName: String? = nil) async throws {
+    ///
+    /// `rawNonce` is the value from `fetchAppleNonce()` whose SHA-256 was set
+    /// on the authorization request — replay protection requires it.
+    func signInWithApple(
+        _ credential: ASAuthorizationAppleIDCredential,
+        displayName: String? = nil,
+        rawNonce: String
+    ) async throws {
         guard let tokenData = credential.identityToken,
               let token = String(data: tokenData, encoding: .utf8)
         else {
@@ -184,7 +204,7 @@ final class AccountStore {
         let bearer = await existingAccessToken()
         _ = adopt(try await post(
             "auth/apple",
-            body: AppleSignInRequest(identityToken: token, displayName: displayName),
+            body: AppleSignInRequest(identityToken: token, displayName: displayName, nonce: rawNonce),
             bearer: bearer
         ))
     }

@@ -1,5 +1,6 @@
 import Vapor
 import Fluent
+import SQLKit
 import JWT
 import ChessOnline
 
@@ -11,6 +12,24 @@ struct AuthController: RouteCollection {
         auth.post("register", use: register)
         auth.post("refresh", use: refresh)
         auth.post("apple", use: signInWithApple)
+        auth.post("apple", "nonce", use: appleNonce)
+    }
+
+    /// Mints a single-use nonce for Sign in with Apple. The client hashes it
+    /// (SHA-256 hex) into the authorization request; Apple echoes the hash in
+    /// the identity token; /auth/apple consumes the stored row — so a
+    /// captured token can't be replayed. Unauthenticated by nature (it
+    /// precedes sign-in) and rate-limited implicitly by row TTL.
+    @Sendable
+    func appleNonce(req: Request) async throws -> AppleNonceResponse {
+        // Opportunistic sweep so abandoned sign-ins don't accumulate.
+        try await AppleNonce.query(on: req.db)
+            .filter(\.$expiresAt < Date())
+            .delete()
+
+        let (raw, model) = AppleNonce.generate()
+        try await model.save(on: req.db)
+        return AppleNonceResponse(nonce: raw)
     }
 
     /// Creates a guest account and returns its first token pair. The refresh
@@ -67,12 +86,32 @@ struct AuthController: RouteCollection {
         }
         let body = try req.content.decode(AppleSignInRequest.self, as: .json)
 
-        let subject: String
+        // Replay protection: the request must carry the raw nonce previously
+        // minted by /auth/apple/nonce, and its consumption must succeed. The
+        // row is deleted *before* token verification so even a failing
+        // attempt burns the nonce.
+        guard let rawNonce = body.nonce, !rawNonce.isEmpty else {
+            throw Abort(.badRequest, reason: "missing nonce (call /auth/apple/nonce first)")
+        }
+        let expectedNonce = AppleNonce.hash(rawNonce)
+        guard try await Self.consumeNonce(hash: expectedNonce, on: req.db) else {
+            throw Abort(.unauthorized, reason: "unknown, expired, or already-used nonce")
+        }
+
+        let claims: AppleTokenClaims
         do {
-            subject = try await req.application.appleTokenVerifier.verify(body.identityToken, req)
+            claims = try await req.application.appleTokenVerifier.verify(body.identityToken, req)
         } catch {
             throw Abort(.unauthorized, reason: "invalid Apple identity token")
         }
+
+        // The token must be bound to this nonce: Apple echoes the hash the
+        // client set on the authorization request. A mismatch means the token
+        // was minted for a different session (or without our nonce at all).
+        guard claims.nonce == expectedNonce else {
+            throw Abort(.unauthorized, reason: "identity token nonce mismatch")
+        }
+        let subject = claims.subject
 
         // A presented bearer must be valid: silently treating an expired or
         // forged bearer as "anonymous" would turn a guest's linking attempt
@@ -92,6 +131,27 @@ struct AuthController: RouteCollection {
             on: req.db
         )
         return try await issueTokens(for: user, on: req)
+    }
+
+    /// Atomically consumes a nonce: one DELETE … RETURNING statement, so two
+    /// concurrent sign-ins presenting the same nonce can never both pass — a
+    /// SELECT-then-DELETE here would be a TOCTOU replay window (review
+    /// finding on this PR). Expired rows never match, so they can't be
+    /// consumed either; the mint endpoint sweeps them. Works on both SQLite
+    /// (3.35+) and Postgres.
+    static func consumeNonce(hash: String, on db: Database) async throws -> Bool {
+        struct Consumed: Decodable {
+            let nonce_hash: String
+        }
+        guard let sql = db as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "nonce store requires an SQL database")
+        }
+        let consumed = try await sql.raw("""
+            DELETE FROM apple_nonces
+            WHERE nonce_hash = \(bind: hash) AND expires_at > \(bind: Date())
+            RETURNING nonce_hash
+            """).first(decoding: Consumed.self)
+        return consumed != nil
     }
 
     /// Account-resolution policy, factored out for testing:
@@ -120,8 +180,7 @@ struct AuthController: RouteCollection {
                 throw Abort(.conflict, reason: "account is already linked to a different Apple ID")
             }
             currentUser.appleUserID = subject
-            try await currentUser.save(on: db)
-            return currentUser
+            return try await savedResolvingLinkRace(currentUser, subject: subject, on: db)
         }
 
         // Apple only shares the name on first authorization; fall back to a
@@ -129,8 +188,32 @@ struct AuthController: RouteCollection {
         let name = requestedName.flatMap { try? User.validateDisplayName($0) }
             ?? User.generatedGuestName()
         let user = User(displayName: name, appleUserID: subject)
-        try await user.save(on: db)
-        return user
+        return try await savedResolvingLinkRace(user, subject: subject, on: db)
+    }
+
+    /// Saves a user that is about to hold the link to `subject`, recovering
+    /// from the first-link race: two concurrent sign-ins with the same Apple
+    /// ID both pass the recover-query (no link exists yet) and both try to
+    /// persist one — the partial unique index rejects the loser. The loser's
+    /// correct outcome is the winner's account (identical to arriving a
+    /// moment later), not a 500.
+    static func savedResolvingLinkRace(
+        _ user: User, subject: String, on db: Database
+    ) async throws -> User {
+        do {
+            try await user.save(on: db)
+            return user
+        } catch where (error as? DatabaseError)?.isConstraintFailure == true {
+            guard let winner = try await User.query(on: db)
+                .filter(\.$appleUserID == subject)
+                .first()
+            else {
+                // Constraint failure but nobody holds the link: not the race
+                // we handle — surface it.
+                throw error
+            }
+            return winner
+        }
     }
 
     private func issueTokens(for user: User, on req: Request) async throws -> AuthResponse {
@@ -152,5 +235,6 @@ struct AuthController: RouteCollection {
 }
 
 extension AuthResponse: @retroactive Content {}
+extension AppleNonceResponse: @retroactive Content {}
 extension UserDTO: @retroactive Content {}
 extension GameRecordDTO: @retroactive Content {}
