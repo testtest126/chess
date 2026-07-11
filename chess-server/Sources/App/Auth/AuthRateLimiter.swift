@@ -47,17 +47,17 @@ actor SlidingWindowRateLimiter {
         // concurrent requests across instances can never both see the last
         // free slot.
         let current = try await sql.raw("""
-            INSERT INTO "auth_rate_windows" ("key", "bucket", "count")
-            VALUES (\(bind: key), \(bind: bucket), 1)
-            ON CONFLICT ("key", "bucket")
-            DO UPDATE SET "count" = "auth_rate_windows"."count" + 1
-            RETURNING "count"
-            """).first(decoding: CountRow.self)?.count ?? 1
+        INSERT INTO "auth_rate_windows" ("key", "bucket", "count")
+        VALUES (\(bind: key), \(bind: bucket), 1)
+        ON CONFLICT ("key", "bucket")
+        DO UPDATE SET "count" = "auth_rate_windows"."count" + 1
+        RETURNING "count"
+        """).first(decoding: CountRow.self)?.count ?? 1
 
         let previous = try await sql.raw("""
-            SELECT "count" FROM "auth_rate_windows"
-            WHERE "key" = \(bind: key) AND "bucket" = \(bind: bucket - 1)
-            """).first(decoding: CountRow.self)?.count ?? 0
+        SELECT "count" FROM "auth_rate_windows"
+        WHERE "key" = \(bind: key) AND "bucket" = \(bind: bucket - 1)
+        """).first(decoding: CountRow.self)?.count ?? 0
 
         try await sweepIfDue(sql, currentBucket: bucket, now: now)
 
@@ -95,8 +95,8 @@ actor SlidingWindowRateLimiter {
         guard now.timeIntervalSince(lastSweep) >= window else { return }
         lastSweep = now
         try await sql.raw("""
-            DELETE FROM "auth_rate_windows" WHERE "bucket" < \(bind: currentBucket - 1)
-            """).run()
+        DELETE FROM "auth_rate_windows" WHERE "bucket" < \(bind: currentBucket - 1)
+        """).run()
     }
 }
 

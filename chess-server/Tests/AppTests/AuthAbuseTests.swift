@@ -110,8 +110,8 @@ final class AuthAbuseTests: XCTestCase {
         struct Row: Decodable { var count: Int }
         let sql = try XCTUnwrap(app.db as? any SQLDatabase)
         let row = try await sql.raw("""
-            SELECT COUNT(*) AS "count" FROM "auth_rate_windows" WHERE "key" = \(bind: key)
-            """).first(decoding: Row.self)
+        SELECT COUNT(*) AS "count" FROM "auth_rate_windows" WHERE "key" = \(bind: key)
+        """).first(decoding: Row.self)
         return try XCTUnwrap(row).count
     }
 
