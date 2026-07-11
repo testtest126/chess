@@ -1,3 +1,5 @@
+> Superseded by [ORCHESTRATOR-EOD-2026-07-11-evening.md](ORCHESTRATOR-EOD-2026-07-11-evening.md) — the queue drained the same day.
+
 # Fleet-root stand-down snapshot — 2026-07-11 (midday)
 
 Written by the solo fleet-root session (user-authorized orchestrator+root).
