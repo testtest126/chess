@@ -567,7 +567,7 @@ function selectMod(id){
 selectMod("chessonline");
 
 /* ================= mini boards ================= */
-const GLYPH={p:"♟",r:"♜",n:"♞",b:"♝",q:"♛",k:"♚"};
+const GLYPH={p:"♟︎",r:"♜",n:"♞",b:"♝",q:"♛",k:"♚"};
 function fenRows(fen){ // returns 8 rows of 8 (piece char or null), rank 8 first
   return fen.split("/").map(row=>{
     const out=[];
@@ -815,7 +815,7 @@ function judge(v){
   if(v<60)return["Good","♝","--j-good"];
   if(v<120)return["Inaccuracy","♘","--j-inac"];
   if(v<250)return["Mistake","♞","--j-mist"];
-  return["Blunder","♟","--j-blun"];
+  return["Blunder","♟︎","--j-blun"];
 }
 function updateJudge(){
   const v=+cpl.value; const[w,g,c]=judge(v);
