@@ -84,6 +84,57 @@ final class AuthAbuseTests: XCTestCase {
         })
     }
 
+    func testProxyHeaderKeysPreferFlyClientIP() async throws {
+        // Behind Fly's proxy, Fly-Client-IP is the canonical client address;
+        // the rightmost X-Forwarded-For entry there is the app's OWN IP and
+        // would fold every client into one shared bucket.
+        setenv("TRUST_PROXY_HEADERS", "1", 1)
+        defer { unsetenv("TRUST_PROXY_HEADERS") }
+        app.authRateLimiter = FixedWindowRateLimiter(limit: 1, window: 60)
+
+        // Two clients sharing the Fly-style XFF tail each get their own window…
+        for client in ["203.0.113.7", "203.0.113.8"] {
+            try await app.test(.POST, "auth/register", beforeRequest: { req in
+                req.headers.replaceOrAdd(name: "Fly-Client-IP", value: client)
+                req.headers.replaceOrAdd(name: "X-Forwarded-For", value: "\(client), 66.241.124.1")
+                try req.content.encode(RegisterRequest(displayName: nil), as: .json)
+            }, afterResponse: { res async in
+                XCTAssertEqual(res.status, .ok, "distinct Fly-Client-IPs must not share a bucket")
+            })
+        }
+
+        // …and the same client is limited on a repeat attempt.
+        try await app.test(.POST, "auth/register", beforeRequest: { req in
+            req.headers.replaceOrAdd(name: "Fly-Client-IP", value: "203.0.113.7")
+            try req.content.encode(RegisterRequest(displayName: nil), as: .json)
+        }, afterResponse: { res async in
+            XCTAssertEqual(res.status, .tooManyRequests)
+        })
+    }
+
+    func testProxyHeaderKeysFallBackToLastForwardedEntry() async throws {
+        // Conventional reverse proxies (nginx et al.) append the peer they
+        // saw as the last X-Forwarded-For entry and set no Fly-Client-IP.
+        // Client-controlled earlier entries must not affect the key.
+        setenv("TRUST_PROXY_HEADERS", "1", 1)
+        defer { unsetenv("TRUST_PROXY_HEADERS") }
+        app.authRateLimiter = FixedWindowRateLimiter(limit: 1, window: 60)
+
+        try await app.test(.POST, "auth/register", beforeRequest: { req in
+            req.headers.replaceOrAdd(name: "X-Forwarded-For", value: "10.9.9.9, 198.51.100.4")
+            try req.content.encode(RegisterRequest(displayName: nil), as: .json)
+        }, afterResponse: { res async in
+            XCTAssertEqual(res.status, .ok)
+        })
+        try await app.test(.POST, "auth/register", beforeRequest: { req in
+            req.headers.replaceOrAdd(name: "X-Forwarded-For", value: "10.8.8.8, 198.51.100.4")
+            try req.content.encode(RegisterRequest(displayName: nil), as: .json)
+        }, afterResponse: { res async in
+            XCTAssertEqual(res.status, .tooManyRequests,
+                           "same proxy-appended peer shares the bucket despite differing spoofable entries")
+        })
+    }
+
     // MARK: - Guest cleanup
 
     /// Seeds a user created `daysAgo` days in the past. `createdAt` is a

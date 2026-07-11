@@ -13,7 +13,9 @@ enum ServerConfig {
         #if DEBUG
         return URL(string: "http://127.0.0.1:8080")!
         #else
-        return URL(string: "https://chess.example.com")! // TODO: deployed server
+        // The Fly.io deployment; the app name lives in fly.toml at the repo
+        // root — change both together.
+        return URL(string: "https://matemate-chess.fly.dev")!
         #endif
     }
 
