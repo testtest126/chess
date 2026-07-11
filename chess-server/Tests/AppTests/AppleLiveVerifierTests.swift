@@ -64,7 +64,7 @@ final class AppleLiveVerifierTests: XCTestCase {
 
     func testAcceptsGenuinelySignedTokenAndLinksAccount() async throws {
         let sub = "000001.live.0001"
-        let auth = try await signIn(token: appleSigned(identity(sub: sub)), displayName: "Anna Appleseed")
+        let auth = try await signIn(sub: sub, displayName: "Anna Appleseed")
 
         XCTAssertEqual(auth.displayName, "Anna Appleseed")
         XCTAssertEqual(auth.appleLinked, true)
@@ -76,7 +76,7 @@ final class AppleLiveVerifierTests: XCTestCase {
     func testInvalidRequestedNameFallsBackToGuestName() async throws {
         // Apple only shares the name once; a policy-violating one must not
         // fail signup — the account is created with a generated name instead.
-        let auth = try await signIn(token: appleSigned(identity(sub: "000002.live.0002")), displayName: "x")
+        let auth = try await signIn(sub: "000002.live.0002", displayName: "x")
         XCTAssertTrue(auth.displayName.hasPrefix("Guest-"))
         XCTAssertEqual(auth.appleLinked, true)
     }
@@ -85,8 +85,8 @@ final class AppleLiveVerifierTests: XCTestCase {
         let sub = "000003.live.0003"
         // Apple mints a fresh token per authorization; the name is only
         // honored while the account is being created.
-        let first = try await signIn(token: appleSigned(identity(sub: sub)), displayName: "Original Name")
-        let second = try await signIn(token: appleSigned(identity(sub: sub)), displayName: "Different Name")
+        let first = try await signIn(sub: sub, displayName: "Original Name")
+        let second = try await signIn(sub: sub, displayName: "Different Name")
 
         XCTAssertEqual(second.userID, first.userID)
         XCTAssertEqual(second.displayName, "Original Name")
@@ -160,6 +160,16 @@ final class AppleLiveVerifierTests: XCTestCase {
         try await expectRejection(of: phony)
     }
 
+    func testRejectsGenuineTokenNotBoundToTheNonce() async throws {
+        // Signed by the real key, every standard claim valid — but minted
+        // without our nonce hash (e.g. replayed from a different session).
+        // The binding check must refuse it even though the signature verifies.
+        let sub = "000011.live.0011"
+        try await expectRejection(of: appleSigned(identity(sub: sub)))
+        let created = try await userCount(appleUserID: sub)
+        XCTAssertEqual(created, 0)
+    }
+
     // MARK: - Helpers
 
     /// The claims in an Apple identity token, as Apple would mint them.
@@ -169,6 +179,9 @@ final class AppleLiveVerifierTests: XCTestCase {
         let exp: ExpirationClaim
         let iat: IssuedAtClaim
         let sub: SubjectClaim
+        /// Apple echoes the nonce hash the client bound into the
+        /// authorization request; absent when no nonce was bound.
+        let nonce: String?
 
         func verify(using _: some JWTAlgorithm) throws {}
     }
@@ -179,15 +192,27 @@ final class AppleLiveVerifierTests: XCTestCase {
         sub: String,
         audience: String? = nil,
         issuer: String = "https://appleid.apple.com",
-        expiresIn: TimeInterval = 600
+        expiresIn: TimeInterval = 600,
+        nonce: String? = nil
     ) -> IdentityToken {
         IdentityToken(
             iss: .init(value: issuer),
             aud: .init(value: audience ?? self.audience),
             exp: .init(value: Date().addingTimeInterval(expiresIn)),
             iat: .init(value: Date()),
-            sub: .init(value: sub)
+            sub: .init(value: sub),
+            nonce: nonce
         )
+    }
+
+    /// Mints a nonce via the real endpoint, like the client does.
+    private func mintNonce() async throws -> String {
+        var raw = ""
+        try await app.test(.POST, "auth/apple/nonce", afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok)
+            raw = try res.content.decode(AppleNonceResponse.self).nonce
+        })
+        return raw
     }
 
     /// Signs claims with the JWKS-published key, the way Apple would.
@@ -197,12 +222,16 @@ final class AppleLiveVerifierTests: XCTestCase {
         return try await keys.sign(payload, kid: appleKeyID)
     }
 
-    /// POSTs the token to /auth/apple and expects a successful sign-in.
-    private func signIn(token: String, displayName: String? = nil) async throws -> AuthResponse {
+    /// Runs the full client flow: mint a nonce, get a token bound to its
+    /// hash, sign in presenting the raw nonce — and expect success.
+    private func signIn(sub: String, displayName: String? = nil) async throws -> AuthResponse {
+        let raw = try await mintNonce()
+        let token = try await appleSigned(identity(sub: sub, nonce: AppleNonce.hash(raw)))
         var response: AuthResponse!
         try await app.test(.POST, "auth/apple", beforeRequest: { req in
             try req.content.encode(
-                AppleSignInRequest(identityToken: token, displayName: displayName), as: .json)
+                AppleSignInRequest(identityToken: token, displayName: displayName, nonce: raw),
+                as: .json)
         }, afterResponse: { res async throws in
             XCTAssertEqual(res.status, .ok)
             response = try res.content.decode(AuthResponse.self)
@@ -210,15 +239,18 @@ final class AppleLiveVerifierTests: XCTestCase {
         return response
     }
 
-    /// POSTs the token to /auth/apple and expects it to be refused.
+    /// POSTs the token to /auth/apple and expects it to be refused. The
+    /// request itself carries a freshly minted nonce, so rejection comes from
+    /// the token being bad — not from the replay guard short-circuiting.
     private func expectRejection(
         of token: String,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
+        let raw = try await mintNonce()
         try await app.test(.POST, "auth/apple", beforeRequest: { req in
             try req.content.encode(
-                AppleSignInRequest(identityToken: token), as: .json)
+                AppleSignInRequest(identityToken: token, nonce: raw), as: .json)
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized, file: file, line: line)
         })

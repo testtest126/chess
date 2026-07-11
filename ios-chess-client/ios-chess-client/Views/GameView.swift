@@ -112,15 +112,25 @@ struct GameView: View {
                     .controlSize(.small)
             }
             if !isEngine {
-                Button("Hint", systemImage: session.isFindingHint ? "lightbulb.fill" : "lightbulb") {
+                // 44pt frames: the bare glyphs hit-test at ~15-21pt, well
+                // under the accessibility minimum (audit #83, finding P1.3).
+                Button {
                     session.requestHint()
+                } label: {
+                    Label("Hint", systemImage: session.isFindingHint ? "lightbulb.fill" : "lightbulb")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .labelStyle(.iconOnly)
                 .disabled(!session.isPlayerTurn || session.isFindingHint)
-                Button("Take Back", systemImage: "arrow.uturn.backward") {
+                Button {
                     session.takeBack()
+                } label: {
+                    Label("Take Back", systemImage: "arrow.uturn.backward")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .labelStyle(.iconOnly)
                 .disabled(!session.canTakeBack)
             }
             Spacer()
