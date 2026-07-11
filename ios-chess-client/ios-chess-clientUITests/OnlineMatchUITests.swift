@@ -25,8 +25,14 @@ final class OnlineMatchUITests: XCTestCase {
 
     @MainActor
     func testOnlineMatchAgainstBot() async throws {
-        guard await OpponentBot.serverIsReachable() else {
-            throw XCTSkip("chess-server not running on 127.0.0.1:8080")
+        // The probe error's domain/code discriminate why the server was
+        // unreachable (connection refused vs timed out vs policy-blocked),
+        // which matters on CI runners where the cause isn't obvious. NSLog
+        // lands it in the xcodebuild log even though skip reasons don't.
+        if let error = await OpponentBot.probeServer() as NSError? {
+            let detail = "\(error.domain) code \(error.code): \(error.localizedDescription)"
+            NSLog("[E2E] server probe failed at %@ — %@", serverBase.absoluteString, detail)
+            throw XCTSkip("chess-server not reachable at \(serverBase) — \(detail)")
         }
 
         // The opponent bot queues first; color assignment is random.
@@ -98,9 +104,7 @@ final class OnlineMatchUITests: XCTestCase {
         )
 
         // Resign and confirm.
-        app.buttons["Resign"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
-        app.buttons.matching(NSPredicate(format: "label == 'Resign'")).allElementsBoundByIndex.last?.tap()
+        confirmResign(in: app)
 
         XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 10), "game over sheet should appear")
 
@@ -127,9 +131,7 @@ final class OnlineMatchUITests: XCTestCase {
         }
 
         // Resign the rematch too, then review from the sheet.
-        app.buttons["Resign"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
-        app.buttons.matching(NSPredicate(format: "label == 'Resign'")).allElementsBoundByIndex.last?.tap()
+        confirmResign(in: app)
         XCTAssertTrue(app.staticTexts["You Lost"].waitForExistence(timeout: 10), "second game over sheet should appear")
 
         // Post-game review over the online game's moves.
@@ -138,13 +140,38 @@ final class OnlineMatchUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
 
         // Back home, the finished game is in Past Games with the bot's name.
+        // The section sits below the fold on phone-sized screens and List
+        // builds rows lazily — an off-screen row isn't in the accessibility
+        // tree at all, so scroll it into the viewport before asserting.
+        // descendants(.any) matches the row Button's combined label as well
+        // as its child StaticTexts.
         app.buttons["Close"].firstMatch.tap()
-        let row = app.staticTexts.matching(
+        let row = app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS %@", bot.displayName)
         ).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "saved online game should list the opponent")
+        for _ in 0..<4 where !row.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "saved online game should list the opponent")
 
         await bot.close()
+    }
+
+    /// Resign via the toolbar, then confirm in the dialog. iOS 26's
+    /// confirmationDialog renders as a popover with no "Cancel" button in
+    /// the accessibility tree (dismissal is the tap-outside region), so the
+    /// dialog's own destructive "Resign" — a second button with that label —
+    /// is the readiness signal. Same pattern as GameFlowUITests.endGame.
+    @MainActor
+    private func confirmResign(in app: XCUIApplication) {
+        app.buttons["Resign"].firstMatch.tap()
+        let resignButtons = app.buttons.matching(NSPredicate(format: "label == 'Resign'"))
+        let dialogOpen = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "count >= 2"), object: resignButtons
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [dialogOpen], timeout: 10), .completed,
+                       "resign confirmation dialog should appear")
+        resignButtons.allElementsBoundByIndex.last?.tap()
     }
 
     private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
@@ -173,10 +200,18 @@ final class OpponentBot: @unchecked Sendable {
     private let engine = NegamaxEngine()
     private(set) var displayName = ""
 
-    static func serverIsReachable() async -> Bool {
+    /// Nil when the server answered /health; otherwise the underlying error,
+    /// whose domain/code say WHY it's unreachable (NSURLErrorCannotConnectToHost
+    /// = nothing listening; NSURLErrorTimedOut = traffic silently dropped).
+    static func probeServer() async -> Error? {
         var request = URLRequest(url: base.appending(path: "health"))
-        request.timeoutInterval = 2
-        return (try? await URLSession.shared.data(for: request)) != nil
+        request.timeoutInterval = 5
+        do {
+            _ = try await URLSession.shared.data(for: request)
+            return nil
+        } catch {
+            return error
+        }
     }
 
     func registerAndQueue(timeControl: TimeControl = .default) async throws {
