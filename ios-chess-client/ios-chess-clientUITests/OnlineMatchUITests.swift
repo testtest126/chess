@@ -25,8 +25,14 @@ final class OnlineMatchUITests: XCTestCase {
 
     @MainActor
     func testOnlineMatchAgainstBot() async throws {
-        guard await OpponentBot.serverIsReachable() else {
-            throw XCTSkip("chess-server not running on 127.0.0.1:8080")
+        // The probe error's domain/code discriminate why the server was
+        // unreachable (connection refused vs timed out vs policy-blocked),
+        // which matters on CI runners where the cause isn't obvious. NSLog
+        // lands it in the xcodebuild log even though skip reasons don't.
+        if let error = await OpponentBot.probeServer() as NSError? {
+            let detail = "\(error.domain) code \(error.code): \(error.localizedDescription)"
+            NSLog("[E2E] server probe failed at %@ — %@", serverBase.absoluteString, detail)
+            throw XCTSkip("chess-server not reachable at \(serverBase) — \(detail)")
         }
 
         // The opponent bot queues first; color assignment is random.
@@ -173,10 +179,18 @@ final class OpponentBot: @unchecked Sendable {
     private let engine = NegamaxEngine()
     private(set) var displayName = ""
 
-    static func serverIsReachable() async -> Bool {
+    /// Nil when the server answered /health; otherwise the underlying error,
+    /// whose domain/code say WHY it's unreachable (NSURLErrorCannotConnectToHost
+    /// = nothing listening; NSURLErrorTimedOut = traffic silently dropped).
+    static func probeServer() async -> Error? {
         var request = URLRequest(url: base.appending(path: "health"))
-        request.timeoutInterval = 2
-        return (try? await URLSession.shared.data(for: request)) != nil
+        request.timeoutInterval = 5
+        do {
+            _ = try await URLSession.shared.data(for: request)
+            return nil
+        } catch {
+            return error
+        }
     }
 
     func registerAndQueue(timeControl: TimeControl = .default) async throws {
