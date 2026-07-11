@@ -140,11 +140,19 @@ final class OnlineMatchUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
 
         // Back home, the finished game is in Past Games with the bot's name.
+        // The section sits below the fold on phone-sized screens and List
+        // builds rows lazily — an off-screen row isn't in the accessibility
+        // tree at all, so scroll it into the viewport before asserting.
+        // descendants(.any) matches the row Button's combined label as well
+        // as its child StaticTexts.
         app.buttons["Close"].firstMatch.tap()
-        let row = app.staticTexts.matching(
+        let row = app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS %@", bot.displayName)
         ).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "saved online game should list the opponent")
+        for _ in 0..<4 where !row.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "saved online game should list the opponent")
 
         await bot.close()
     }
