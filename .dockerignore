@@ -1,0 +1,10 @@
+# Keep the Fly/Docker build context to sources only — the repo root carries
+# ~19 GB of agent worktrees and build artifacts otherwise (deploy needs just
+# ChessKit + chess-server sources; see chess-server/Dockerfile).
+.claude/
+.git/
+.github/
+**/.build/
+ios-chess-client/
+docs/
+*.sqlite

@@ -3,6 +3,7 @@ import SwiftData
 import ChessKit
 import ChessOnline
 import AuthenticationServices
+import CryptoKit
 
 /// Root screen: start a new game against the engine, or revisit past games.
 struct HomeView: View {
@@ -21,6 +22,9 @@ struct HomeView: View {
     @State private var renameError: String?
     @State private var signInError: String?
     @State private var isSigningInWithApple = false
+    /// Prefetched single-use nonce for Sign in with Apple; its SHA-256 is
+    /// bound into the authorization request for replay protection.
+    @State private var pendingAppleNonce: String?
     @AppStorage(BoardTheme.storageKey) private var boardThemeRaw = BoardTheme.classic.rawValue
 
     enum ColorChoice: String, CaseIterable, Identifiable {
@@ -129,13 +133,24 @@ struct HomeView: View {
                     } else {
                         SignInWithAppleButton { request in
                             request.requestedScopes = [.fullName]
+                            // Bind the server-issued nonce (hashed, per
+                            // Apple's convention) so the identity token
+                            // can't be replayed. Prefetched in .task below.
+                            if let raw = pendingAppleNonce {
+                                request.nonce = Self.sha256Hex(raw)
+                            }
                         } onCompletion: { result in
-                            handleAppleSignInResult(result)
+                            handleAppleSignInResult(result, rawNonce: pendingAppleNonce)
                         }
                         .frame(height: 40)
                         .disabled(isSigningInWithApple)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 2, trailing: 16))
                         .listRowBackground(Color.clear)
+                        .task {
+                            if pendingAppleNonce == nil {
+                                pendingAppleNonce = try? await AccountStore.shared.fetchAppleNonce()
+                            }
+                        }
 
                         if isSigningInWithApple {
                             HStack(spacing: 12) {
@@ -289,9 +304,15 @@ struct HomeView: View {
         }
     }
 
-    private func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
+    private func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>, rawNonce: String?) {
         isSigningInWithApple = true
+        // Nonces are single-use: whatever happens next, this one is spent.
+        pendingAppleNonce = nil
         Task {
+            defer {
+                // Refetch so the button is ready for another attempt.
+                Task { pendingAppleNonce = try? await AccountStore.shared.fetchAppleNonce() }
+            }
             do {
                 switch result {
                 case .success(let authorization):
@@ -299,9 +320,15 @@ struct HomeView: View {
                         signInError = String(localized: "Unexpected credential type", comment: "Sign in with Apple error")
                         return
                     }
+                    guard let rawNonce else {
+                        signInError = String(localized: "Couldn't reach the server to secure the sign-in. Try again.",
+                                             comment: "Sign in with Apple error when the nonce prefetch failed")
+                        return
+                    }
                     try await AccountStore.shared.signInWithApple(
                         credential,
-                        displayName: credential.fullName.flatMap(formatFullName)
+                        displayName: credential.fullName.flatMap(formatFullName),
+                        rawNonce: rawNonce
                     )
                 case .failure(let error):
                     if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
@@ -316,6 +343,11 @@ struct HomeView: View {
             }
             isSigningInWithApple = false
         }
+    }
+
+    /// SHA-256 hex — Apple's convention for the authorization request nonce.
+    static func sha256Hex(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     private func formatFullName(_ name: PersonNameComponents) -> String? {

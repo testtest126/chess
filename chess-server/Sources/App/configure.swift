@@ -6,16 +6,21 @@ import JWT
 
 public func configure(_ app: Application) async throws {
     // MARK: Database
-    // Postgres in deployment (DATABASE_URL), SQLite file for local development,
-    // in-memory SQLite under test.
+    // Postgres when DATABASE_URL is set; an explicit SQLite file when
+    // SQLITE_PATH is (the zero-spend Fly deployment: one machine, one small
+    // volume); in-memory SQLite under test; a local file for development.
+    // Production still refuses to boot with neither — an *implicit* database
+    // is how data quietly ends up on an ephemeral disk.
     if let databaseURL = Environment.get("DATABASE_URL") {
         try app.databases.use(.postgres(url: databaseURL), as: .psql)
+    } else if let sqlitePath = Environment.get("SQLITE_PATH") {
+        app.databases.use(.sqlite(.file(sqlitePath)), as: .sqlite)
     } else if app.environment == .testing {
         app.databases.use(.sqlite(.memory), as: .sqlite)
     } else {
         guard app.environment != .production else {
-            app.logger.critical("DATABASE_URL must be set in production")
-            throw Abort(.internalServerError, reason: "missing DATABASE_URL")
+            app.logger.critical("set DATABASE_URL (postgres) or SQLITE_PATH (file) in production")
+            throw Abort(.internalServerError, reason: "no database configured")
         }
         app.databases.use(.sqlite(.file("chess-dev.sqlite")), as: .sqlite)
     }
@@ -26,6 +31,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddUserRating())
     app.migrations.add(AddUserAppleID())
     app.migrations.add(AddGameRecordTimeControl())
+    app.migrations.add(CreateAppleNonce())
     try await app.autoMigrate()
 
     // MARK: JWT signing key
