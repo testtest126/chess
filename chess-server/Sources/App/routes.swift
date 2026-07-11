@@ -23,8 +23,10 @@ func routes(_ app: Application) throws {
     // registering onText/onClose handlers (they're NIOLoopBound).
     app.webSocket("play", shouldUpgrade: { req -> EventLoopFuture<HTTPHeaders?> in
         req.eventLoop.makeFutureWithTask {
-            if let payload = try? await req.jwt.verify(as: UserPayload.self),
-               let id = payload.userID {
+            // authenticatedUserID also confirms the account row still exists,
+            // not just the signature: a deleted account's not-yet-expired JWT
+            // must not open a socket (#108).
+            if let id = try? await req.authenticatedUserID() {
                 req.storage[AuthenticatedUserIDKey.self] = id
             }
             return [:]

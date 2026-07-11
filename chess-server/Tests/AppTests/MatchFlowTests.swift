@@ -631,6 +631,27 @@ final class MatchFlowTests: XCTestCase {
             // Upgrade rejection is also acceptable.
         }
     }
+
+    func testDeletedAccountSocketIsClosed() async throws {
+        // Account deletion (#108): the bearer is still signature-valid and
+        // unexpired after DELETE /me, but the account is gone — /play must
+        // refuse it like any other bad credential.
+        let auth = try await register()
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port!)/me")!)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204)
+
+        do {
+            let socket = try await TestSocket.connect(port: port, token: auth.accessToken, on: app.eventLoopGroup)
+            try await socket.send(.joinQueue(timeControl: .default))
+            let closed = try await socket.waitForClose(timeoutSeconds: 5)
+            XCTAssertTrue(closed, "socket for a deleted account should be closed")
+        } catch {
+            // Upgrade rejection is also acceptable.
+        }
+    }
 }
 
 // MARK: - WebSocket test harness
