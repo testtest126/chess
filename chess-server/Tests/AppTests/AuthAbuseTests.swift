@@ -36,7 +36,10 @@ final class AuthAbuseTests: XCTestCase {
         guard case .limited(let retryAfter) = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(10)) else {
             return XCTFail("request past the limit must be refused")
         }
-        XCTAssertGreaterThanOrEqual(retryAfter, 1, "retry guidance is at least a second")
+        // With no previous bucket and current saturated at 4, a quiet client
+        // is admitted at fraction g = 1 − (limit−1)/current = 0.5 of the
+        // next bucket: (1 − 10/60 + 0.5) × 60 = 80s.
+        XCTAssertEqual(retryAfter, 80, accuracy: 0.001, "retry guidance matches the decay math")
 
         // Two windows later both buckets have aged out; the key is admitted again.
         let afterReset = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(121))
@@ -90,6 +93,22 @@ final class AuthAbuseTests: XCTestCase {
         if case .allowed = try await one.check("ip", on: app.db, now: bucketStart.addingTimeInterval(3)) {
             XCTFail("the refusal holds on every instance")
         }
+    }
+
+    func testRefusalsSaturateOnePastTheLimit() async throws {
+        // Hammering must not grow the counter without bound: the count caps
+        // at limit + 1, so once traffic stops the key recovers after one
+        // rollover (old fixed-window behavior) and Retry-After stays honest.
+        let limiter = SlidingWindowRateLimiter(limit: 2, window: 60)
+        for i in 0..<8 {
+            _ = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(Double(i)))
+        }
+        struct Row: Decodable { var count: Int }
+        let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+        let row = try await sql.raw("""
+        SELECT "count" FROM "auth_rate_windows" WHERE "key" = \(bind: "ip")
+        """).first(decoding: Row.self)
+        XCTAssertEqual(try XCTUnwrap(row).count, 3, "counter saturates at limit + 1")
     }
 
     func testStaleBucketsAreSweptFromTheStore() async throws {
