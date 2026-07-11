@@ -33,10 +33,26 @@ public struct AppleSignInRequest: Codable, Sendable, Equatable {
     /// Preferred display name for a newly created account (Apple only
     /// provides the name on first authorization).
     public var displayName: String?
+    /// The raw single-use nonce previously issued by POST /auth/apple/nonce.
+    /// Its SHA-256 must have been bound into the authorization request, so
+    /// the identity token can't be replayed.
+    public var nonce: String?
 
-    public init(identityToken: String, displayName: String? = nil) {
+    public init(identityToken: String, displayName: String? = nil, nonce: String? = nil) {
         self.identityToken = identityToken
         self.displayName = displayName
+        self.nonce = nonce
+    }
+}
+
+/// POST /auth/apple/nonce — a fresh single-use nonce for Sign in with Apple.
+public struct AppleNonceResponse: Codable, Sendable, Equatable {
+    /// Raw nonce: hash it with SHA-256 (hex) for `ASAuthorization`'s
+    /// `request.nonce`, and send it raw in `AppleSignInRequest.nonce`.
+    public var nonce: String
+
+    public init(nonce: String) {
+        self.nonce = nonce
     }
 }
 

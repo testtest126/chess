@@ -1,5 +1,6 @@
 @testable import App
 import XCTVapor
+import Fluent
 import JWT
 import ChessOnline
 
@@ -100,28 +101,67 @@ final class AuthTests: XCTestCase {
     // exercise everything downstream of it: configuration gating, rejection
     // mapping, and the account-resolution policy.
 
-    /// Configures SIWA with a stub verifier that accepts `validTokens` and
-    /// maps them to Apple subjects; everything else is rejected.
+    /// Tracks the nonce hash each sign-in bound, so the stub verifier can
+    /// echo it the way Apple echoes the request nonce in the real token.
+    private actor NonceEcho {
+        var current: String?
+        func set(_ value: String?) { current = value }
+    }
+    private let nonceEcho = NonceEcho()
+
+    /// Configures SIWA with a stub verifier that accepts `validTokens`, maps
+    /// them to Apple subjects, and echoes the request-bound nonce hash —
+    /// mirroring how Apple mints real identity tokens.
     private func configureApple(validTokens: [String: String]) {
         app.jwt.apple.applicationIdentifier = "com.test.matemate"
+        let echo = nonceEcho
         app.appleTokenVerifier = AppleTokenVerifier { token, _ in
             guard let subject = validTokens[token] else {
                 throw Abort(.unauthorized)
             }
-            return subject
+            return AppleTokenClaims(subject: subject, nonce: await echo.current)
         }
     }
 
+    /// Mints a nonce via the real endpoint, like the client does.
+    private func mintNonce() async throws -> String {
+        var raw = ""
+        try await app.test(.POST, "auth/apple/nonce", afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok)
+            raw = try res.content.decode(AppleNonceResponse.self).nonce
+        })
+        return raw
+    }
+
+    /// Signs in, minting a fresh nonce unless one is supplied. `tokenNonce`
+    /// overrides what the stub verifier reports as the token's bound nonce
+    /// (defaults to the correct hash, i.e. a well-behaved client).
     private func signInWithApple(
-        token: String, displayName: String? = nil, bearer: String? = nil
+        token: String, displayName: String? = nil, bearer: String? = nil,
+        nonce: String?? = nil, tokenNonce: String?? = nil
     ) async throws -> (HTTPStatus, AuthResponse?) {
+        let rawNonce: String?
+        if case .some(let override) = nonce {
+            rawNonce = override
+        } else {
+            rawNonce = try await mintNonce()
+        }
+        if case .some(let override) = tokenNonce {
+            await nonceEcho.set(override)
+        } else {
+            await nonceEcho.set(rawNonce.map(AppleNonce.hash))
+        }
+
         var status: HTTPStatus = .internalServerError
         var response: AuthResponse?
         try await app.test(.POST, "auth/apple", beforeRequest: { req in
             if let bearer {
                 req.headers.bearerAuthorization = .init(token: bearer)
             }
-            try req.content.encode(AppleSignInRequest(identityToken: token, displayName: displayName), as: .json)
+            try req.content.encode(
+                AppleSignInRequest(identityToken: token, displayName: displayName, nonce: rawNonce),
+                as: .json
+            )
         }, afterResponse: { res async in
             status = res.status
             response = try? res.content.decode(AuthResponse.self)
@@ -264,5 +304,98 @@ final class AuthTests: XCTestCase {
 
         let (status, _) = try await signInWithApple(token: forged)
         XCTAssertEqual(status, .unauthorized, "a token signed with our own key must never authenticate as Apple")
+    }
+
+    // MARK: - Nonce replay protection (#53)
+
+    func testAppleSignInRequiresNonce() async throws {
+        configureApple(validTokens: ["token-n0": "apple-subject-n0"])
+        let (status, _) = try await signInWithApple(token: "token-n0", nonce: .some(nil))
+        XCTAssertEqual(status, .badRequest, "sign-in without a nonce must be refused")
+    }
+
+    func testAppleSignInRejectsUnknownNonce() async throws {
+        configureApple(validTokens: ["token-n1": "apple-subject-n1"])
+        // A nonce the server never minted.
+        let (status, _) = try await signInWithApple(token: "token-n1", nonce: .some("made-up-nonce"))
+        XCTAssertEqual(status, .unauthorized)
+    }
+
+    func testAppleSignInNonceIsSingleUse() async throws {
+        configureApple(validTokens: ["token-n2": "apple-subject-n2"])
+
+        let raw = try await mintNonce()
+        let (first, _) = try await signInWithApple(token: "token-n2", nonce: .some(raw))
+        XCTAssertEqual(first, .ok)
+
+        // Replaying the identical request — same token, same nonce — fails:
+        // the nonce was consumed. This is the replay attack itself.
+        let (replay, _) = try await signInWithApple(token: "token-n2", nonce: .some(raw))
+        XCTAssertEqual(replay, .unauthorized, "a consumed nonce must never authenticate again")
+    }
+
+    func testAppleSignInRejectsTokenBoundToDifferentNonce() async throws {
+        configureApple(validTokens: ["token-n3": "apple-subject-n3"])
+        // The request presents a validly minted nonce, but the identity token
+        // was bound to something else (stolen from another session).
+        let (status, _) = try await signInWithApple(
+            token: "token-n3",
+            tokenNonce: .some(AppleNonce.hash("some-other-session-nonce"))
+        )
+        XCTAssertEqual(status, .unauthorized, "token nonce must match the presented nonce")
+    }
+
+    func testFailedSignInStillBurnsTheNonce() async throws {
+        configureApple(validTokens: [:]) // every token rejected
+
+        let raw = try await mintNonce()
+        let (bad, _) = try await signInWithApple(token: "rejected-token", nonce: .some(raw))
+        XCTAssertEqual(bad, .unauthorized)
+
+        // The nonce died with the failed attempt.
+        configureApple(validTokens: ["token-n4": "apple-subject-n4"])
+        let (reuse, _) = try await signInWithApple(token: "token-n4", nonce: .some(raw))
+        XCTAssertEqual(reuse, .unauthorized, "a nonce burned by a failed attempt must stay burned")
+    }
+
+    func testNonceConsumptionIsAtomicAndExpiryAware() async throws {
+        // Fresh nonce: consumable exactly once (single DELETE..RETURNING —
+        // no SELECT-then-DELETE TOCTOU window).
+        let (raw, model) = AppleNonce.generate()
+        try await model.save(on: app.db)
+        let hash = AppleNonce.hash(raw)
+        let first = try await AuthController.consumeNonce(hash: hash, on: app.db)
+        XCTAssertTrue(first)
+        let second = try await AuthController.consumeNonce(hash: hash, on: app.db)
+        XCTAssertFalse(second, "a consumed nonce must never be consumable again")
+
+        // Expired nonce: never consumable, and left for the sweeper.
+        let expired = AppleNonce(nonceHash: AppleNonce.hash("old"), expiresAt: Date(timeIntervalSinceNow: -60))
+        try await expired.save(on: app.db)
+        let expiredResult = try await AuthController.consumeNonce(hash: AppleNonce.hash("old"), on: app.db)
+        XCTAssertFalse(expiredResult, "expired nonces must not authenticate")
+    }
+
+    // MARK: - First-link race (#53)
+
+    func testFirstLinkRaceLoserGetsWinnersAccount() async throws {
+        // Simulate the loser's position deterministically: the winner linked
+        // `subject` after the loser's recover-query missed, so the loser's
+        // save trips the partial unique index. The helper must resolve to the
+        // winner's account instead of surfacing a 500.
+        let winner = User(displayName: "Winner", appleUserID: "raced-subject")
+        try await winner.save(on: app.db)
+
+        let loser = User(displayName: "Loser", appleUserID: "raced-subject")
+        let resolved = try await AuthController.savedResolvingLinkRace(
+            loser, subject: "raced-subject", on: app.db
+        )
+        XCTAssertEqual(try resolved.requireID(), try winner.requireID())
+
+        // Exactly one account holds the link.
+        let holders = try await User.query(on: app.db)
+            .filter(\.$appleUserID == "raced-subject")
+            .count()
+        XCTAssertEqual(holders, 1)
     }
 }

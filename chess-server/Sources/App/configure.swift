@@ -31,6 +31,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddUserRating())
     app.migrations.add(AddUserAppleID())
     app.migrations.add(AddGameRecordTimeControl())
+    app.migrations.add(CreateAppleNonce())
     try await app.autoMigrate()
 
     // MARK: JWT signing key
