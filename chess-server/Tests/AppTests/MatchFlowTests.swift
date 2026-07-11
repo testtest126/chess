@@ -645,7 +645,7 @@ final class MatchFlowTests: XCTestCase {
         // Black replies immediately; black should also gain the increment.
         try await match.black.send(.move(uci: "e7e5"))
         guard case .movePlayed(_, let clock2W) = try await match.white.next(),
-              case .movePlayed(_, _) = try await match.black.next()
+              case .movePlayed = try await match.black.next()
         else {
             return XCTFail("expected move broadcast")
         }

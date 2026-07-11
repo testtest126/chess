@@ -1,5 +1,5 @@
 import XCTest
-import ChessKit
+@testable import ChessKit
 @testable import ChessProtocol
 
 final class ZobristTests: XCTestCase {
