@@ -17,7 +17,7 @@
 # DATABASE_URL, no Postgres cluster. Migrations run at boot.
 
 app = "matemate-chess"
-primary_region = "waw"
+primary_region = "fra"
 
 [build]
   dockerfile = "chess-server/Dockerfile"
