@@ -152,6 +152,14 @@ struct OnlineGameView: View {
         .background(Color(.systemGroupedBackground))
         .sensoryFeedback(.impact(weight: .light), trigger: session.game.moveCount)
         .sensoryFeedback(.success, trigger: session.game.isOver) { _, isOver in isOver }
+        // VoiceOver hears every board change. A reconnect resync can grow the
+        // count by more than one; announcing just the latest move is right —
+        // it tells the player where the game stands now.
+        .onChange(of: session.game.moveCount) { oldCount, newCount in
+            if newCount > oldCount {
+                MoveAnnouncer.announceLastMove(in: session.game)
+            }
+        }
     }
 
     private func failureView(_ message: String) -> some View {

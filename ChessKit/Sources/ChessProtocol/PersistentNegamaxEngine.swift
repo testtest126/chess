@@ -38,6 +38,12 @@ final class SearchStopSignal: @unchecked Sendable {
 /// running search short with ``stopSearch()``; because the underlying search
 /// only writes table entries for fully searched subtrees, an interrupted
 /// search never leaves invalid entries behind.
+///
+/// The lock stays `NSLock` under the Swift 6 language mode deliberately:
+/// `Mutex` needs iOS 18/macOS 15 (this package deploys to iOS 17/macOS 13),
+/// and an actor would force `async` onto the synchronous ``ChessEngine``
+/// API. Every access to `table` happens while `lock` is held (lock/defer
+/// pairs in each public method), which is the invariant `@unchecked` asserts.
 public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
     public var name: String { core.name }
     public var author: String { core.author }

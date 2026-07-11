@@ -235,11 +235,16 @@ struct BoardView: View {
 
     @ViewBuilder
     private func coordinateLabels(sq: Int, size: CGFloat, row: Int, col: Int, isLight: Bool) -> some View {
-        let labelColor = isLight ? theme.darkSquare : theme.lightSquare
+        // Contrast-validated per theme; white-on-dark additionally needs the
+        // halo because mid-tone dark squares can't reach 4.5:1 with any text
+        // color (see BoardTheme.coordinateColor).
+        let labelColor = theme.coordinateColor(onLight: isLight)
+        let halo: Color = isLight ? .clear : .black.opacity(0.8)
         if col == 0 {
             Text("\(Sq.rank(sq) + 1)")
                 .font(.system(size: size * 0.22, weight: .semibold))
                 .foregroundStyle(labelColor)
+                .shadow(color: halo, radius: 1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(size * 0.06)
         }
@@ -247,6 +252,7 @@ struct BoardView: View {
             Text(String("abcdefgh"[String.Index(utf16Offset: Sq.file(sq), in: "abcdefgh")]))
                 .font(.system(size: size * 0.22, weight: .semibold))
                 .foregroundStyle(labelColor)
+                .shadow(color: halo, radius: 1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .padding(size * 0.06)
         }
