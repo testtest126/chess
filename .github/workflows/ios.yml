@@ -109,13 +109,19 @@ jobs:
           tail -50 chess-server/server.log
           exit 1
 
-      - name: Run UI tests
+      - name: Run unit and UI tests
         # -parallel-testing-enabled NO is what makes the online E2E reach the
         # server: parallel testing runs UI tests on simulator CLONES, whose
         # 127.0.0.1 does not reach the host loopback. #59's run 29081469990
         # is the evidence — the server answered curl on the host at the same
         # moment the in-clone probe timed out and the suite skipped. On the
         # destination simulator itself, loopback is shared with the host.
+        #
+        # ios-chess-clientTests is the app's unit-test target — it must be
+        # selected explicitly or it never runs anywhere in CI (#99): ci.yml
+        # only tests the packages, and the UI-test selectors below don't
+        # pull it in. It shares the booted simulator, costing well under a
+        # minute.
         #
         # -retry-tests-on-failure absorbs runner-infrastructure flakes (stuck
         # simulators, xctrunner launch RequestDenied) that have caused most
@@ -142,6 +148,7 @@ jobs:
             -test-iterations 3 \
             -test-repetition-relaunch-enabled YES \
             -parallel-testing-enabled NO \
+            -only-testing:ios-chess-clientTests \
             -only-testing:ios-chess-clientUITests/GameFlowUITests \
             -only-testing:ios-chess-clientUITests/OnlineMatchUITests \
             | tee ui-tests.log | tail -400
