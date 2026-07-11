@@ -35,11 +35,14 @@ extension View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.buttonStyle(.glassProminent).controlSize(.large)
+                .modifier(BrandCTALabelColor())
         } else {
             self.buttonStyle(.borderedProminent).controlSize(.large)
+                .modifier(BrandCTALabelColor())
         }
         #else
         self.buttonStyle(.borderedProminent).controlSize(.large)
+            .modifier(BrandCTALabelColor())
         #endif
     }
 
@@ -64,5 +67,17 @@ extension View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// Label color for the brand-gold primary CTAs (#117). The light-mode brass
+/// carries white at large-text AA contrast; the brighter dark-mode gold
+/// would land under 2:1 with white, so it takes near-black instead. Applied
+/// by `primaryActionButtonStyle()` so every screen's CTA agrees.
+private struct BrandCTALabelColor: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(colorScheme == .dark ? Color(white: 0.12) : .white)
     }
 }
