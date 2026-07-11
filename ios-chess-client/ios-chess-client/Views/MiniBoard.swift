@@ -8,6 +8,9 @@ import ChessKit
 struct MiniBoard: View {
     let board: Board
     let theme: BoardTheme
+    /// Bottom-of-board perspective; history rows pass the side the player
+    /// held so the miniature matches the ReviewView the row opens.
+    var orientation: PieceColor = .white
 
     var body: some View {
         GeometryReader { geo in
@@ -16,7 +19,9 @@ struct MiniBoard: View {
                 ForEach(0..<8, id: \.self) { row in
                     HStack(spacing: 0) {
                         ForEach(0..<8, id: \.self) { col in
-                            let sq = Sq.index(file: col, rank: 7 - row)
+                            let rank = orientation == .white ? 7 - row : row
+                            let file = orientation == .white ? col : 7 - col
+                            let sq = Sq.index(file: file, rank: rank)
                             ZStack {
                                 Rectangle()
                                     .fill(Sq.isLight(sq) ? theme.lightSquare : theme.darkSquare)

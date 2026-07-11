@@ -74,10 +74,20 @@ extension View {
 /// carries white at large-text AA contrast; the brighter dark-mode gold
 /// would land under 2:1 with white, so it takes near-black instead. Applied
 /// by `primaryActionButtonStyle()` so every screen's CTA agrees.
+///
+/// Disabled buttons are left alone: forcing a color there would override
+/// the system style's dimmed label and make a disabled CTA read as active
+/// (e.g. Play Online while a sign-in is in flight).
 private struct BrandCTALabelColor: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var isEnabled
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content.foregroundStyle(colorScheme == .dark ? Color(white: 0.12) : .white)
+        if isEnabled {
+            content.foregroundStyle(colorScheme == .dark ? Color(white: 0.12) : .white)
+        } else {
+            content
+        }
     }
 }
