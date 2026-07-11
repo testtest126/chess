@@ -91,7 +91,27 @@ Auth, token verification, crypto, account linking, session management:
 
 ## Tooling
 
-Project skills live in `.claude/skills/` and encode the above mechanically:
-`/fleet-status` (evidence sweep), `/verify-at-head` (scratch-worktree
-verification), `/claim-issue` (safe claiming). Prefer them over ad-hoc
-equivalents.
+Project skills live in `.claude/skills/` and encode the above mechanically.
+That directory is gitignored — the skills are machine-local, shared by every
+session on this machine but not part of the repo. Prefer them over ad-hoc
+equivalents:
+
+- `/claim-issue` — safe claiming: four-way dedupe, claim comment, worktree
+  cut off `origin/main`.
+- `/fleet-status` — evidence-based status sweep of main, CI, PRs, issues,
+  worktrees, and claim signals.
+- `/verify-at-head` — build-and-test verification at an exact SHA in a
+  detached scratch worktree.
+- `/open-pr` — package a finished branch into a PR and request merge from
+  the orchestrator (worker side of rule 4).
+- `/merge-pr` — the orchestrator's merge-gate checklist: identity check,
+  green on the current merge state, iOS lane, security verdict,
+  `orchestrator-approval` (merger side of rule 4).
+- `/security-gate` — rule 5 mechanics: classification, draft-until-APPROVE
+  at the exact head, test independence.
+- `/file-issue` — dedupe-first issue filing with the repo's label
+  conventions (rule 6).
+- `/review-pr` — repo-specific review checklist: wire-protocol
+  compatibility, engine determinism, server authority, test adequacy.
+- `/run-local` — run the server, test suites, and app from a worktree
+  without building in the shared checkout.
