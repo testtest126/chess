@@ -9,6 +9,7 @@ struct OnlineGameView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var flipped = false
     @State private var showResignConfirmation = false
@@ -47,7 +48,8 @@ struct OnlineGameView: View {
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("Flip", systemImage: "arrow.up.arrow.down") {
-                        withAnimation { flipped.toggle() }
+                        // Reduce Motion: flip instantly instead of animating (#83).
+                        withAnimation(reduceMotion ? nil : .default) { flipped.toggle() }
                     }
                     Button("Offer Draw", systemImage: "equal.circle") {
                         session.offerDraw()
