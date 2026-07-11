@@ -134,6 +134,7 @@ final class GameFlowUITests: XCTestCase {
 
     /// Waits for the element to exist and be hittable, then taps it. A bare
     /// `tap()` right after a transition can race layout on cold simulators.
+    @MainActor
     private func tapWhenReady(
         _ element: XCUIElement, _ what: String,
         timeout: TimeInterval = GameFlowUITests.ciTimeout,
