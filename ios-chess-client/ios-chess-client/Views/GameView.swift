@@ -8,6 +8,7 @@ struct GameView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var flipped = false
     @State private var showResignConfirmation = false
@@ -58,7 +59,8 @@ struct GameView: View {
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("Flip", systemImage: "arrow.up.arrow.down") {
-                        withAnimation { flipped.toggle() }
+                        // Reduce Motion: flip instantly instead of animating (#83).
+                        withAnimation(reduceMotion ? nil : .default) { flipped.toggle() }
                     }
                     Button("Resign", systemImage: "flag.fill") {
                         showResignConfirmation = true
@@ -262,6 +264,8 @@ struct CapturedPiecesView: View {
 struct MoveListView: View {
     let history: [Game.HistoryEntry]
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
@@ -283,7 +287,11 @@ struct MoveListView: View {
             }
             .onChange(of: history.count) {
                 if let last = history.indices.last {
-                    withAnimation { proxy.scrollTo(last, anchor: .trailing) }
+                    // Reduce Motion: still follow the latest move — that's
+                    // function, not decoration — but jump instead of gliding.
+                    withAnimation(reduceMotion ? nil : .default) {
+                        proxy.scrollTo(last, anchor: .trailing)
+                    }
                 }
             }
         }
