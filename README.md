@@ -25,16 +25,19 @@
 - ♟️ **Play the engine** — four strengths from Beginner to Expert, driven by a
   negamax search with a transposition table, quiescence, and an opening book.
   Get hints, take moves back, drag or tap pieces.
-- 🌍 **Play people online** — 5+3 blitz with matchmaking, server-enforced
-  clocks, draw offers, Elo ratings, and a leaderboard. No sign-up: a guest
-  account is created for you on first play and lives in your Keychain.
+- 🌍 **Play people online** — Bullet 1+0, Blitz 5+3, or Rapid 10+5, with
+  rating-based matchmaking, server-enforced clocks, draw offers, Elo ratings,
+  and a leaderboard. No sign-up: a guest account is created for you on first
+  play and lives in your Keychain — add Sign in with Apple to recover it on
+  a new device.
 - 📈 **Review every game** — engine analysis of each move (best → blunder),
   accuracy scores, an evaluation graph, "best was …" suggestions, and full
-  board playback. Works for engine and online games alike.
+  board playback. Works for engine and online games alike, and online games
+  sync from the server, so your history follows you across devices.
 
 ## Try it in two minutes
 
-All you need is a Mac with **Xcode 15+** (iOS 17 SDK).
+All you need is a Mac with **Xcode 16+** (Swift 6 toolchain, iOS 17 SDK).
 
 ```sh
 git clone https://github.com/testtest126/chess.git
@@ -81,7 +84,7 @@ Three design decisions worth knowing:
 ## Tests
 
 ```sh
-swift test --package-path ChessKit        # rules, engine, protocol (60 tests)
+swift test --package-path ChessKit        # rules, engine, protocol
 swift test --package-path chess-server    # auth + WebSocket match integration
 ```
 
