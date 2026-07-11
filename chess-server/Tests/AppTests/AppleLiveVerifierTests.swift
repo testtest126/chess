@@ -116,7 +116,8 @@ final class AppleLiveVerifierTests: XCTestCase {
         let selfIssued = JWTKeyCollection()
         await selfIssued.add(
             hmac: HMACKey(from: "insecure-development-key-do-not-deploy"),
-            digestAlgorithm: .sha256)
+            digestAlgorithm: .sha256
+        )
         let forged = try await selfIssued.sign(identity(sub: "000005.live.0005"))
 
         try await expectRejection(of: forged)
@@ -231,7 +232,8 @@ final class AppleLiveVerifierTests: XCTestCase {
         try await app.test(.POST, "auth/apple", beforeRequest: { req in
             try req.content.encode(
                 AppleSignInRequest(identityToken: token, displayName: displayName, nonce: raw),
-                as: .json)
+                as: .json
+            )
         }, afterResponse: { res async throws in
             XCTAssertEqual(res.status, .ok)
             response = try res.content.decode(AuthResponse.self)
@@ -250,7 +252,8 @@ final class AppleLiveVerifierTests: XCTestCase {
         let raw = try await mintNonce()
         try await app.test(.POST, "auth/apple", beforeRequest: { req in
             try req.content.encode(
-                AppleSignInRequest(identityToken: token, nonce: raw), as: .json)
+                AppleSignInRequest(identityToken: token, nonce: raw), as: .json
+            )
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized, file: file, line: line)
         })

@@ -3,7 +3,6 @@ import ChessKit
 @testable import ChessProtocol
 
 final class PersistentEngineTests: XCTestCase {
-
     // MARK: - Table persistence
 
     func testColdPersistentEngineMatchesFreshEngineExactly() {

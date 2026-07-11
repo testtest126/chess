@@ -55,20 +55,20 @@ struct LeaderboardView: View {
                 Button {
                     selectedPlayer = entry
                 } label: {
-                HStack(spacing: 12) {
-                    rankBadge(index + 1)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(entry.displayName)
-                            .font(.headline)
-                        Text("^[\(entry.games) game](inflect: true)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        rankBadge(index + 1)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(entry.displayName)
+                                .font(.headline)
+                            Text("^[\(entry.games) game](inflect: true)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("\(entry.rating)")
+                            .font(.title3.monospacedDigit().bold())
                     }
-                    Spacer()
-                    Text("\(entry.rating)")
-                        .font(.title3.monospacedDigit().bold())
-                }
-                .contentShape(Rectangle())
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(isMe ? Color.accentColor.opacity(0.12) : nil)

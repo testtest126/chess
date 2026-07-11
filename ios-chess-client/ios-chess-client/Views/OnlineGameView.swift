@@ -206,7 +206,6 @@ struct OnlineGameView: View {
     }
 
     /// Ticking clock; the active side counts down between server syncs.
-    @ViewBuilder
     private func clockView(for color: PieceColor) -> some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
             if let seconds = session.remainingSeconds(for: color, at: context.date) {

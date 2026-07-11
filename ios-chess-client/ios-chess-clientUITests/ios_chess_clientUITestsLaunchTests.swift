@@ -8,7 +8,6 @@
 import XCTest
 
 final class ios_chess_clientUITestsLaunchTests: XCTestCase {
-
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }

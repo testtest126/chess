@@ -8,8 +8,7 @@ import ChessOnline
 /// (TEST_RUNNER_CHESS_SERVER_URL via xcodebuild) to point the suite at
 /// another server, e.g. a spare port when 8080 is already in use.
 private let serverBase = URL(string:
-    ProcessInfo.processInfo.environment["CHESS_SERVER_URL"] ?? "http://127.0.0.1:8080"
-)!
+    ProcessInfo.processInfo.environment["CHESS_SERVER_URL"] ?? "http://127.0.0.1:8080")!
 
 /// End-to-end online play against a real server, `serverBase`.
 ///
@@ -18,7 +17,6 @@ private let serverBase = URL(string:
 /// engine moves — then the UI drives the app through matchmaking, a move,
 /// resignation, and review. Skipped automatically when the server isn't up.
 final class OnlineMatchUITests: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }

@@ -6,6 +6,7 @@ import JWT
 
 public func configure(_ app: Application) async throws {
     // MARK: Database
+
     // Postgres when DATABASE_URL is set; an explicit SQLite file when
     // SQLITE_PATH is (the zero-spend Fly deployment: one machine, one small
     // volume); in-memory SQLite under test; a local file for development.
@@ -35,6 +36,7 @@ public func configure(_ app: Application) async throws {
     try await app.autoMigrate()
 
     // MARK: JWT signing key
+
     // The signing secret is mandatory outside development so tokens survive
     // restarts and can never fall back to a known value.
     if let secret = Environment.get("JWT_SECRET") {
@@ -49,6 +51,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // MARK: Sign in with Apple
+
     // SIWA_APP_ID is the iOS app's bundle identifier; Apple identity tokens
     // are verified against it as the audience. The /auth/apple endpoint
     // returns 503 until this is configured.
@@ -57,6 +60,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // MARK: Auth abuse protection (#32)
+
     // Per-IP fixed-window throttle on /auth/*. Effectively off under test so
     // the suite's rapid registrations pass; rate-limit tests install a tight
     // limiter themselves.
@@ -72,6 +76,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // MARK: Realtime coordinator
+
     app.gameCoordinator = GameCoordinator(app: app)
 
     try routes(app)

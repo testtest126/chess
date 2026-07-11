@@ -102,8 +102,7 @@ extension ClientMessage: Codable {
         case .joinQueue:
             // Absent on peers that predate selectable controls: assume 5+3.
             self = .joinQueue(timeControl:
-                try container.decodeIfPresent(TimeControl.self, forKey: .timeControl) ?? .default
-            )
+                try container.decodeIfPresent(TimeControl.self, forKey: .timeControl) ?? .default)
         case .leaveQueue: self = .leaveQueue
         case .move: self = .move(uci: try container.decode(String.self, forKey: .uci))
         case .resign: self = .resign

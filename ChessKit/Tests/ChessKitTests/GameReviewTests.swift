@@ -2,7 +2,6 @@ import XCTest
 @testable import ChessKit
 
 final class GameReviewTests: XCTestCase {
-
     private func game(_ ucis: [String]) -> Game {
         var g = Game()
         for uci in ucis { try! g.play(uci: uci) }

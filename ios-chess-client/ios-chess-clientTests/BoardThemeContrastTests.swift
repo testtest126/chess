@@ -12,7 +12,6 @@ import UIKit
 /// isolation under Swift 6; the test target's default is nonisolated.
 @MainActor
 struct BoardThemeContrastTests {
-
     private func rgb(_ color: Color) -> (Double, Double, Double) {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)

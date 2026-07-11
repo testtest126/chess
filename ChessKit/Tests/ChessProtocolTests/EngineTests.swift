@@ -3,7 +3,6 @@ import ChessKit
 @testable import ChessProtocol
 
 final class EngineTests: XCTestCase {
-
     private let engine = NegamaxEngine()
 
     func testFindsMateInOne() {

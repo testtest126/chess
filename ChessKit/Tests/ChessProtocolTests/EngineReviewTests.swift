@@ -8,7 +8,6 @@ import ChessKit
 /// position refactor already catches one-move recaptures; the engine
 /// evaluator pins that guarantee and extends it to deeper tactics.
 final class EngineReviewTests: XCTestCase {
-
     /// Fixed-depth, uncapped, bookless: fully deterministic.
     private let evaluator = NegamaxEngine().reviewEvaluator(limit: SearchLimit(depth: 3))
 

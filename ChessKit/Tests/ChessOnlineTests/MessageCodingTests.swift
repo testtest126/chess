@@ -2,7 +2,6 @@ import XCTest
 @testable import ChessOnline
 
 final class MessageCodingTests: XCTestCase {
-
     func testClientMessageRoundTrip() throws {
         let messages: [ClientMessage] = [
             .joinQueue(timeControl: .bullet), .joinQueue(timeControl: .blitz),
@@ -47,8 +46,7 @@ final class MessageCodingTests: XCTestCase {
     func testOptionalFieldsDecodeWhenAbsent() throws {
         // Older peers may omit clock/rating/control fields entirely.
         let start = try ServerMessage(jsonString:
-            #"{"type":"game_start","gameID":"00000000-0000-0000-0000-000000000000","yourColor":"white","opponentName":"X","moves":[]}"#
-        )
+            #"{"type":"game_start","gameID":"00000000-0000-0000-0000-000000000000","yourColor":"white","opponentName":"X","moves":[]}"#)
         guard case .gameStart(let payload) = start else { return XCTFail() }
         XCTAssertNil(payload.clock)
         XCTAssertNil(payload.opponentRating)
