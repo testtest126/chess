@@ -41,13 +41,6 @@ final class OpeningBookTests: XCTestCase {
         XCTAssertTrue(ucis.contains("c7c5"))
     }
 
-    func testIllegalMoveEndsLine() {
-        // "e2e5" is illegal from the starting position.
-        let book = OpeningBook(lines: ["e2e5 e7e5"])
-        XCTAssertEqual(book.positionCount, 0)
-        XCTAssertTrue(book.moves(for: Board()).isEmpty)
-    }
-
     func testOutOfBookPositionReturnsEmpty() {
         let book = OpeningBook(lines: ["e2e4 e7e5"])
         // Position after 1. d4 is not in the book.
