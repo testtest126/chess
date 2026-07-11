@@ -51,8 +51,6 @@ struct HomeView: View {
         }
     }
 
-    @Environment(\.dynamicTypeSize) private var typeSize
-
     private var themeTileStrip: some View {
         HStack(spacing: 12) {
             ForEach(BoardTheme.allCases) { theme in

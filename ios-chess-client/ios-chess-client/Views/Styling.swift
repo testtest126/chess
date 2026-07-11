@@ -82,7 +82,6 @@ private struct BrandCTALabelColor: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
 
-    @ViewBuilder
     func body(content: Content) -> some View {
         if isEnabled {
             content.foregroundStyle(colorScheme == .dark ? Color(white: 0.12) : .white)
