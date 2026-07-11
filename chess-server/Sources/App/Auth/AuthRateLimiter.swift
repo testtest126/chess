@@ -11,8 +11,9 @@ import SQLKit
 /// a verdict weighs the current bucket plus the previous one decayed linearly
 /// by how far the current bucket has progressed. A burst straddling a bucket
 /// boundary therefore can't get 2× the limit the way plain fixed windows
-/// allow. Refused requests are counted too, so a client hammering past the
-/// limit keeps itself limited.
+/// allow. Refused requests count too, but only up to one past the limit —
+/// hammering can't wedge the counter, so once the traffic stops the key is
+/// admitted again after rollover, the same recovery the fixed window gave.
 actor SlidingWindowRateLimiter {
     enum Verdict: Equatable {
         case allowed
@@ -40,17 +41,26 @@ actor SlidingWindowRateLimiter {
             throw Abort(.internalServerError, reason: "rate limiter requires a SQL database")
         }
 
+        // Real keys are IP addresses (≤45 chars); a hostile proxy-supplied
+        // header must not be able to blow past index row-size limits and
+        // turn the counter upsert into an error path.
+        let key = String(key.prefix(64))
+
         let bucket = Int(now.timeIntervalSince1970 / window)
         let fraction = (now.timeIntervalSince1970 - Double(bucket) * window) / window
 
         // One atomic statement counts this request and reads the result, so
         // concurrent requests across instances can never both see the last
-        // free slot.
+        // free slot. The CASE saturates the count one past the limit (see
+        // the type comment).
         let current = try await sql.raw("""
         INSERT INTO "auth_rate_windows" ("key", "bucket", "count")
         VALUES (\(bind: key), \(bind: bucket), 1)
         ON CONFLICT ("key", "bucket")
-        DO UPDATE SET "count" = "auth_rate_windows"."count" + 1
+        DO UPDATE SET "count" = CASE
+            WHEN "auth_rate_windows"."count" > \(bind: limit) THEN "auth_rate_windows"."count"
+            ELSE "auth_rate_windows"."count" + 1
+        END
         RETURNING "count"
         """).first(decoding: CountRow.self)?.count ?? 1
 
@@ -59,11 +69,15 @@ actor SlidingWindowRateLimiter {
         WHERE "key" = \(bind: key) AND "bucket" = \(bind: bucket - 1)
         """).first(decoding: CountRow.self)?.count ?? 0
 
-        try await sweepIfDue(sql, currentBucket: bucket, now: now)
-
         let weighted = Double(previous) * (1 - fraction) + Double(current)
-        guard weighted > Double(limit) else { return .allowed }
-        return .limited(retryAfter: retryAfter(previous: previous, current: current, fraction: fraction))
+        let verdict: Verdict = weighted <= Double(limit)
+            ? .allowed
+            : .limited(retryAfter: retryAfter(previous: previous, current: current, fraction: fraction))
+
+        // Housekeeping runs after the verdict is decided and never fails the
+        // request.
+        await sweepIfDue(sql, currentBucket: bucket, now: now)
+        return verdict
     }
 
     /// Seconds until a retry would be admitted, assuming the client goes
@@ -87,16 +101,25 @@ actor SlidingWindowRateLimiter {
         return max(1, (1 - fraction + g) * window)
     }
 
-    /// Buckets older than the previous window no longer influence any
-    /// verdict. Sweeping at most once per window keeps the table at roughly
-    /// two rows per recently active key, so an attacker rotating source
-    /// addresses can't grow it without bound.
-    private func sweepIfDue(_ sql: any SQLDatabase, currentBucket: Int, now: Date) async throws {
+    /// Buckets outside current±1 no longer influence any verdict: previous
+    /// feeds the decay, current+1 tolerates a clock-ahead peer instance, and
+    /// everything else — including rows stranded by an
+    /// AUTH_RATE_LIMIT_WINDOW change, which renumbers buckets — is
+    /// reclaimed. Sweeping at most once per window keeps the table at a few
+    /// rows per recently active key, so an attacker rotating source
+    /// addresses can't grow it without bound. Errors are logged, not
+    /// thrown: housekeeping must never fail an already-decided request.
+    private func sweepIfDue(_ sql: any SQLDatabase, currentBucket: Int, now: Date) async {
         guard now.timeIntervalSince(lastSweep) >= window else { return }
         lastSweep = now
-        try await sql.raw("""
-        DELETE FROM "auth_rate_windows" WHERE "bucket" < \(bind: currentBucket - 1)
-        """).run()
+        do {
+            try await sql.raw("""
+            DELETE FROM "auth_rate_windows"
+            WHERE "bucket" < \(bind: currentBucket - 1) OR "bucket" > \(bind: currentBucket + 1)
+            """).run()
+        } catch {
+            sql.logger.warning("auth rate limiter sweep failed: \(String(reflecting: error))")
+        }
     }
 }
 
