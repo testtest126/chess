@@ -100,6 +100,24 @@ struct CreateAppleNonce: AsyncMigration {
     }
 }
 
+struct CreateAuthRateWindow: AsyncMigration {
+    // Shared store for the auth rate limiter (#79). No `.id()`: the limiter
+    // upserts on ("key", "bucket") and never supplies one; the composite
+    // unique constraint is also what its ON CONFLICT target resolves to.
+    func prepare(on database: Database) async throws {
+        try await database.schema("auth_rate_windows")
+            .field("key", .string, .required)
+            .field("bucket", .int64, .required)
+            .field("count", .int, .required)
+            .unique(on: "key", "bucket")
+            .create()
+    }
+
+    func revert(on database: Database) async throws {
+        try await database.schema("auth_rate_windows").delete()
+    }
+}
+
 struct CreateGameRecord: AsyncMigration {
     func prepare(on database: Database) async throws {
         try await database.schema(GameRecord.schema)

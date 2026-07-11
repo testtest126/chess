@@ -1,10 +1,12 @@
 @testable import App
 import XCTVapor
 import Fluent
+import SQLKit
 import ChessOnline
 
-/// Abuse protection for the auth surface (#32): the per-IP rate limit on
-/// /auth/* and the abandoned-guest cleanup job.
+/// Abuse protection for the auth surface (#32, #79): the per-IP rate limit
+/// on /auth/* — counted in the shared database so every instance draws from
+/// one budget — and the abandoned-guest cleanup job.
 final class AuthAbuseTests: XCTestCase {
     var app: Application!
 
@@ -20,33 +22,97 @@ final class AuthAbuseTests: XCTestCase {
 
     // MARK: - Limiter semantics
 
-    func testLimiterAdmitsUpToLimitThenRefusesUntilWindowResets() async {
-        let limiter = FixedWindowRateLimiter(limit: 3, window: 60)
-        let start = Date()
+    /// A fixed instant on a bucket boundary (divisible by the 60s window),
+    /// so tests control exactly where in a bucket each request lands.
+    private let bucketStart = Date(timeIntervalSince1970: 60_000_000)
+
+    func testLimiterAdmitsUpToLimitThenRefusesUntilWindowPasses() async throws {
+        let limiter = SlidingWindowRateLimiter(limit: 3, window: 60)
 
         for i in 0..<3 {
-            let verdict = await limiter.check("ip", now: start.addingTimeInterval(Double(i)))
+            let verdict = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(Double(i)))
             XCTAssertEqual(verdict, .allowed, "request \(i + 1) is within the limit")
         }
-        let refused = await limiter.check("ip", now: start.addingTimeInterval(10))
-        XCTAssertEqual(refused, .limited(retryAfter: 50), "window opened at t=0, so t=10 waits 50s")
+        guard case .limited(let retryAfter) = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(10)) else {
+            return XCTFail("request past the limit must be refused")
+        }
+        XCTAssertGreaterThanOrEqual(retryAfter, 1, "retry guidance is at least a second")
 
-        // A fresh window admits again.
-        let afterReset = await limiter.check("ip", now: start.addingTimeInterval(61))
+        // Two windows later both buckets have aged out; the key is admitted again.
+        let afterReset = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(121))
         XCTAssertEqual(afterReset, .allowed)
     }
 
-    func testLimiterKeysAreIndependent() async {
-        let limiter = FixedWindowRateLimiter(limit: 1, window: 60)
-        let now = Date()
+    func testWindowBoundaryBurstIsSmoothed() async throws {
+        // A fixed window admits `limit` at the end of one window and `limit`
+        // more right after the boundary — 2× the limit in seconds. The
+        // sliding window weighs the previous bucket in, decaying as the new
+        // bucket progresses.
+        let limiter = SlidingWindowRateLimiter(limit: 4, window: 60)
 
-        let first = await limiter.check("ip-a", now: now)
+        for i in 0..<4 {
+            let lateBurst = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(55 + Double(i)))
+            XCTAssertEqual(lateBurst, .allowed, "the first 4 requests fit the budget")
+        }
+        if case .allowed = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(61)) {
+            XCTFail("just past the boundary the previous bucket still weighs ~full; a fresh burst must be refused")
+        }
+        // Halfway into the new bucket the old one has decayed enough to admit.
+        let afterDecay = try await limiter.check("ip", on: app.db, now: bucketStart.addingTimeInterval(91))
+        XCTAssertEqual(afterDecay, .allowed)
+    }
+
+    func testLimiterKeysAreIndependent() async throws {
+        let limiter = SlidingWindowRateLimiter(limit: 1, window: 60)
+
+        let first = try await limiter.check("ip-a", on: app.db, now: bucketStart)
         XCTAssertEqual(first, .allowed)
-        if case .allowed = await limiter.check("ip-a", now: now) {
+        if case .allowed = try await limiter.check("ip-a", on: app.db, now: bucketStart) {
             XCTFail("second request from the same key must be limited")
         }
-        let otherKey = await limiter.check("ip-b", now: now)
+        let otherKey = try await limiter.check("ip-b", on: app.db, now: bucketStart)
         XCTAssertEqual(otherKey, .allowed, "another key has its own window")
+    }
+
+    func testLimitIsSharedAcrossLimiterInstances() async throws {
+        // Two limiters over one database stand in for two server instances:
+        // the budget must be shared, not `limit × instances` (#79).
+        let one = SlidingWindowRateLimiter(limit: 2, window: 60)
+        let two = SlidingWindowRateLimiter(limit: 2, window: 60)
+
+        let first = try await one.check("ip", on: app.db, now: bucketStart)
+        XCTAssertEqual(first, .allowed)
+        let second = try await two.check("ip", on: app.db, now: bucketStart.addingTimeInterval(1))
+        XCTAssertEqual(second, .allowed)
+        if case .allowed = try await two.check("ip", on: app.db, now: bucketStart.addingTimeInterval(2)) {
+            XCTFail("an instance must see requests counted by its peers")
+        }
+        if case .allowed = try await one.check("ip", on: app.db, now: bucketStart.addingTimeInterval(3)) {
+            XCTFail("the refusal holds on every instance")
+        }
+    }
+
+    func testStaleBucketsAreSweptFromTheStore() async throws {
+        let limiter = SlidingWindowRateLimiter(limit: 5, window: 60)
+
+        _ = try await limiter.check("old-ip", on: app.db, now: bucketStart)
+        // Two windows later any check sweeps buckets that no longer affect
+        // verdicts, so rotating source addresses can't grow the table.
+        _ = try await limiter.check("new-ip", on: app.db, now: bucketStart.addingTimeInterval(180))
+
+        let oldRows = try await windowRows(key: "old-ip")
+        XCTAssertEqual(oldRows, 0, "aged-out buckets are deleted")
+        let newRows = try await windowRows(key: "new-ip")
+        XCTAssertEqual(newRows, 1, "the live bucket stays")
+    }
+
+    private func windowRows(key: String) async throws -> Int {
+        struct Row: Decodable { var count: Int }
+        let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+        let row = try await sql.raw("""
+            SELECT COUNT(*) AS "count" FROM "auth_rate_windows" WHERE "key" = \(bind: key)
+            """).first(decoding: Row.self)
+        return try XCTUnwrap(row).count
     }
 
     // MARK: - HTTP surface
@@ -54,7 +120,7 @@ final class AuthAbuseTests: XCTestCase {
     func testAuthEndpointsReturn429PastTheLimit() async throws {
         // Test requests carry no socket address, so they all share one
         // bucket — which is exactly what this test needs.
-        app.authRateLimiter = FixedWindowRateLimiter(limit: 2, window: 60)
+        app.authRateLimiter = SlidingWindowRateLimiter(limit: 2, window: 60)
 
         for _ in 0..<2 {
             try await app.test(.POST, "auth/register", beforeRequest: { req in
@@ -90,7 +156,7 @@ final class AuthAbuseTests: XCTestCase {
         // would fold every client into one shared bucket.
         setenv("TRUST_PROXY_HEADERS", "1", 1)
         defer { unsetenv("TRUST_PROXY_HEADERS") }
-        app.authRateLimiter = FixedWindowRateLimiter(limit: 1, window: 60)
+        app.authRateLimiter = SlidingWindowRateLimiter(limit: 1, window: 60)
 
         // Two clients sharing the Fly-style XFF tail each get their own window…
         for client in ["203.0.113.7", "203.0.113.8"] {
@@ -118,7 +184,7 @@ final class AuthAbuseTests: XCTestCase {
         // Client-controlled earlier entries must not affect the key.
         setenv("TRUST_PROXY_HEADERS", "1", 1)
         defer { unsetenv("TRUST_PROXY_HEADERS") }
-        app.authRateLimiter = FixedWindowRateLimiter(limit: 1, window: 60)
+        app.authRateLimiter = SlidingWindowRateLimiter(limit: 1, window: 60)
 
         try await app.test(.POST, "auth/register", beforeRequest: { req in
             req.headers.replaceOrAdd(name: "X-Forwarded-For", value: "10.9.9.9, 198.51.100.4")

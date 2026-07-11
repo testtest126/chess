@@ -1,49 +1,102 @@
 import Vapor
+import Fluent
+import SQLKit
 
-/// Fixed-window request counter keyed by client, used to throttle the
-/// unauthenticated auth endpoints. A window opens on a key's first request
-/// and admits `limit` requests until `window` seconds have passed; later
-/// requests are refused with the seconds remaining until the window resets.
-actor FixedWindowRateLimiter {
+/// Sliding-window request counter shared through the application database,
+/// used to throttle the unauthenticated auth endpoints. Counters live in the
+/// `auth_rate_windows` table rather than process memory, so every server
+/// instance draws from the same budget and restarts don't reset windows (#79).
+///
+/// The window slides: requests land in fixed buckets of `window` seconds, and
+/// a verdict weighs the current bucket plus the previous one decayed linearly
+/// by how far the current bucket has progressed. A burst straddling a bucket
+/// boundary therefore can't get 2× the limit the way plain fixed windows
+/// allow. Refused requests are counted too, so a client hammering past the
+/// limit keeps itself limited.
+actor SlidingWindowRateLimiter {
     enum Verdict: Equatable {
         case allowed
         case limited(retryAfter: TimeInterval)
     }
 
-    private struct Window {
-        var start: Date
-        var count: Int
-    }
-
     private let limit: Int
     private let window: TimeInterval
-    private var windows: [String: Window] = [:]
-
-    /// Entry count above which expired windows are swept out, so an attacker
-    /// rotating source addresses can't grow the dictionary without bound.
-    private let pruneThreshold = 4096
+    private var lastSweep: Date = .distantPast
 
     init(limit: Int, window: TimeInterval = 60) {
         self.limit = max(1, limit)
-        self.window = window
+        self.window = max(1, window)
     }
 
-    func check(_ key: String, now: Date = Date()) -> Verdict {
-        if windows.count > pruneThreshold {
-            windows = windows.filter { now.timeIntervalSince($0.value.start) < window }
+    private struct CountRow: Decodable {
+        var count: Int
+    }
+
+    func check(_ key: String, on database: any Database, now: Date = Date()) async throws -> Verdict {
+        guard let sql = database as? any SQLDatabase else {
+            // Both supported drivers (Postgres, SQLite) are SQL databases;
+            // reaching this means a misconfigured fixture, not a client at
+            // fault — and a limiter that can't count must not admit.
+            throw Abort(.internalServerError, reason: "rate limiter requires a SQL database")
         }
 
-        if var current = windows[key], now.timeIntervalSince(current.start) < window {
-            guard current.count < limit else {
-                return .limited(retryAfter: window - now.timeIntervalSince(current.start))
+        let bucket = Int(now.timeIntervalSince1970 / window)
+        let fraction = (now.timeIntervalSince1970 - Double(bucket) * window) / window
+
+        // One atomic statement counts this request and reads the result, so
+        // concurrent requests across instances can never both see the last
+        // free slot.
+        let current = try await sql.raw("""
+            INSERT INTO "auth_rate_windows" ("key", "bucket", "count")
+            VALUES (\(bind: key), \(bind: bucket), 1)
+            ON CONFLICT ("key", "bucket")
+            DO UPDATE SET "count" = "auth_rate_windows"."count" + 1
+            RETURNING "count"
+            """).first(decoding: CountRow.self)?.count ?? 1
+
+        let previous = try await sql.raw("""
+            SELECT "count" FROM "auth_rate_windows"
+            WHERE "key" = \(bind: key) AND "bucket" = \(bind: bucket - 1)
+            """).first(decoding: CountRow.self)?.count ?? 0
+
+        try await sweepIfDue(sql, currentBucket: bucket, now: now)
+
+        let weighted = Double(previous) * (1 - fraction) + Double(current)
+        guard weighted > Double(limit) else { return .allowed }
+        return .limited(retryAfter: retryAfter(previous: previous, current: current, fraction: fraction))
+    }
+
+    /// Seconds until a retry would be admitted, assuming the client goes
+    /// quiet meanwhile (further requests push this out — they count too).
+    private func retryAfter(previous: Int, current: Int, fraction: Double) -> TimeInterval {
+        let limit = Double(self.limit)
+
+        // Still within the current bucket, the previous bucket's weight
+        // decays: a retry at fraction g adds one to `current` and is admitted
+        // once previous × (1 − g) + current + 1 ≤ limit.
+        if previous > 0 {
+            let g = 1 - (limit - Double(current) - 1) / Double(previous)
+            if g <= 1 {
+                return max(1, (g - fraction) * window)
             }
-            current.count += 1
-            windows[key] = current
-            return .allowed
         }
 
-        windows[key] = Window(start: now, count: 1)
-        return .allowed
+        // Otherwise wait for rollover, when this bucket becomes the previous
+        // one and decays in turn: current × (1 − g) + 1 ≤ limit.
+        let g = max(0, 1 - (limit - 1) / Double(current))
+        return max(1, (1 - fraction + g) * window)
+    }
+
+    /// Buckets older than the previous window no longer influence any
+    /// verdict. Sweeping at most once per window keeps the table at roughly
+    /// two rows per recently active key, so an attacker rotating source
+    /// addresses can't grow it without bound.
+    private func sweepIfDue(_ sql: any SQLDatabase, currentBucket: Int, now: Date) async throws {
+        guard now.timeIntervalSince(lastSweep) >= window else { return }
+        lastSweep = now
+        try await sql.raw("""
+            DELETE FROM "auth_rate_windows" WHERE "bucket" < \(bind: currentBucket - 1)
+            """).run()
     }
 }
 
@@ -51,7 +104,8 @@ actor FixedWindowRateLimiter {
 /// IP. Refusals are 429 with a Retry-After header.
 struct AuthRateLimitMiddleware: AsyncMiddleware {
     func respond(to request: Request, chainingTo next: AsyncResponder) async throws -> Response {
-        let verdict = await request.application.authRateLimiter.check(clientKey(for: request))
+        let verdict = try await request.application.authRateLimiter
+            .check(clientKey(for: request), on: request.db)
         if case .limited(let retryAfter) = verdict {
             let seconds = max(1, Int(retryAfter.rounded(.up)))
             throw Abort(.tooManyRequests,
@@ -96,13 +150,13 @@ extension Environment {
 
 extension Application {
     private struct AuthRateLimiterKey: StorageKey {
-        typealias Value = FixedWindowRateLimiter
+        typealias Value = SlidingWindowRateLimiter
     }
 
     /// Shared limiter for the auth endpoints. Configured in `configure(_:)`;
     /// tests install a tighter one to exercise the 429 path.
-    var authRateLimiter: FixedWindowRateLimiter {
-        get { storage[AuthRateLimiterKey.self] ?? FixedWindowRateLimiter(limit: .max) }
+    var authRateLimiter: SlidingWindowRateLimiter {
+        get { storage[AuthRateLimiterKey.self] ?? SlidingWindowRateLimiter(limit: .max) }
         set { storage[AuthRateLimiterKey.self] = newValue }
     }
 }
