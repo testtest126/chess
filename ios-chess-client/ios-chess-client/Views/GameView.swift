@@ -44,6 +44,15 @@ struct GameView: View {
             .background(Color(.systemGroupedBackground))
             .sensoryFeedback(.impact(weight: .light), trigger: session.game.moveCount)
             .sensoryFeedback(.success, trigger: session.game.isOver) { _, isOver in isOver }
+            // VoiceOver hears every board change; a shrinking count is the
+            // engine game's Take Back.
+            .onChange(of: session.game.moveCount) { oldCount, newCount in
+                if newCount > oldCount {
+                    MoveAnnouncer.announceLastMove(in: session.game)
+                } else if newCount < oldCount {
+                    MoveAnnouncer.announceTakeback()
+                }
+            }
             .navigationTitle("MateMate")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
