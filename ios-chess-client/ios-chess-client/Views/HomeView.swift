@@ -51,6 +51,34 @@ struct HomeView: View {
         }
     }
 
+    private var themeTileStrip: some View {
+        HStack(spacing: 12) {
+            ForEach(BoardTheme.allCases) { theme in
+                let isSelected = theme.rawValue == boardThemeRaw
+                Button {
+                    boardThemeRaw = theme.rawValue
+                } label: {
+                    VStack(spacing: 5) {
+                        ThemeSwatchGrid(theme: theme)
+                            .frame(width: 52, height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+                            }
+                        Text(theme.label)
+                            .font(.caption2.weight(isSelected ? .semibold : .regular))
+                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityHidden(true)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -247,33 +275,15 @@ struct HomeView: View {
                     .pickerStyle(.menu)
 
                     // Visual half of the picker (#117): the same selection,
-                    // as tappable board tiles.
-                    HStack(spacing: 12) {
-                        ForEach(BoardTheme.allCases) { theme in
-                            let isSelected = theme.rawValue == boardThemeRaw
-                            Button {
-                                boardThemeRaw = theme.rawValue
-                            } label: {
-                                VStack(spacing: 5) {
-                                    ThemeSwatchGrid(theme: theme)
-                                        .frame(width: 52, height: 52)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2)
-                                        }
-                                    Text(theme.label)
-                                        .font(.caption2.weight(isSelected ? .semibold : .regular))
-                                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(theme.label)
-                            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-                            .frame(maxWidth: .infinity)
-                        }
+                    // as tappable board tiles. Decorative duplication of the
+                    // Picker above, so it hides at accessibility type sizes
+                    // (52pt tiles can't host AX-size captions — the failure
+                    // class audit #83 item 5 fixed elsewhere on this screen)
+                    // and from VoiceOver (the Picker is the accessible path;
+                    // five extra stops would announce nothing new).
+                    if !typeSize.isAccessibilitySize {
+                        themeTileStrip
                     }
-                    .padding(.vertical, 4)
                 }
 
                 Section("Past Games") {
@@ -569,26 +579,37 @@ struct SavedGameRow: View {
     }
 }
 
-/// Final-position miniature for a history row (#117). Rebuilding the game
-/// costs a UCI replay per on-screen row — cheap next to ReviewView's full
-/// engine pass, and List only materializes visible rows.
+/// Final-position miniature for a history row (#117). The UCI replay is not
+/// main-thread cheap — every ply runs several legal-move generations, which
+/// is why ReviewView runs the same `Game.from` detached — so the board is
+/// computed off-main once per row and only the O(1) final `game.board` is
+/// kept. Oriented to the side the player held, matching the ReviewView the
+/// row opens.
 private struct FinalPositionThumbnail: View {
     let saved: SavedGame
     @AppStorage(BoardTheme.storageKey) private var themeRaw = BoardTheme.classic.rawValue
+    @State private var board: Board?
 
     var body: some View {
         let theme = BoardTheme(rawValue: themeRaw) ?? .classic
         Group {
-            if let board = (try? Game.from(uciMoves: saved.moves))?.positions.last {
-                MiniBoard(board: board, theme: theme)
+            if let board {
+                MiniBoard(board: board, theme: theme, orientation: saved.playerColor)
             } else {
-                // Unparseable rows (never expected) still get a tile.
+                // Placeholder while the replay runs (and the terminal state
+                // for unparseable rows, which are never expected).
                 ThemeSwatchGrid(theme: theme)
             }
         }
         .frame(width: 56, height: 56)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityHidden(true)
+        .task(id: saved.persistentModelID) {
+            let moves = saved.moves
+            board = await Task.detached(priority: .utility) {
+                (try? Game.from(uciMoves: moves))?.board
+            }.value
+        }
     }
 }
 
