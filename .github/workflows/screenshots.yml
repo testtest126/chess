@@ -1,16 +1,18 @@
 name: Screenshots
 
-# On-demand README/marketing screenshot capture (issue #118). Runs
-# ScreenshotCaptureTests on a simulator with a normalized status bar,
-# exports the attached PNGs from the xcresult, uploads them as an artifact
-# and (by default) commits them to docs/screenshots/ on the branch it was
-# dispatched from — which lets sessions without a Mac produce and consume
-# real device screenshots entirely through CI. Never runs automatically.
+# On-demand README/marketing capture (issue #118). Boots chess-server so
+# ScreenshotCaptureTests can stage its scripted online showcase game (live
+# clocks, a real Past Games row), runs the capture in light AND dark
+# appearance, records the light run into a sped-up demo GIF, then exports
+# the attached PNGs and commits everything to docs/screenshots/ on the
+# branch it was dispatched from — which lets sessions without a Mac produce
+# and consume real device media entirely through CI. Never runs
+# automatically.
 on:
   workflow_dispatch:
     inputs:
       commit:
-        description: "Commit captured PNGs to docs/screenshots/ on this branch"
+        description: "Commit captured media to docs/screenshots/ on this branch"
         type: boolean
         default: true
 
@@ -23,9 +25,22 @@ jobs:
     # macos-26 for the same reason as ios.yml: it ships the iOS 26 SDK, so
     # captures show the Liquid Glass styling users on current iOS see.
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+
+      - name: Cache SwiftPM build (server)
+        uses: actions/cache@v6
+        with:
+          path: chess-server/.build
+          key: server-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift', 'chess-server/Package.resolved') }}
+          restore-keys: server-spm-${{ runner.os }}-
+
+      - name: Build chess-server
+        # The showcase path plays a real online game; a build break here
+        # only downgrades the capture to the engine fallback, so keep going.
+        continue-on-error: true
+        run: swift build --package-path chess-server
 
       - name: Pick an iPhone simulator
         id: sim
@@ -52,8 +67,7 @@ jobs:
           xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
 
       - name: Normalize the status bar
-        # The Apple-conventional 9:41, full signal, full battery — keeps
-        # every capture consistent with docs/screenshot-home.png.
+        # The Apple-conventional 9:41, full signal, full battery.
         run: |
           xcrun simctl status_bar "${{ steps.sim.outputs.udid }}" override \
             --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
@@ -70,14 +84,40 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             | tail -30
 
-      - name: Capture screenshots
-        # The engine game is offline, so no chess-server is needed. Serial
-        # testing for the same reason as ios.yml (no simulator clones).
-        timeout-minutes: 20
+      - name: Start chess-server
+        # Best-effort: if it can't come up, the capture test detects the
+        # missing /health probe and falls back to the offline engine game.
+        run: |
+          if [ ! -x chess-server/.build/debug/App ]; then
+            echo "::warning::server binary missing — captures use the engine fallback"
+            exit 0
+          fi
+          (cd chess-server && nohup bash -c \
+            'while true; do .build/debug/App serve --hostname 127.0.0.1 --port 8080 >> server.log 2>&1; echo "[watchdog] server exited ($?), restarting" >> server.log; sleep 1; done' \
+            > /dev/null 2>&1 &)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+              echo "chess-server is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::warning::chess-server did not become healthy — captures use the engine fallback"
+
+      - name: Capture screenshots (light) with demo recording
+        # The simulator recording spans the whole light run: lobby →
+        # matchmaking → the scripted line with live clocks → the win →
+        # review. Sped up afterwards it becomes the README demo.
+        timeout-minutes: 25
         env:
           TEST_RUNNER_CAPTURE_SCREENSHOTS: "1"
         run: |
           set -o pipefail
+          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance light || true
+          xcrun simctl io "${{ steps.sim.outputs.udid }}" recordVideo --codec h264 --force demo.mov &
+          echo $! > recorder.pid
+          sleep 2
+          STATUS=0
           xcodebuild test-without-building \
             -project ios-chess-client/ios-chess-client.xcodeproj \
             -scheme ios-chess-client \
@@ -85,44 +125,87 @@ jobs:
             -resultBundlePath Screenshots.xcresult \
             -parallel-testing-enabled NO \
             -only-testing:ios-chess-clientUITests/ScreenshotCaptureTests \
-            | tail -100
+            | tail -100 || STATUS=$?
+          kill -INT "$(cat recorder.pid)" 2>/dev/null || true
+          sleep 5  # let the recorder finalize the mov
+          exit $STATUS
 
-      - name: Export attachments from the result bundle
+      - name: Capture screenshots (dark)
+        # Second pass in dark appearance; the showcase stages a fresh game.
+        # Best-effort — a dark-pass failure must not cost the light results.
+        continue-on-error: true
+        timeout-minutes: 25
+        env:
+          TEST_RUNNER_CAPTURE_SCREENSHOTS: "1"
+        run: |
+          set -o pipefail
+          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance dark
+          xcodebuild test-without-building \
+            -project ios-chess-client/ios-chess-client.xcodeproj \
+            -scheme ios-chess-client \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath ScreenshotsDark.xcresult \
+            -parallel-testing-enabled NO \
+            -only-testing:ios-chess-clientUITests/ScreenshotCaptureTests \
+            | tail -60
+
+      - name: Render the demo GIF
+        # Timelapse the whole light run into a ~20s, README-friendly GIF
+        # (GitHub inlines GIFs; committed .mp4s don't render in READMEs).
+        # Best-effort: no demo must never mean no screenshots.
+        continue-on-error: true
+        run: |
+          command -v ffmpeg >/dev/null || brew install --quiet ffmpeg
+          [ -s demo.mov ] || { echo "::warning::no demo.mov captured"; exit 0; }
+          mkdir -p shots
+          ffmpeg -y -i demo.mov \
+            -vf "setpts=PTS/5,fps=10,scale=320:-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer" \
+            -loop 0 shots/demo.gif
+          ls -la shots/demo.gif
+
+      - name: Export attachments from the result bundles
         # xcresulttool gives exported files opaque names; manifest.json maps
         # them back to the XCTAttachment names, which we translate to the
-        # stable docs/ filenames. The find fallback keeps the artifact useful
-        # even if a future Xcode changes the manifest shape.
+        # stable docs/ filenames (dark pass gets a -dark suffix).
         run: |
-          xcrun xcresulttool export attachments --path Screenshots.xcresult --output-path exported
           mkdir -p shots
-          if [ -f exported/manifest.json ]; then
-            jq -r '.. | objects | select(has("exportedFileName") and has("suggestedHumanReadableName")) | [.exportedFileName, .suggestedHumanReadableName] | @tsv' exported/manifest.json \
-            | while IFS=$'\t' read -r file name; do
-                case "$name" in
-                  readme-home*)   cp "exported/$file" shots/screenshot-home.png ;;
-                  readme-game*)   cp "exported/$file" shots/screenshot-game.png ;;
-                  readme-review*) cp "exported/$file" shots/screenshot-review.png ;;
-                esac
-              done
-          fi
-          if [ -z "$(ls -A shots)" ]; then
+          export_bundle() {
+            local bundle="$1" suffix="$2" dir
+            [ -d "$bundle" ] || { echo "skipping $bundle (absent)"; return 0; }
+            dir=$(mktemp -d)
+            xcrun xcresulttool export attachments --path "$bundle" --output-path "$dir"
+            if [ -f "$dir/manifest.json" ]; then
+              jq -r '.. | objects | select(has("exportedFileName") and has("suggestedHumanReadableName")) | [.exportedFileName, .suggestedHumanReadableName] | @tsv' "$dir/manifest.json" \
+              | while IFS=$'\t' read -r file name; do
+                  case "$name" in
+                    readme-home*)   cp "$dir/$file" "shots/screenshot-home${suffix}.png" ;;
+                    readme-game*)   cp "$dir/$file" "shots/screenshot-game${suffix}.png" ;;
+                    readme-review*) cp "$dir/$file" "shots/screenshot-review${suffix}.png" ;;
+                  esac
+                done
+            fi
+          }
+          export_bundle Screenshots.xcresult ""
+          export_bundle ScreenshotsDark.xcresult "-dark"
+          if ! ls shots/*.png >/dev/null 2>&1; then
             echo "manifest mapping found nothing; exporting every PNG as-is"
-            find exported -name '*.png' -exec cp {} shots/ \;
+            [ -d Screenshots.xcresult ] && xcrun xcresulttool export attachments --path Screenshots.xcresult --output-path raw && find raw -name '*.png' -exec cp {} shots/ \;
           fi
           ls -la shots
 
-      - name: Upload screenshots artifact
+      - name: Upload media artifact
         uses: actions/upload-artifact@v7
         with:
           name: app-screenshots
           path: shots
           if-no-files-found: error
 
-      - name: Commit screenshots to the invoking branch
+      - name: Commit media to the invoking branch
         if: ${{ inputs.commit }}
         run: |
           mkdir -p docs/screenshots
-          cp shots/*.png docs/screenshots/
+          cp shots/*.png docs/screenshots/ 2>/dev/null || true
+          cp shots/demo.gif docs/screenshots/ 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/screenshots
@@ -133,10 +216,13 @@ jobs:
           git commit -m "Screenshots: refresh simulator captures (screenshots.yml)"
           git push origin "HEAD:${{ github.ref_name }}"
 
-      - name: Upload result bundle on failure
+      - name: Upload result bundles on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: Screenshots.xcresult
-          path: Screenshots.xcresult
+          path: |
+            Screenshots.xcresult
+            ScreenshotsDark.xcresult
+            chess-server/server.log
           retention-days: 7
