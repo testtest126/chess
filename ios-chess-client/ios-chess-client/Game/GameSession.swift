@@ -4,7 +4,9 @@ import ChessKit
 import ChessProtocol
 
 /// Engine strength presets exposed in the UI, mapped to search limits.
-enum Difficulty: String, CaseIterable, Codable, Identifiable {
+/// `nonisolated`: pure value computations, referenced from outside the app's
+/// MainActor default (SavedGame is a SwiftData model, not MainActor-bound).
+nonisolated enum Difficulty: String, CaseIterable, Codable, Identifiable {
     case beginner, casual, club, expert
 
     /// The Home screen's last-picked level, persisted in UserDefaults.
