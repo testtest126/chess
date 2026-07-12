@@ -49,8 +49,8 @@ struct MatchmakingConfig: Sendable {
 /// and clocks/timeouts are enforced here. All mutation happens on this actor;
 /// sockets are only written to from here.
 actor GameCoordinator {
-    /// How long a disconnected player has to return before forfeiting.
-    static let abandonGracePeriod: Duration = .seconds(60)
+    /// Default time a disconnected player has to return before forfeiting.
+    static let defaultAbandonGracePeriod: Duration = .seconds(60)
 
     struct Seat {
         let userID: UUID
@@ -67,7 +67,11 @@ actor GameCoordinator {
         var black: Seat
         let timeControl: TimeControl
         let clock: ClockConfig
-        var abandonTask: Task<Void, Never>?
+        /// Per-color forfeit timers. Keyed by color so a reconnecting player
+        /// cancels only their own pending forfeit — never their still-absent
+        /// opponent's. (A single shared task let one player's return cancel the
+        /// other's abandonment forfeit when both had dropped.)
+        var abandonTasks: [PieceColor: Task<Void, Never>] = [:]
 
         // Clock state: the side to move has been burning time since `turnStartedAt`.
         var whiteSeconds: Double
@@ -108,6 +112,18 @@ actor GameCoordinator {
         func setSocket(_ socket: WebSocket?, for userID: UUID) {
             if white.userID == userID { white.socket = socket }
             if black.userID == userID { black.socket = socket }
+        }
+
+        /// Cancels and clears the pending abandonment forfeit for one color.
+        func cancelAbandonTask(for color: PieceColor) {
+            abandonTasks[color]?.cancel()
+            abandonTasks[color] = nil
+        }
+
+        /// Cancels both colors' forfeit timers (game teardown).
+        func cancelAllAbandonTasks() {
+            for task in abandonTasks.values { task.cancel() }
+            abandonTasks.removeAll()
         }
 
         func remainingSeconds(of color: PieceColor) -> Double {
@@ -209,17 +225,21 @@ actor GameCoordinator {
     private let rematchWindow: Duration
     /// Rating-window pairing rules; tests inject fast-widening variants.
     private let matchmaking: MatchmakingConfig
+    /// Grace before a disconnected player forfeits; tests inject a short one.
+    private let abandonGracePeriod: Duration
 
     init(
         app: Application,
         clock: ClockConfig? = nil,
         rematchWindow: Duration = .seconds(60),
-        matchmaking: MatchmakingConfig = .standard
+        matchmaking: MatchmakingConfig = .standard,
+        abandonGracePeriod: Duration = GameCoordinator.defaultAbandonGracePeriod
     ) {
         self.app = app
         self.clockOverride = clock
         self.rematchWindow = rematchWindow
         self.matchmaking = matchmaking
+        self.abandonGracePeriod = abandonGracePeriod
     }
 
     private func clockConfig(for control: TimeControl) -> ClockConfig {
@@ -236,10 +256,9 @@ actor GameCoordinator {
         socketsByUser[userID] = socket
 
         // Reconnect to a game in progress, if any.
-        if let game = activeGame(for: userID) {
+        if let game = activeGame(for: userID), let color = game.color(of: userID) {
             game.setSocket(socket, for: userID)
-            game.abandonTask?.cancel()
-            game.abandonTask = nil
+            game.cancelAbandonTask(for: color)
             send(gameStartMessage(game, for: userID), to: socket)
             send(.opponentStatus(connected: game.opponentSeat(of: userID)?.socket != nil), to: socket)
             send(.opponentStatus(connected: true), to: game.opponentSeat(of: userID)?.socket)
@@ -253,15 +272,19 @@ actor GameCoordinator {
         removeFromAllQueues(userID: userID)
         abandonRematch(userID: userID)
 
-        guard let game = activeGame(for: userID) else { return }
+        guard let game = activeGame(for: userID), let color = game.color(of: userID) else { return }
         game.setSocket(nil, for: userID)
         send(.opponentStatus(connected: false), to: game.opponentSeat(of: userID)?.socket)
 
         // Forfeit if the player doesn't come back in time. (The chess clock
-        // keeps running regardless and may end the game sooner.)
+        // keeps running regardless and may end the game sooner.) Keyed by
+        // color so this timer is independent of the opponent's — if both drop
+        // and one returns, the other's forfeit still stands.
         let gameID = game.id
-        game.abandonTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.abandonGracePeriod)
+        let grace = abandonGracePeriod
+        game.cancelAbandonTask(for: color)
+        game.abandonTasks[color] = Task { [weak self] in
+            try? await Task.sleep(for: grace)
             guard !Task.isCancelled else { return }
             await self?.forfeitIfStillGone(gameID: gameID, userID: userID)
         }
@@ -634,7 +657,7 @@ actor GameCoordinator {
     // MARK: - Game teardown
 
     private func finish(_ game: LiveGame) async {
-        game.abandonTask?.cancel()
+        game.cancelAllAbandonTasks()
         game.timeoutTask?.cancel()
         gamesByID[game.id] = nil
         gameIDByUser[game.white.userID] = nil
