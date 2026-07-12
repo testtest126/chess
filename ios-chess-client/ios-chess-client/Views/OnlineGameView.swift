@@ -94,8 +94,11 @@ struct OnlineGameView: View {
                 case .finished:
                     gameEnded()
                 case .playing:
-                    // A rematch started: hide the sheet, arm saving again.
+                    // A rematch started: dismiss whichever end-of-game sheet
+                    // is showing (game over *or* review) so the new game isn't
+                    // left live underneath it, and arm saving again.
                     showGameOver = false
+                    showReview = false
                     saved = false
                 default:
                     break
