@@ -63,6 +63,30 @@ final class GameReviewTests: XCTestCase {
         XCTAssertGreaterThan(review.summary.accuracyWhite, 99)
     }
 
+    func testPlayingTheEvaluatorsBestMoveIsNeverAMistake() {
+        // Regression for #153: the pre-move and post-move searches reach the
+        // same line at different depths, so their scores disagree even when
+        // the mover played the engine's own preferred move — which used to
+        // render a best move as a "mistake". When the played move IS the
+        // evaluator's bestMove, the loss must be exactly zero.
+        var g = Game()
+        try! g.play(uci: "e2e4")
+        let played = g.history[0].move
+        // Prefer exactly the played move from the initial position, but report
+        // very different before/after scores that would otherwise charge a
+        // large loss.
+        let evaluator: GameReview.Evaluator = { board in
+            board.sideToMove == .white
+                ? GameReview.PositionAssessment(score: 300, bestMove: played)
+                : GameReview.PositionAssessment(score: 0)
+        }
+        let review = GameReview(analyzing: g, evaluator: evaluator)
+        let move = review.moves[0]
+        XCTAssertEqual(move.centipawnLoss, 0, "playing the evaluator's best move is never a loss")
+        XCTAssertEqual(move.judgment, .best)
+        XCTAssertNil(move.bestSAN, "no better move to suggest when the best move was played")
+    }
+
     func testJudgmentThresholds() {
         XCTAssertEqual(GameReview.Judgment(centipawnLoss: 0), .best)
         XCTAssertEqual(GameReview.Judgment(centipawnLoss: 40), .good)

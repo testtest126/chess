@@ -55,7 +55,10 @@ struct ReviewView: View {
                     // Engine-backed evaluation: bounded per position so even
                     // long games finish in seconds.
                     let engine = NegamaxEngine()
-                    let limit = SearchLimit(depth: 3, maxNodes: 50_000, moveTime: 0.15)
+                    // No moveTime: a wall-clock budget makes the analysis
+                    // non-deterministic (different results on each reopen).
+                    // Fixed depth + node cap keeps it bounded and reproducible.
+                    let limit = SearchLimit(depth: 3, maxNodes: 50_000)
                     let review = GameReview(
                         analyzing: game,
                         evaluator: engine.reviewEvaluator(limit: limit),

@@ -91,13 +91,23 @@ public struct GameReview: Sendable {
         var analyses: [MoveAnalysis] = []
         for (i, entry) in game.history.enumerated() {
             let mover = positions[i].sideToMove
-            let bestEval = assessments[i].score      // best play from the position before
-            let actualEval = assessments[i + 1].score // what the played move led to
 
-            // Loss from the mover's perspective.
-            let loss = mover == .white
-                ? max(0, bestEval - actualEval)
-                : max(0, actualEval - bestEval)
+            // When the mover played the evaluator's own preferred move, the
+            // loss is zero by definition. Otherwise compare the best-play
+            // score before the move against the score after it — but those two
+            // searches reach the same line at different depths, so for the
+            // best move the raw delta is a phantom loss that used to render a
+            // best move as a "mistake" (#153).
+            let loss: Int
+            if assessments[i].bestMove == entry.move {
+                loss = 0
+            } else {
+                let bestEval = assessments[i].score      // best play from the position before
+                let actualEval = assessments[i + 1].score // what the played move led to
+                loss = mover == .white
+                    ? max(0, bestEval - actualEval)
+                    : max(0, actualEval - bestEval)
+            }
             // Cap: positions already lost/won shouldn't produce absurd loss values.
             let cappedLoss = min(loss, 1000)
 
@@ -112,7 +122,7 @@ public struct GameReview: Sendable {
                 san: entry.san,
                 uci: entry.move.uci,
                 mover: mover,
-                evalAfter: actualEval,
+                evalAfter: assessments[i + 1].score,
                 centipawnLoss: cappedLoss,
                 judgment: Judgment(centipawnLoss: cappedLoss),
                 bestSAN: bestSAN
