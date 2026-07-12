@@ -71,6 +71,10 @@ The short version is below. For the full story — an interactive module map,
 a single move traced end to end, the wire protocol, and the engine pipeline —
 see the **[architecture overview](https://testtest126.github.io/chess/architecture/)**.
 
+And for a *different* story — how this whole thing was built by a swarm of Claude
+agents coordinating over git, with one human steering — see the illustrated
+making-of, **[How the Agents Talked](https://testtest126.github.io/chess/the-fleet/)**.
+
 | Directory | What it is |
 | --- | --- |
 | [`ChessKit/`](ChessKit) | Swift package, three libraries: **ChessKit** (board, legal moves, SAN/FEN/PGN, game state, review), **ChessProtocol** (engine, opening book, UCI adapter), **ChessOnline** (wire protocol shared by app & server) |
