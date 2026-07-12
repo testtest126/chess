@@ -43,7 +43,7 @@ enum GuestAccountCleanup {
         // permanently, growing the users table without bound (#155, M3).
         var removed = 0
         for start in stride(from: 0, to: candidateIDs.count, by: batchSize) {
-            let batch = Array(candidateIDs[start ..< min(start + batchSize, candidateIDs.count)])
+            let batch = Array(candidateIDs[start..<min(start + batchSize, candidateIDs.count)])
 
             // Still active: a refresh token issued within the retention period.
             let activeIDs = Set(
