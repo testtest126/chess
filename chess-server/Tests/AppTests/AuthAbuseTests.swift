@@ -221,4 +221,20 @@ final class AuthAbuseTests: XCTestCase {
         XCTAssertEqual(first, 0)
         XCTAssertEqual(second, 0)
     }
+
+    func testCleanupReapsAcrossBatchBoundaries() async throws {
+        // Regression for #155 (M3): the pre-batch code sent every candidate ID
+        // in one IN(…) query, which threw past the driver's bind ceiling and
+        // — swallowed by the scheduler — halted reaping forever. Seed more
+        // deletable guests than one batch holds and confirm the batched loop
+        // reaps every one across boundaries. batchSize is injected small so the
+        // test doesn't need thousands of rows.
+        for _ in 0..<5 {
+            _ = try await seedUser(daysAgo: 60) // old, no token, no game → deletable
+        }
+        let removed = try await GuestAccountCleanup.run(on: app.db, batchSize: 2)
+        XCTAssertEqual(removed, 5, "every deletable guest is reaped across the 2+2+1 batches")
+        let remaining = try await User.query(on: app.db).count()
+        XCTAssertEqual(remaining, 0, "no abandoned guest left behind")
+    }
 }

@@ -22,7 +22,7 @@ enum GuestAccountCleanup {
 
     /// Runs one cleanup pass and returns how many accounts were deleted.
     @discardableResult
-    static func run(on db: Database, now: Date = Date()) async throws -> Int {
+    static func run(on db: Database, now: Date = Date(), batchSize: Int = GuestAccountCleanup.batchSize) async throws -> Int {
         let cutoff = now.addingTimeInterval(-retention)
         // Tokens live `RefreshToken.lifetime` from issue, so "issued after the
         // cutoff" is "expires after cutoff + lifetime".
