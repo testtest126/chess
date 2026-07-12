@@ -619,6 +619,43 @@ final class MatchFlowTests: XCTestCase {
         try await b.close()
     }
 
+    func testClockIncrementIsAddedAfterEachMove() async throws {
+        // Blitz = 5+3 default. Use a custom clock with a clear increment to
+        // isolate the behaviour: 10s initial, 2s increment.
+        app.gameCoordinator = GameCoordinator(
+            app: app,
+            clock: ClockConfig(initialSeconds: 10, incrementSeconds: 2)
+        )
+
+        let match = try await startMatch()
+
+        // White plays immediately; the clock should show ~10s + 2s increment
+        // minus negligible think time for white, and ~10s for black.
+        try await match.white.send(.move(uci: "e2e4"))
+        guard case .movePlayed(_, let clock1W) = try await match.white.next(),
+              case .movePlayed(_, let clock1B) = try await match.black.next()
+        else {
+            return XCTFail("expected move broadcast")
+        }
+        let afterWhiteMove = try XCTUnwrap(clock1W)
+        // White spent nearly 0s thinking, got +2s increment → ~12s.
+        XCTAssertGreaterThan(afterWhiteMove.whiteSeconds, 11, "white should have gained the 2s increment")
+        XCTAssertEqual(afterWhiteMove.blackSeconds, 10, accuracy: 1)
+
+        // Black replies immediately; black should also gain the increment.
+        try await match.black.send(.move(uci: "e7e5"))
+        guard case .movePlayed(_, let clock2W) = try await match.white.next(),
+              case .movePlayed = try await match.black.next()
+        else {
+            return XCTFail("expected move broadcast")
+        }
+        let afterBlackMove = try XCTUnwrap(clock2W)
+        XCTAssertGreaterThan(afterBlackMove.blackSeconds, 11, "black should have gained the 2s increment")
+
+        try await match.white.close()
+        try await match.black.close()
+    }
+
     func testUnauthenticatedSocketIsClosed() async throws {
         do {
             let socket = try await TestSocket.connect(port: port, token: "garbage", on: app.eventLoopGroup)

@@ -44,6 +44,24 @@ final class GameTests: XCTestCase {
         XCTAssertEqual(board.status, .fiftyMoveDraw)
     }
 
+    func testStalemateIsDraw() {
+        // Direct stalemate: Black king trapped with no legal moves, not in check.
+        let staleBoard = Board(fen: "k7/2Q5/1K6/8/8/8/8/8 b - - 0 1")!
+        XCTAssertTrue(staleBoard.legalMoves().isEmpty)
+        XCTAssertEqual(staleBoard.status, .stalemate)
+    }
+
+    func testPlayingIntoStalemateEndsGameAsDraw() {
+        // Qc7 creates the stalemate position from testStalemateIsDraw.
+        // Before: Black king a8, White king b6 + queen d8.
+        // After Qd8-c7: Qc7 covers a7, b7, b8; Kb6 covers a7, a5, b7, c7, b5, c5.
+        // Black king on a8 has no squares and is not in check.
+        var game = try! Game(fen: "k2Q4/8/1K6/8/8/8/8/8 w - - 0 1")
+        try! game.play(uci: "d8c7")
+        XCTAssertEqual(game.result, .draw)
+        XCTAssertEqual(game.endReason, .stalemate)
+    }
+
     func testInsufficientMaterial() {
         XCTAssertTrue(Board(fen: "8/8/8/4k3/8/8/8/4K3 w - - 0 1")!.hasInsufficientMaterial)   // K vs K
         XCTAssertTrue(Board(fen: "8/8/8/4k3/8/8/8/4KB2 w - - 0 1")!.hasInsufficientMaterial)  // K+B vs K
