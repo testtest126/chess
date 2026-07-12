@@ -57,18 +57,27 @@ struct AuthController: RouteCollection {
         let body = try req.content.decode(RefreshRequest.self, as: .json)
         let digest = RefreshToken.hash(body.refreshToken)
 
-        guard let stored = try await RefreshToken.query(on: req.db)
-            .filter(\.$tokenHash == digest)
-            .first()
-        else {
-            throw Abort(.unauthorized, reason: "invalid refresh token")
+        // Consume the token atomically: one DELETE … RETURNING, so two
+        // requests presenting the same token (a real client and a replayed
+        // stolen token) can never both mint a fresh pair — only the racer
+        // whose DELETE hits the row proceeds; the other gets 401. A
+        // SELECT-then-delete here was a replay window (#147). Expired tokens
+        // don't match, so they can't be exchanged either; cleanup reaps them.
+        // Mirrors `consumeNonce`; portable across Postgres and SQLite 3.35+.
+        guard let sql = req.db as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "refresh token store requires an SQL database")
         }
+        struct Consumed: Decodable { let user_id: String }
+        let consumed = try await sql.raw("""
+        DELETE FROM refresh_tokens
+        WHERE token_hash = \(bind: digest) AND expires_at > \(bind: Date())
+        RETURNING CAST(user_id AS text) AS user_id
+        """).first(decoding: Consumed.self)
 
-        try await stored.delete(on: req.db)
-        guard stored.expiresAt > Date() else {
-            throw Abort(.unauthorized, reason: "refresh token expired")
+        guard let consumed, let userID = UUID(uuidString: consumed.user_id) else {
+            throw Abort(.unauthorized, reason: "invalid or expired refresh token")
         }
-        guard let user = try await User.find(stored.$user.id, on: req.db) else {
+        guard let user = try await User.find(userID, on: req.db) else {
             throw Abort(.unauthorized, reason: "unknown user")
         }
         return try await issueTokens(for: user, on: req)
