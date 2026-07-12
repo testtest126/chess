@@ -99,7 +99,7 @@ final class AuthTests: XCTestCase {
                     var code: UInt = 0
                     try await box.value.test(.POST, "auth/refresh", beforeRequest: { req in
                         try req.content.encode(RefreshRequest(refreshToken: token), as: .json)
-                    }, afterResponse: { res in
+                    }, afterResponse: { res async in
                         code = res.status.code
                     })
                     return code
