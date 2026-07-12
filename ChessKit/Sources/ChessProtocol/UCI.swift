@@ -69,7 +69,7 @@ public final class UCIEngine {
 
     // MARK: - Command handlers
 
-    /// Parses `position [startpos | fen <6 fields>] [moves <uci>...]`.
+    /// Parses `position [startpos | fen <fen fields>] [moves <uci>...]`.
     private func applyPosition(_ args: [String]) {
         var index = 0
         var newBoard: Board?
@@ -78,8 +78,11 @@ public final class UCIEngine {
             newBoard = Board()
             index = 1
         } else if args.first == "fen" {
-            // A FEN is up to six space-separated fields following "fen".
-            let fenFields = Array(args.dropFirst().prefix(6))
+            // The FEN runs until the "moves" keyword, capped at six fields.
+            // Stopping at "moves" is what lets a short FEN (Board accepts 4–5
+            // fields, defaulting the clocks) keep its trailing moves instead of
+            // swallowing the "moves" token and the moves into the FEN string.
+            let fenFields = Array(args.dropFirst().prefix { $0 != "moves" }.prefix(6))
             newBoard = Board(fen: fenFields.joined(separator: " "))
             index = 1 + fenFields.count
         }

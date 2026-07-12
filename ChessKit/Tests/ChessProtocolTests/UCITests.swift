@@ -42,6 +42,16 @@ final class UCITests: XCTestCase {
         XCTAssertNil(uci.currentBoard[Sq.parse("e2")!])
     }
 
+    func testPositionShortFENWithMoves() {
+        // A 4-field FEN (no halfmove/fullmove counters) followed by moves.
+        // The "moves" keyword must not be absorbed into the FEN, or the move
+        // is silently dropped and e2e4 is never applied.
+        let uci = makeAdapter()
+        uci.process("position fen 4k3/8/8/8/8/8/4P3/4K3 w - - moves e2e4")
+        XCTAssertEqual(uci.currentBoard[Sq.parse("e4")!], Piece(color: .white, kind: .pawn))
+        XCTAssertNil(uci.currentBoard[Sq.parse("e2")!])
+    }
+
     func testUCINewGameResets() {
         let uci = makeAdapter()
         uci.process("position startpos moves e2e4")
