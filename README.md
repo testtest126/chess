@@ -17,9 +17,11 @@
 ---
 
 <p align="center">
-  <img src="docs/screenshots/screenshot-game.png" width="280" alt="Playing the engine">
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/screenshot-review.png" width="280" alt="Post-game review">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/demo-light.gif">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/demo-dark.gif">
+    <img src="docs/demo-dark.gif" width="280" alt="MateMate demo — home, gameplay, and review">
+  </picture>
 </p>
 
 ## What you can do
