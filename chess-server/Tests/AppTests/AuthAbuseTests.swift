@@ -221,4 +221,49 @@ final class AuthAbuseTests: XCTestCase {
         XCTAssertEqual(first, 0)
         XCTAssertEqual(second, 0)
     }
+
+    func testCleanupReapsAcrossBatchBoundaries() async throws {
+        // Regression for #155 (M3): the pre-batch code sent every candidate ID
+        // in one IN(…) query, which threw past the driver's bind ceiling and
+        // — swallowed by the scheduler — halted reaping forever. Seed more
+        // deletable guests than one batch holds and confirm the batched loop
+        // reaps every one across boundaries. batchSize is injected small so the
+        // test doesn't need thousands of rows.
+        for _ in 0..<5 {
+            _ = try await seedUser(daysAgo: 60) // old, no token, no game → deletable
+        }
+        let removed = try await GuestAccountCleanup.run(on: app.db, batchSize: 2)
+        XCTAssertEqual(removed, 5, "every deletable guest is reaped across the 2+2+1 batches")
+        let remaining = try await User.query(on: app.db).count()
+        XCTAssertEqual(remaining, 0, "no abandoned guest left behind")
+    }
+
+    func testCleanupSparesGuestLinkedMidPass() async throws {
+        // Regression for #155 (L1 TOCTOU): a guest can link an Apple ID *after*
+        // it is read as a candidate but *before* the DELETE runs. The DELETE
+        // re-asserts `appleUserID == null`, so the now-recoverable account must
+        // survive. The seam commits the link inside that exact window; two
+        // controls confirm the pass still reaps ordinary abandoned guests, and
+        // the returned count reflects only what was actually deleted.
+        let linker = try await seedUser(daysAgo: 60)
+        let controlA = try await seedUser(daysAgo: 60)
+        let controlB = try await seedUser(daysAgo: 60)
+
+        let removed = try await GuestAccountCleanup.run(on: app.db) {
+            // Runs in the candidate-read → delete window: link `linker` to Apple.
+            linker.appleUserID = "apple-subject-midpass"
+            try await linker.save(on: app.db)
+        }
+
+        // The mid-pass link spares `linker`…
+        let survivor = try await User.find(linker.requireID(), on: app.db)
+        XCTAssertNotNil(survivor, "an account linked mid-pass must not be reaped")
+        XCTAssertEqual(survivor?.appleUserID, "apple-subject-midpass")
+        // …while the untouched controls are reaped.
+        let survivingControlA = try await User.find(controlA.requireID(), on: app.db)
+        let survivingControlB = try await User.find(controlB.requireID(), on: app.db)
+        XCTAssertNil(survivingControlA, "an ordinary abandoned guest is still reaped")
+        XCTAssertNil(survivingControlB, "an ordinary abandoned guest is still reaped")
+        XCTAssertEqual(removed, 2, "the spared account must not be counted as deleted")
+    }
 }
