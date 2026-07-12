@@ -10,7 +10,7 @@
 # Required secrets (fly secrets set NAME=value):
 #   JWT_SECRET   — e.g. $(openssl rand -hex 32); production refuses to boot
 #                  without it
-#   SIWA_APP_ID  — the iOS bundle ID (private.ios-chess-client). Optional:
+#   SIWA_APP_ID  — the iOS bundle ID (se.kovalskyi.matemate). Optional:
 #                  /auth/apple returns 503 until it is set
 #
 # The database is SQLite at SQLITE_PATH on the mounted volume — no

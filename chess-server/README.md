@@ -65,7 +65,7 @@ terminated by Fly. From the repo root:
 ```sh
 fly volumes create matemate_data --size 1              # SQLite lives here
 fly secrets set JWT_SECRET=$(openssl rand -hex 32)
-fly secrets set SIWA_APP_ID=private.ios-chess-client   # enables /auth/apple
+fly secrets set SIWA_APP_ID=se.kovalskyi.matemate   # enables /auth/apple
 fly deploy
 fly scale count 1
 ```
