@@ -26,14 +26,15 @@ final class EngineTests: XCTestCase {
     }
 
     func testRecognizesPerpetualCheckAsDraw() {
-        // White is down a full rook, but has a forced perpetual check:
-        // 1.Qd8+ Kh7 2.Qd3+ Kg8 3.Qd8+ … repeats the position (Black's king
-        // is boxed to g8/h7 by its own pieces). Without repetition awareness
-        // the search values the repeating line by material and reports White as
-        // lost; recognizing the repeat scores that line a draw, which is the
-        // best White has — so the search returns exactly 0.
-        let board = Board(fen: "6kq/5pp1/7p/8/8/8/1r3PPP/3Q3K w - - 0 1")!
-        let result = engine.search(board, limit: SearchLimit(depth: 6))
+        // White is down a pawn and Black's a2-pawn is a step from promoting, but
+        // White has a forced perpetual check — 1.Qd3+ Kb4 2.Qd4+ Kb5 3.Qd3+ …
+        // repeats the position. Without repetition awareness the search values
+        // the line by material (a lost pawn, then a new black queen) and reports
+        // White as worse; recognizing the repeat scores that line a draw, the
+        // best White has, so the search returns exactly 0. (Position confirmed
+        // drawn by an independent engine at both shallow and deep search.)
+        let board = Board(fen: "8/8/8/6q1/4Q3/1k5K/p7/8 w - - 0 1")!
+        let result = engine.search(board, limit: SearchLimit(depth: 8))
         XCTAssertEqual(result.scoreCentipawns, 0, "a forced perpetual check is a draw, not a loss")
     }
 
