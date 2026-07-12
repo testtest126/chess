@@ -127,4 +127,30 @@ final class LeaderboardControllerTests: XCTestCase {
             XCTAssertEqual(aliceEntry?.games, 2)
         })
     }
+
+    func testLeaderboardSurfacesRealPlayersBehindManyZeroGameGuests() async throws {
+        // Regression for #145: 200+ zero-game guests at the default rating
+        // used to fill the fetch-then-filter window, so a games-having player
+        // rated *below* the guests never got fetched and the board came back
+        // empty. Seed enough guests to blow past the old 200-row limit.
+        for i in 0..<210 {
+            try await User(displayName: "Guest\(i)", rating: User.initialRating).save(on: app.db)
+        }
+        let veteran = try await register(name: "Veteran")
+        let rival = try await register(name: "Rival")
+        try await setRating(1100, for: veteran) // below the 1200 guests
+
+        try await seedGame(whiteID: veteran.userID, blackID: rival.userID)
+
+        try await app.test(.GET, "leaderboard", beforeRequest: { req in
+            req.headers.bearerAuthorization = .init(token: veteran.accessToken)
+        }, afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok)
+            let entries = try res.content.decode([LeaderboardEntry].self)
+            XCTAssertTrue(entries.map(\.id).contains(veteran.userID),
+                          "a games-having player must appear even behind 200+ zero-game guests (#145)")
+            XCTAssertFalse(entries.contains { $0.games == 0 },
+                           "zero-game accounts must never appear on the board")
+        })
+    }
 }
