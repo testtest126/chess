@@ -94,7 +94,7 @@ final class AuthTests: XCTestCase {
         // (#147). This is the concurrent race testRefreshRotatesToken can't
         // reach: the old SELECT-then-delete let multiple racers both through.
         let codes = try await withThrowingTaskGroup(of: UInt.self) { group in
-            for _ in 0 ..< 8 {
+            for _ in 0..<8 {
                 group.addTask {
                     var code: UInt = 0
                     try await box.value.test(.POST, "auth/refresh", beforeRequest: { req in
