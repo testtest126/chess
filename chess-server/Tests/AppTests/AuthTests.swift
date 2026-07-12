@@ -80,6 +80,42 @@ final class AuthTests: XCTestCase {
         })
     }
 
+    func testConcurrentRefreshRedeemsTheTokenExactlyOnce() async throws {
+        let auth = try await register()
+        // Application isn't Sendable; a box lets it cross into the concurrent
+        // task closures. Safe here — Vapor routes each test request
+        // independently, which is exactly the concurrency under test.
+        let box = SendableBox(value: app!)
+        let token = auth.refreshToken
+
+        // Fire several simultaneous refreshes of the SAME token. Rotation is
+        // atomic (DELETE … RETURNING), so exactly one may redeem it — a
+        // replayed stolen token and the real client cannot both mint a session
+        // (#147). This is the concurrent race testRefreshRotatesToken can't
+        // reach: the old SELECT-then-delete let multiple racers both through.
+        let codes = try await withThrowingTaskGroup(of: UInt.self) { group in
+            for _ in 0 ..< 8 {
+                group.addTask {
+                    var code: UInt = 0
+                    try await box.value.test(.POST, "auth/refresh", beforeRequest: { req in
+                        try req.content.encode(RefreshRequest(refreshToken: token), as: .json)
+                    }, afterResponse: { res in
+                        code = res.status.code
+                    })
+                    return code
+                }
+            }
+            var all: [UInt] = []
+            for try await code in group { all.append(code) }
+            return all
+        }
+
+        XCTAssertEqual(codes.filter { $0 == 200 }.count, 1,
+                       "exactly one concurrent refresh may redeem the token")
+        XCTAssertEqual(codes.filter { $0 == 401 }.count, 7,
+                       "every other concurrent refresh is rejected")
+    }
+
     func testProtectedRoutesRejectAnonymous() async throws {
         try await app.test(.GET, "me", afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
@@ -400,4 +436,10 @@ final class AuthTests: XCTestCase {
             .count()
         XCTAssertEqual(holders, 1)
     }
+}
+
+/// Carries a non-Sendable value into concurrent task closures for the
+/// refresh-race test.
+private struct SendableBox<T>: @unchecked Sendable {
+    let value: T
 }
