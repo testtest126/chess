@@ -16,10 +16,17 @@ enum GuestAccountCleanup {
     /// How long an abandoned guest account is kept.
     static let retention: TimeInterval = 30 * 24 * 3600
 
+    /// Max IDs per IN (…) query, so bind counts stay under the driver ceiling
+    /// (SQLite ~32k, Postgres ~65k) even for the two-column game lookup.
+    static let batchSize = 1000
+
     /// Runs one cleanup pass and returns how many accounts were deleted.
     @discardableResult
     static func run(on db: Database, now: Date = Date()) async throws -> Int {
         let cutoff = now.addingTimeInterval(-retention)
+        // Tokens live `RefreshToken.lifetime` from issue, so "issued after the
+        // cutoff" is "expires after cutoff + lifetime".
+        let activeThreshold = cutoff.addingTimeInterval(RefreshToken.lifetime)
 
         // Guests old enough to be candidates at all.
         let candidates = try await User.query(on: db)
@@ -29,42 +36,54 @@ enum GuestAccountCleanup {
         let candidateIDs = try candidates.map { try $0.requireID() }
         guard !candidateIDs.isEmpty else { return 0 }
 
-        // Still active: a refresh token issued within the retention period.
-        // Tokens live `RefreshToken.lifetime` from issue, so "issued after
-        // the cutoff" is "expires after cutoff + lifetime".
-        let activeThreshold = cutoff.addingTimeInterval(RefreshToken.lifetime)
-        let activeIDs = Set(
+        // Process candidates in batches so no single IN (…) query exceeds the
+        // driver's bind-parameter ceiling (SQLite ~32k, Postgres ~65k). Past
+        // ~16k candidates the two-column game query blew the limit, threw, and
+        // — the error being swallowed by the scheduler — stopped guest cleanup
+        // permanently, growing the users table without bound (#155, M3).
+        var removed = 0
+        for start in stride(from: 0, to: candidateIDs.count, by: batchSize) {
+            let batch = Array(candidateIDs[start ..< min(start + batchSize, candidateIDs.count)])
+
+            // Still active: a refresh token issued within the retention period.
+            let activeIDs = Set(
+                try await RefreshToken.query(on: db)
+                    .filter(\.$user.$id ~~ batch)
+                    .filter(\.$expiresAt > activeThreshold)
+                    .all()
+                    .map { $0.$user.id }
+            )
+
+            // Has a game history worth keeping (either color; game_records has
+            // no FK to users, so this is the join).
+            let playerIDs = Set(
+                try await GameRecord.query(on: db)
+                    .group(.or) { or in
+                        or.filter(\.$whiteID ~~ batch)
+                        or.filter(\.$blackID ~~ batch)
+                    }
+                    .all()
+                    .flatMap { [$0.whiteID, $0.blackID] }
+            )
+
+            let deletable = batch.filter { !activeIDs.contains($0) && !playerIDs.contains($0) }
+            guard !deletable.isEmpty else { continue }
+
+            // The FK cascade covers Postgres; delete tokens explicitly anyway so
+            // behavior doesn't depend on SQLite's foreign_keys pragma in dev/test.
             try await RefreshToken.query(on: db)
-                .filter(\.$user.$id ~~ candidateIDs)
-                .filter(\.$expiresAt > activeThreshold)
-                .all()
-                .map { $0.$user.id }
-        )
-
-        // Has a game history worth keeping (either color; game_records has no
-        // FK to users, so this is the join).
-        let playerIDs = Set(
-            try await GameRecord.query(on: db)
-                .group(.or) { or in
-                    or.filter(\.$whiteID ~~ candidateIDs)
-                    or.filter(\.$blackID ~~ candidateIDs)
-                }
-                .all()
-                .flatMap { [$0.whiteID, $0.blackID] }
-        )
-
-        let deletable = candidateIDs.filter { !activeIDs.contains($0) && !playerIDs.contains($0) }
-        guard !deletable.isEmpty else { return 0 }
-
-        // The FK cascade covers Postgres; delete tokens explicitly anyway so
-        // behavior doesn't depend on SQLite's foreign_keys pragma in dev/test.
-        try await RefreshToken.query(on: db)
-            .filter(\.$user.$id ~~ deletable)
-            .delete()
-        try await User.query(on: db)
-            .filter(\.$id ~~ deletable)
-            .delete()
-        return deletable.count
+                .filter(\.$user.$id ~~ deletable)
+                .delete()
+            // Re-assert appleUserID == null in the delete: if an account linked
+            // Apple between the candidate read above and here it is now
+            // recoverable and must not be reaped (#155, L1 TOCTOU).
+            try await User.query(on: db)
+                .filter(\.$id ~~ deletable)
+                .filter(\.$appleUserID == .null)
+                .delete()
+            removed += deletable.count
+        }
+        return removed
     }
 }
 
