@@ -122,7 +122,7 @@ public struct GameReview: Sendable {
                 san: entry.san,
                 uci: entry.move.uci,
                 mover: mover,
-                evalAfter: actualEval,
+                evalAfter: assessments[i + 1].score,
                 centipawnLoss: cappedLoss,
                 judgment: Judgment(centipawnLoss: cappedLoss),
                 bestSAN: bestSAN
