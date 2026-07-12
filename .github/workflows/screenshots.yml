@@ -6,6 +6,9 @@ name: Screenshots
 # and (by default) commits them to docs/screenshots/ on the branch it was
 # dispatched from — which lets sessions without a Mac produce and consume
 # real device screenshots entirely through CI. Never runs automatically.
+# `main` is branch-protected, so a dispatch from main can't push directly;
+# it opens a PR with the refreshed captures instead (see the two mutually
+# exclusive commit steps below).
 on:
   workflow_dispatch:
     inputs:
@@ -16,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   capture:
@@ -133,6 +137,33 @@ jobs:
           git commit -m "Screenshots: refresh simulator captures (screenshots.yml)"
           echo "Committing screenshots to branch: ${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Open a PR with refreshed screenshots (main is protected)
+        # main rejects direct pushes (branch protection), so the invoking
+        # branch being main means the only way to actually land captures is
+        # a PR: push to a side branch and open it against main.
+        if: ${{ inputs.commit && github.ref_name == 'main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p docs/screenshots
+          cp shots/*.png docs/screenshots/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          if git diff --cached --quiet; then
+            echo "captures identical to what's committed; nothing to do"
+            exit 0
+          fi
+          BRANCH="ci/screenshots-refresh-${{ github.run_id }}"
+          git checkout -b "$BRANCH"
+          git commit -m "Screenshots: refresh simulator captures (screenshots.yml)"
+          git push origin "HEAD:$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Screenshots: refresh simulator captures" \
+            --body "Automated refresh of \`docs/screenshots/\` from a Screenshots workflow dispatch on \`main\` (run ${{ github.run_id }}). \`main\` is branch-protected, so this lands as a PR instead of a direct push."
 
       - name: Upload result bundle on failure
         if: failure()
