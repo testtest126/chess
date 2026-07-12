@@ -131,6 +131,18 @@ final class MatchFlowTests: XCTestCase {
             XCTAssertEqual(echoedW, uci)
             XCTAssertEqual(echoedB, uci)
             XCTAssertNotNil(clockW, "moves should carry clock state")
+            if uci == "f2f3" {
+                // Regression for #142: the illegal move rejected above must not
+                // have charged an increment or reset White's timer, so after
+                // White's first legal move the clock carries exactly one
+                // increment, not two.
+                let liveWhite = try XCTUnwrap(clockW).whiteSeconds
+                XCTAssertLessThanOrEqual(
+                    liveWhite,
+                    ClockConfig.standard.initialSeconds + ClockConfig.standard.incrementSeconds + 1,
+                    "an illegal move must not farm the clock increment (#142)"
+                )
+            }
         }
 
         guard case .gameOver(let overW) = try await match.white.next(),

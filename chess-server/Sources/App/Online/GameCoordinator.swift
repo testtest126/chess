@@ -131,20 +131,28 @@ actor GameCoordinator {
                 + Double(elapsed.components.attoseconds) / 1e18
         }
 
-        /// Deducts the mover's elapsed time. Returns false if the flag fell.
-        func chargeMover(increment: Double) -> Bool {
+        /// Remaining time for the side to move, net of the in-progress turn.
+        /// A value <= 0 means the mover's flag has fallen. Read-only, so a
+        /// late move can be rejected without mutating the clock — an illegal
+        /// move then cannot farm the increment or reset the timer (#142).
+        func moverRemaining() -> Double {
+            let stored = game.sideToMove == .white ? whiteSeconds : blackSeconds
+            return stored - secondsSinceTurnStart()
+        }
+
+        /// Commits a validated turn to `side`'s clock: charge the elapsed
+        /// think time, add the increment, and start the opponent's turn.
+        /// Called only after the move is known legal, so an illegal move never
+        /// touches the clock. `side` is explicit because `game.sideToMove` has
+        /// already flipped by the time this runs.
+        func commitMove(by side: PieceColor, increment: Double) {
             let elapsed = secondsSinceTurnStart()
-            if game.sideToMove == .white {
-                whiteSeconds -= elapsed
-                if whiteSeconds <= 0 { whiteSeconds = 0; return false }
-                whiteSeconds += increment
+            if side == .white {
+                whiteSeconds = max(0, whiteSeconds - elapsed) + increment
             } else {
-                blackSeconds -= elapsed
-                if blackSeconds <= 0 { blackSeconds = 0; return false }
-                blackSeconds += increment
+                blackSeconds = max(0, blackSeconds - elapsed) + increment
             }
             turnStartedAt = .now
-            return true
         }
     }
 
@@ -518,9 +526,13 @@ actor GameCoordinator {
             return
         }
 
-        // Charge thinking time before validating: a move that arrives after
-        // the flag fell loses on time even if the timeout task hasn't fired.
-        guard game.chargeMover(increment: game.clock.incrementSeconds) else {
+        // Flag check first, read-only: a move that arrives after the mover's
+        // flag fell still loses on time even if the timeout task hasn't fired.
+        // Doing this without mutating the clock means a move that turns out
+        // illegal cannot farm the increment or reset the think-timer (#142) —
+        // only the validated move below commits the clock.
+        guard game.moverRemaining() > 0 else {
+            if color == .white { game.whiteSeconds = 0 } else { game.blackSeconds = 0 }
             await flagFell(game)
             return
         }
@@ -531,6 +543,10 @@ actor GameCoordinator {
             send(.errorMessage("illegal move"), to: socket)
             return
         }
+
+        // Legal move committed (sideToMove has flipped): charge the mover's
+        // think time, add the increment, and pass the turn.
+        game.commitMove(by: color, increment: game.clock.incrementSeconds)
 
         // Any move sweeps a pending draw offer off the table.
         game.drawOfferedBy = nil
