@@ -21,8 +21,19 @@ enum GuestAccountCleanup {
     static let batchSize = 1000
 
     /// Runs one cleanup pass and returns how many accounts were deleted.
+    ///
+    /// `afterCandidateSnapshot` is a test seam: it runs once, inside the
+    /// TOCTOU window between reading the candidate set and reaping it, so a
+    /// test can commit an Apple link mid-pass and prove the DELETE's
+    /// `appleUserID == null` re-assertion spares it (#155, L1). No-op by
+    /// default.
     @discardableResult
-    static func run(on db: Database, now: Date = Date(), batchSize: Int = GuestAccountCleanup.batchSize) async throws -> Int {
+    static func run(
+        on db: Database,
+        now: Date = Date(),
+        batchSize: Int = GuestAccountCleanup.batchSize,
+        afterCandidateSnapshot: () async throws -> Void = {}
+    ) async throws -> Int {
         let cutoff = now.addingTimeInterval(-retention)
         // Tokens live `RefreshToken.lifetime` from issue, so "issued after the
         // cutoff" is "expires after cutoff + lifetime".
@@ -35,6 +46,7 @@ enum GuestAccountCleanup {
             .all()
         let candidateIDs = try candidates.map { try $0.requireID() }
         guard !candidateIDs.isEmpty else { return 0 }
+        try await afterCandidateSnapshot()
 
         // Process candidates in batches so no single IN (…) query exceeds the
         // driver's bind-parameter ceiling (SQLite ~32k, Postgres ~65k). Past
@@ -81,7 +93,12 @@ enum GuestAccountCleanup {
                 .filter(\.$id ~~ deletable)
                 .filter(\.$appleUserID == .null)
                 .delete()
-            removed += deletable.count
+            // Count rows actually reaped, not rows we intended to reap: a guest
+            // spared by the re-assert above must not inflate the total (the doc
+            // contract is "how many accounts were deleted", and the scheduler
+            // logs it).
+            let spared = try await User.query(on: db).filter(\.$id ~~ deletable).count()
+            removed += deletable.count - spared
         }
         return removed
     }

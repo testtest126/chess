@@ -237,4 +237,33 @@ final class AuthAbuseTests: XCTestCase {
         let remaining = try await User.query(on: app.db).count()
         XCTAssertEqual(remaining, 0, "no abandoned guest left behind")
     }
+
+    func testCleanupSparesGuestLinkedMidPass() async throws {
+        // Regression for #155 (L1 TOCTOU): a guest can link an Apple ID *after*
+        // it is read as a candidate but *before* the DELETE runs. The DELETE
+        // re-asserts `appleUserID == null`, so the now-recoverable account must
+        // survive. The seam commits the link inside that exact window; two
+        // controls confirm the pass still reaps ordinary abandoned guests, and
+        // the returned count reflects only what was actually deleted.
+        let linker = try await seedUser(daysAgo: 60)
+        let controlA = try await seedUser(daysAgo: 60)
+        let controlB = try await seedUser(daysAgo: 60)
+
+        let removed = try await GuestAccountCleanup.run(on: app.db) {
+            // Runs in the candidate-read → delete window: link `linker` to Apple.
+            linker.appleUserID = "apple-subject-midpass"
+            try await linker.save(on: app.db)
+        }
+
+        // The mid-pass link spares `linker`…
+        let survivor = try await User.find(linker.requireID(), on: app.db)
+        XCTAssertNotNil(survivor, "an account linked mid-pass must not be reaped")
+        XCTAssertEqual(survivor?.appleUserID, "apple-subject-midpass")
+        // …while the untouched controls are reaped.
+        let survivingControlA = try await User.find(controlA.requireID(), on: app.db)
+        let survivingControlB = try await User.find(controlB.requireID(), on: app.db)
+        XCTAssertNil(survivingControlA, "an ordinary abandoned guest is still reaped")
+        XCTAssertNil(survivingControlB, "an ordinary abandoned guest is still reaped")
+        XCTAssertEqual(removed, 2, "the spared account must not be counted as deleted")
+    }
 }
