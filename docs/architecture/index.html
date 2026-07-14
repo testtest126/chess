@@ -21,6 +21,28 @@
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --serif:"Iowan Old Style",Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+
+  /* theme engine: cultural worlds override these below --serif -- component rules that want a
+     themed headline font read --display; everything hardcoded here is what the untouched
+     default already looked like, so the default view does not move a pixel. */
+  --display: var(--serif);
+  --buff-ink: #173D2E;
+  --hero-grad: linear-gradient(168deg,#1B4736 0%,#143527 58%,#102B20 100%);
+  --hero-pattern: #E7D3A4;
+  --hero-ink: #EFE9D6;
+  --hero-eyebrow: #CBB98A;
+  --hero-em: #E7D3A4;
+  --hero-lede: #D8DCC9;
+  --hero-stat-b: #F2ECD9;
+  --hero-stat-span: #A9BCA6;
+  --wire-line: #4E7A63;
+  --wire-end-bg: #123023;
+  --code-bg: #143527;
+  --code-ink: #D9E6D6;
+  --code-key: #9CC9AC;
+  --code-str: #E7D3A4;
+  --code-num: #E0A46B;
+  --orn-opacity: .15;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -48,6 +70,114 @@
   --sq-light:#CBB584; --sq-dark:#42664F;
   --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
 }
+
+/* ==== the cultural worlds : opt-in via data-theme, same 7 keys as docs/the-fleet/ ====
+   this page's own variable names (--bg/--surface/--accent/... instead of --ground/--gold/...);
+   --j-* (move-quality scale) split into a dark-surface set and a light-surface set only, since
+   they are a functional green->red signal, not decoration -- everything else reskins per world. */
+:root[data-theme="arabic"]{
+  --bg:#0d1233; --surface:#131a45; --surface-2:#182050;
+  --ink:#ece7d6; --ink-soft:#b9b8cb; --line:rgba(212,175,55,.22); --line-soft:rgba(212,175,55,.12);
+  --accent:#d4af37; --accent-ink:#1c1233;
+  --buff:#d4af37; --buff-soft:#3a3560; --buff-ink:#1c1233;
+  --sq-light:#e3d9b8; --sq-dark:#33408f;
+  --green-deep:#a8862a;
+  --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
+  --display: "Futura","Century Gothic","Avenir Next","Segoe UI",sans-serif;
+  --hero-grad: linear-gradient(168deg,#182050 0%,#131a45 58%,#0d1233 100%);
+  --hero-pattern: #d4af37;
+  --hero-ink:#ece7d6; --hero-eyebrow:#d4af37; --hero-em:#e6c454; --hero-lede:#cdd0ea;
+  --hero-stat-b:#f3eedd; --hero-stat-span:#b9b8cb;
+  --wire-line: rgba(212,175,55,.5); --wire-end-bg:#182050;
+  --code-bg:#0a0e26; --code-ink:#cdd0ea; --code-key:#d4af37; --code-str:#8fd0e0; --code-num:#e6c454;
+  --orn-opacity: .16;
+}
+:root[data-theme="japanese"]{
+  --bg:#f4efe4; --surface:#efe8d8; --surface-2:#e9e0cc;
+  --ink:#2a2a28; --ink-soft:#5c5a52; --line:rgba(42,42,40,.14); --line-soft:rgba(42,42,40,.07);
+  --accent:#c94a35; --accent-ink:#f4efe4;
+  --buff:#9c8355; --buff-soft:#e9e0cc; --buff-ink:#2a2a28;
+  --sq-light:#efe6d0; --sq-dark:#83786a;
+  --green-deep:#5c5a52;
+  --j-best:#1E7A46; --j-good:#71992F; --j-inac:#C2951C; --j-mist:#CF7118; --j-blun:#BB3A2C;
+  --display: "Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP","Songti SC",Georgia,"Times New Roman",serif;
+  --hero-grad: linear-gradient(168deg,#efe8d8 0%,#f4efe4 58%,#e9e0cc 100%);
+  --hero-pattern: #2a2a28;
+  --hero-ink:#2a2a28; --hero-eyebrow:#9c8355; --hero-em:#c94a35; --hero-lede:#5c5a52;
+  --hero-stat-b:#2a2a28; --hero-stat-span:#8b887c;
+  --wire-line: rgba(42,42,40,.35); --wire-end-bg:#efe8d8;
+  --code-bg:#2a2a28; --code-ink:#f4efe4; --code-key:#c9a86a; --code-str:#c94a35; --code-num:#8b9c8f;
+  --orn-opacity: .05;
+}
+:root[data-theme="indian"]{
+  --bg:#2a0f14; --surface:#37151b; --surface-2:#421a21;
+  --ink:#f7ead0; --ink-soft:#d2b48c; --line:rgba(232,160,32,.20); --line-soft:rgba(232,160,32,.1);
+  --accent:#e8a020; --accent-ink:#2a0f14;
+  --buff:#e8a020; --buff-soft:#421a21; --buff-ink:#2a0f14;
+  --sq-light:#f0dcae; --sq-dark:#7a2f3a;
+  --green-deep:#c07f14;
+  --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
+  --display: "Didot","Bodoni MT","Playfair Display",Georgia,"Times New Roman",serif;
+  --hero-grad: linear-gradient(168deg,#421a21 0%,#37151b 58%,#2a0f14 100%);
+  --hero-pattern: #e8a020;
+  --hero-ink:#f7ead0; --hero-eyebrow:#e8a020; --hero-em:#f0b840; --hero-lede:#d2b48c;
+  --hero-stat-b:#f7ead0; --hero-stat-span:#d2b48c;
+  --wire-line: rgba(232,160,32,.5); --wire-end-bg:#421a21;
+  --code-bg:#210a0d; --code-ink:#f7ead0; --code-key:#e8a020; --code-str:#2bb3ad; --code-num:#f0b840;
+  --orn-opacity: .17;
+}
+:root[data-theme="codex"]{
+  --bg:#ece0c0; --surface:#e4d5ad; --surface-2:#dccb9c;
+  --ink:#2b2013; --ink-soft:#5a4a30; --line:rgba(43,32,19,.18); --line-soft:rgba(43,32,19,.09);
+  --accent:#a3241c; --accent-ink:#ece0c0;
+  --buff:#af8a2e; --buff-soft:#dccb9c; --buff-ink:#2b2013;
+  --sq-light:#ece0c0; --sq-dark:#8a6a1e;
+  --green-deep:#5a4a30;
+  --j-best:#1E7A46; --j-good:#71992F; --j-inac:#C2951C; --j-mist:#CF7118; --j-blun:#BB3A2C;
+  --display: "Old English Text MT","Cloister Black","Blackmoor LET","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --hero-grad: linear-gradient(168deg,#e4d5ad 0%,#ece0c0 58%,#dccb9c 100%);
+  --hero-pattern: #2b2013;
+  --hero-ink:#2b2013; --hero-eyebrow:#8a6a1e; --hero-em:#a3241c; --hero-lede:#5a4a30;
+  --hero-stat-b:#2b2013; --hero-stat-span:#8a7852;
+  --wire-line: rgba(43,32,19,.3); --wire-end-bg:#e4d5ad;
+  --code-bg:#2b2013; --code-ink:#ece0c0; --code-key:#af8a2e; --code-str:#a3241c; --code-num:#3f7a6e;
+  --orn-opacity: .12;
+}
+:root[data-theme="andalus"]{
+  --bg:#062a28; --surface:#0a3532; --surface-2:#0e403c;
+  --ink:#f0e6d2; --ink-soft:#c2b294; --line:rgba(201,150,60,.18); --line-soft:rgba(201,150,60,.09);
+  --accent:#c9963c; --accent-ink:#062a28;
+  --buff:#c9963c; --buff-soft:#0e403c; --buff-ink:#062a28;
+  --sq-light:#e6d7ad; --sq-dark:#1f6b62;
+  --green-deep:#a2761f;
+  --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
+  --display: "Avenir Next","Century Gothic","Futura",sans-serif;
+  --hero-grad: linear-gradient(168deg,#0e403c 0%,#0a3532 58%,#062a28 100%);
+  --hero-pattern: #c9963c;
+  --hero-ink:#f0e6d2; --hero-eyebrow:#c9963c; --hero-em:#dcb15a; --hero-lede:#c2b294;
+  --hero-stat-b:#f0e6d2; --hero-stat-span:#c2b294;
+  --wire-line: rgba(201,150,60,.5); --wire-end-bg:#0e403c;
+  --code-bg:#04201e; --code-ink:#cdeae4; --code-key:#c9963c; --code-str:#2fb3a6; --code-num:#e0ba6a;
+  --orn-opacity: .17;
+}
+:root[data-theme="terminal"]{
+  --bg:#080b0a; --surface:#0d120f; --surface-2:#111814;
+  --ink:#c9d6c9; --ink-soft:#7f9a83; --line:rgba(80,220,120,.18); --line-soft:rgba(80,220,120,.08);
+  --accent:#48d06a; --accent-ink:#080b0a;
+  --buff:#48d06a; --buff-soft:#111814; --buff-ink:#080b0a;
+  --sq-light:#2e5c39; --sq-dark:#0c1c11;
+  --green-deep:#33a552;
+  --j-best:#4CAF78; --j-good:#9BC161; --j-inac:#D9B44A; --j-mist:#E0924A; --j-blun:#D96A5C;
+  --display: var(--mono);
+  --hero-grad: linear-gradient(168deg,#111814 0%,#0d120f 58%,#080b0a 100%);
+  --hero-pattern: #48d06a;
+  --hero-ink:#c9d6c9; --hero-eyebrow:#48d06a; --hero-em:#6ee08a; --hero-lede:#7f9a83;
+  --hero-stat-b:#c9d6c9; --hero-stat-span:#7f9a83;
+  --wire-line: rgba(72,208,106,.5); --wire-end-bg:#111814;
+  --code-bg:#050807; --code-ink:#c9d6c9; --code-key:#48d06a; --code-str:#59d0c0; --code-num:#8fe0a0;
+  --orn-opacity: .1;
+}
+
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
@@ -72,24 +202,24 @@ nav a.sec{font-family:var(--sans);font-size:12.5px;letter-spacing:.04em;text-dec
 nav a.sec:hover{color:var(--accent)}
 
 /* ---------- hero (deliberately green in both themes) ---------- */
-header.hero{background:linear-gradient(168deg,#1B4736 0%,#143527 58%,#102B20 100%);color:#EFE9D6;position:relative;overflow:hidden}
+header.hero{background:var(--hero-grad);color:var(--hero-ink);position:relative;overflow:hidden}
 header.hero::before{content:"";position:absolute;inset:0;opacity:.10;pointer-events:none;
   background:
-    repeating-linear-gradient(0deg, transparent 0 72px, #E7D3A4 72px 73px),
-    repeating-linear-gradient(90deg, transparent 0 72px, #E7D3A4 72px 73px)}
+    repeating-linear-gradient(0deg, transparent 0 72px, var(--hero-pattern) 72px 73px),
+    repeating-linear-gradient(90deg, transparent 0 72px, var(--hero-pattern) 72px 73px)}
 .hero .wrap{position:relative;padding-top:84px;padding-bottom:64px}
-.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#CBB98A}
-.hero h1{font-size:clamp(38px,6vw,60px);line-height:1.08;font-weight:700;margin:14px 0 0;max-width:14em}
-.hero h1 em{font-style:italic;color:#E7D3A4}
-.hero p.lede{font-size:clamp(17px,2.2vw,20px);max-width:34em;color:#D8DCC9;margin:20px 0 0}
+.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--hero-eyebrow)}
+.hero h1{font-family:var(--display);font-size:clamp(38px,6vw,60px);line-height:1.08;font-weight:700;margin:14px 0 0;max-width:14em}
+.hero h1 em{font-style:italic;color:var(--hero-em)}
+.hero p.lede{font-size:clamp(17px,2.2vw,20px);max-width:34em;color:var(--hero-lede);margin:20px 0 0}
 .wireline{margin:44px 0 8px;position:relative;height:56px;max-width:640px}
-.wireline .rail{position:absolute;left:34px;right:34px;top:27px;border-top:2px dotted #4E7A63}
-.wireline .end{position:absolute;top:0;width:56px;height:56px;border:1.5px solid #4E7A63;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;font-size:26px;background:#123023}
+.wireline .rail{position:absolute;left:34px;right:34px;top:27px;border-top:2px dotted var(--wire-line)}
+.wireline .end{position:absolute;top:0;width:56px;height:56px;border:1.5px solid var(--wire-line);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--wire-end-bg)}
 .wireline .end.a{left:0}
 .wireline .end.b{right:0}
 .wireline .packet{position:absolute;top:15px;left:56px;font-family:var(--mono);font-size:11.5px;
-  background:#E7D3A4;color:#173D2E;padding:3px 9px;border-radius:99px;white-space:nowrap;
+  background:var(--buff);color:var(--buff-ink);padding:3px 9px;border-radius:99px;white-space:nowrap;
   animation:travel 5.5s ease-in-out infinite}
 @keyframes travel{
   0%,8%{left:9%;opacity:0}
@@ -99,13 +229,13 @@ header.hero::before{content:"";position:absolute;inset:0;opacity:.10;pointer-eve
   64%,100%{left:calc(88% - 215px);opacity:0}
 }
 .hero .stats{display:flex;flex-wrap:wrap;gap:12px 36px;margin-top:40px;font-family:var(--sans)}
-.hero .stat b{display:block;font-size:21px;font-weight:650;color:#F2ECD9;font-variant-numeric:tabular-nums}
-.hero .stat span{font-size:12.5px;color:#A9BCA6;letter-spacing:.03em}
+.hero .stat b{display:block;font-size:21px;font-weight:650;color:var(--hero-stat-b);font-variant-numeric:tabular-nums}
+.hero .stat span{font-size:12.5px;color:var(--hero-stat-span);letter-spacing:.03em}
 
 /* ---------- sections ---------- */
 section{padding:72px 0 12px}
 .sec-eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:600}
-section h2{font-size:clamp(27px,3.6vw,36px);margin-top:10px;font-weight:700}
+section h2{font-family:var(--display);font-size:clamp(27px,3.6vw,36px);margin-top:10px;font-weight:700}
 section p.intro{max-width:38em;color:var(--ink-soft);font-size:17.5px;margin:14px 0 34px}
 .rule{border:0;border-top:1px solid var(--line);margin:64px 0 0}
 
@@ -153,7 +283,7 @@ section p.intro{max-width:38em;color:var(--ink-soft);font-size:17.5px;margin:14p
 .track{position:relative;height:40px;margin:0 6px 14px}
 .track .rail{position:absolute;left:8%;right:8%;top:19px;border-top:2px dotted var(--line)}
 .chip{position:absolute;top:6px;left:0;transform:translateX(-50%);font-family:var(--mono);font-size:11px;
-  background:var(--buff);color:#173D2E;padding:4px 10px;border-radius:99px;white-space:nowrap;
+  background:var(--buff);color:var(--buff-ink);padding:4px 10px;border-radius:99px;white-space:nowrap;
   transition:left .7s cubic-bezier(.4,0,.2,1),opacity .4s;box-shadow:0 1px 4px rgba(0,0,0,.18)}
 :root[data-theme="dark"] .chip{color:#141B12}
 .chip.err{background:var(--j-blun);color:#fff}
@@ -189,9 +319,9 @@ section p.intro{max-width:38em;color:var(--ink-soft);font-size:17.5px;margin:14p
 .stepdesc p{margin:8px 0 0;max-width:46em;font-size:16px}
 .stepdesc p code, .inspector p code, .exp p code{font-family:var(--mono);font-size:.85em;background:var(--surface-2);
   border:1px solid var(--line-soft);border-radius:4px;padding:0 4px}
-.json{font-family:var(--mono);font-size:13px;background:#143527;color:#D9E6D6;border-radius:8px;
+.json{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);border-radius:8px;
   padding:12px 16px;margin-top:14px;overflow-x:auto;white-space:pre}
-.json .k{color:#9CC9AC}.json .s{color:#E7D3A4}.json .n{color:#E0A46B}
+.json .k{color:var(--code-key)}.json .s{color:var(--code-str)}.json .n{color:var(--code-num)}
 .json.err .s{color:#F0A99E}
 
 /* ---------- protocol ---------- */
@@ -266,7 +396,116 @@ footer .prov{font-size:12.5px;color:var(--ink-soft);margin-top:22px}
   .msg .type{min-width:0}
   .msg > button{flex-wrap:wrap;gap:4px 14px}
 }
+
+/* ---------- theme engine : ornament layer + switcher, same 7 keys as docs/the-fleet/ ---------- */
+.ornament{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;display:none}
+:root[data-theme="arabic"] .ornament,
+:root[data-theme="japanese"] .ornament,
+:root[data-theme="indian"] .ornament,
+:root[data-theme="codex"] .ornament,
+:root[data-theme="andalus"] .ornament,
+:root[data-theme="terminal"] .ornament{display:block}
+.orn-rect{fill:none}
+:root[data-theme="arabic"]   .orn-rect{fill:url(#hex6)}
+:root[data-theme="japanese"] .orn-rect{fill:url(#ensoFaint)}
+:root[data-theme="indian"]   .orn-rect{fill:url(#jaali)}
+:root[data-theme="codex"]    .orn-rect{fill:url(#vine)}
+:root[data-theme="andalus"]  .orn-rect{fill:url(#star8)}
+:root[data-theme="terminal"] .orn-rect{fill:url(#scan)}
+.orn-g{stroke:var(--accent);stroke-opacity:var(--orn-opacity);stroke-width:1;fill:none}
+.orn-scan-a{fill:var(--accent);fill-opacity:calc(var(--orn-opacity) * .5)}
+.orn-scan-b{fill:var(--accent);fill-opacity:var(--orn-opacity)}
+
+/* switcher lives inline in the sticky nav, not fixed -- the nav already claims that strip */
+.theme-switcher{position:relative;margin-left:auto;flex:none}
+.theme-switcher .toggle{font-family:var(--sans);font-size:12px;letter-spacing:.02em;color:var(--ink-soft);
+  background:transparent;border:1px solid var(--line);border-radius:99px;padding:5px 13px;cursor:pointer;
+  white-space:nowrap;display:block}
+.theme-switcher .toggle:hover{color:var(--accent);border-color:var(--accent)}
+.theme-switcher .toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.theme-menu{list-style:none;margin:0;position:absolute;top:calc(100% + .5rem);right:0;min-width:11.5rem;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.35rem;
+  display:flex;flex-direction:column;gap:.1rem;box-shadow:0 12px 30px rgba(0,0,0,.18);z-index:41}
+.theme-menu[hidden]{display:none}
+.theme-opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:.5rem;
+  font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);padding:.45rem .6rem;border-radius:7px;width:100%}
+.theme-opt .glyph{width:1.1em;text-align:center;flex:none}
+.theme-opt:hover,.theme-opt:focus-visible{background:color-mix(in srgb, var(--accent) 12%, transparent);color:var(--ink);outline:none}
+.theme-opt[aria-checked="true"]{color:var(--accent);font-weight:600}
+
+.era-toast{position:fixed;top:3.4rem;right:24px;z-index:41;font-family:var(--sans);font-size:11px;
+  letter-spacing:.03em;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);
+  border-radius:99px;padding:.35rem .8rem;opacity:0;transform:translateY(-4px);pointer-events:none;
+  transition:opacity .4s ease,transform .4s ease;box-shadow:0 6px 18px rgba(0,0,0,.15)}
+.era-toast.show{opacity:1;transform:translateY(0)}
+
+@media (prefers-reduced-motion:no-preference){
+  .skin-anim body,.skin-anim body *:not(.era-toast){
+    transition:background-color .4s ease,color .4s ease,border-color .4s ease,fill .4s ease}
+}
 </style>
+
+<svg class="ornament" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- andalus : azulejo / Alhambra 8-point star lattice -->
+    <pattern id="star8" width="72" height="72" patternUnits="userSpaceOnUse">
+      <g class="orn-g">
+        <rect x="14" y="14" width="44" height="44"/>
+        <rect x="14" y="14" width="44" height="44" transform="rotate(45 36 36)"/>
+        <rect x="27" y="27" width="18" height="18" transform="rotate(45 36 36)"/>
+        <rect x="-22" y="-22" width="44" height="44" transform="rotate(45 0 0)"/>
+        <rect x="50" y="-22" width="44" height="44" transform="rotate(45 72 0)"/>
+        <rect x="-22" y="50" width="44" height="44" transform="rotate(45 0 72)"/>
+        <rect x="50" y="50" width="44" height="44" transform="rotate(45 72 72)"/>
+      </g>
+    </pattern>
+    <!-- indian : jaali lattice screen -->
+    <pattern id="jaali" width="64" height="64" patternUnits="userSpaceOnUse">
+      <g class="orn-g">
+        <circle cx="0" cy="0" r="32"/>
+        <circle cx="64" cy="0" r="32"/>
+        <circle cx="0" cy="64" r="32"/>
+        <circle cx="64" cy="64" r="32"/>
+        <circle cx="32" cy="32" r="32"/>
+        <circle cx="32" cy="32" r="9"/>
+      </g>
+    </pattern>
+    <!-- arabic : six-fold interlace rosette -->
+    <pattern id="hex6" width="66" height="66" patternUnits="userSpaceOnUse">
+      <g class="orn-g" transform="translate(33 33)">
+        <circle r="11"/>
+        <circle cx="19" cy="0" r="11"/>
+        <circle cx="9.5" cy="16.45" r="11"/>
+        <circle cx="-9.5" cy="16.45" r="11"/>
+        <circle cx="-19" cy="0" r="11"/>
+        <circle cx="-9.5" cy="-16.45" r="11"/>
+        <circle cx="9.5" cy="-16.45" r="11"/>
+      </g>
+    </pattern>
+    <!-- terminal : CRT scanlines -->
+    <pattern id="scan" width="5" height="5" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="5" height="1" class="orn-scan-a"/>
+      <rect x="0" y="0" width="1" height="1" class="orn-scan-b"/>
+    </pattern>
+    <!-- japanese : ensō, wide-spaced and incomplete -- ma, the negative space, is the point -->
+    <pattern id="ensoFaint" width="150" height="150" patternUnits="userSpaceOnUse">
+      <g class="orn-g" stroke-linecap="round">
+        <circle cx="75" cy="75" r="30" stroke-dasharray="148 40" stroke-dashoffset="14"/>
+      </g>
+    </pattern>
+    <!-- codex : illuminated marginalia, a vine with leaf ticks -->
+    <pattern id="vine" width="130" height="130" patternUnits="userSpaceOnUse">
+      <g class="orn-g" stroke-linecap="round">
+        <path d="M0 68 C 22 24, 43 112, 65 68 C 87 24, 108 112, 130 68"/>
+        <circle cx="22" cy="34" r="2.6"/>
+        <circle cx="65" cy="68" r="2.6"/>
+        <circle cx="108" cy="34" r="2.6"/>
+      </g>
+    </pattern>
+  </defs>
+  <rect class="orn-rect" width="100%" height="100%"/>
+</svg>
+<div class="era-toast" id="eraToast" aria-live="polite"></div>
 
 <nav aria-label="Sections">
   <div class="wrap">
@@ -276,6 +515,18 @@ footer .prov{font-size:12.5px;color:var(--ink-soft);margin-top:22px}
     <a class="sec" href="#wire">The wire</a>
     <a class="sec" href="#engine">The engine</a>
     <a class="sec" href="#decisions">Decisions</a>
+    <div class="theme-switcher">
+      <button class="toggle" id="themeBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="themeMenu">&#10022; Default</button>
+      <ul class="theme-menu" id="themeMenu" role="menu" aria-label="Visual theme" hidden>
+        <li role="none"><button role="menuitemradio" aria-checked="true"  class="theme-opt" data-theme=""><span class="glyph">&#10022;</span>Default</button></li>
+        <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="arabic"><span class="glyph">&#10038;</span>Arabic</button></li>
+        <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="japanese"><span class="glyph">&#9711;</span>Japanese</button></li>
+        <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="indian"><span class="glyph">&#10048;</span>Indian</button></li>
+        <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="codex"><span class="glyph">&#10086;</span>Codex</button></li>
+        <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="andalus"><span class="glyph">&#10036;</span>El-Andalus</button></li>
+        <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="terminal"><span class="glyph">&#10095;</span>Terminal</button></li>
+      </ul>
+    </div>
   </div>
 </nav>
 
@@ -828,6 +1079,115 @@ function updateJudge(){
 cpl.addEventListener("input",updateJudge); updateJudge();
 </script>
 
+<script>
+/* ================= theme switcher =================
+   Same 7 keys, same #theme=<id> hash, same localStorage["mm-theme"] key as docs/the-fleet/ and
+   docs/the-fleet/night-two/ -- a choice made on any page carries to the others. No canvas here
+   (this page's diagrams are DOM, not a hero board), so this is just the switcher mechanics. */
+(function () {
+  "use strict";
+
+  var root = document.documentElement;
+  var themeBtn = document.getElementById("themeBtn");
+  var themeMenu = document.getElementById("themeMenu");
+  var themeOpts = Array.prototype.slice.call(themeMenu.querySelectorAll(".theme-opt"));
+  var eraToast = document.getElementById("eraToast");
+
+  var LABEL = {
+    "": "✦ Default", arabic: "✶ Arabic", japanese: "◯ Japanese",
+    indian: "❀ Indian", codex: "❦ Codex", andalus: "✴ El-Andalus", terminal: "❯ Terminal"
+  };
+  var BLURB = {
+    "":       "Default · the untouched view",
+    arabic:   "Arabic · kufic geometry, indigo + gold",
+    japanese: "Japanese · sumi-e minimalism, washi + vermillion",
+    indian:   "Indian · ornamental jewel tones",
+    codex:    "Codex · illuminated manuscript",
+    andalus:  "El-Andalus · azulejo + horseshoe geometry",
+    terminal: "Terminal · CRT phosphor"
+  };
+  var order = ["", "arabic", "japanese", "indian", "codex", "andalus", "terminal"];
+  var skinIdx = 0;
+
+  var toastTimer;
+  function showEra(id) {
+    if (!eraToast) return;
+    eraToast.textContent = BLURB[id];
+    eraToast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { eraToast.classList.remove("show"); }, 2600);
+  }
+  function closeMenu(refocusBtn) {
+    themeMenu.hidden = true;
+    themeBtn.setAttribute("aria-expanded", "false");
+    if (refocusBtn) themeBtn.focus();
+  }
+  function openMenu() {
+    themeMenu.hidden = false;
+    themeBtn.setAttribute("aria-expanded", "true");
+    (themeOpts[skinIdx] || themeOpts[0]).focus();
+  }
+  function applyTheme(id, announce) {
+    skinIdx = order.indexOf(id);
+    if (id === "") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", id);
+    themeBtn.textContent = LABEL[id];
+    themeOpts.forEach(function (opt) {
+      opt.setAttribute("aria-checked", opt.getAttribute("data-theme") === id ? "true" : "false");
+    });
+    try { localStorage.setItem("mm-theme", id); } catch (e) {}
+    if (announce) showEra(id);
+  }
+
+  themeBtn.addEventListener("click", function () {
+    if (themeMenu.hidden) openMenu(); else closeMenu(false);
+  });
+  themeBtn.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); openMenu(); }
+    else if (e.key === "Escape") { closeMenu(false); }
+  });
+  themeOpts.forEach(function (opt, i) {
+    opt.addEventListener("click", function () {
+      applyTheme(opt.getAttribute("data-theme"), true);
+      closeMenu(true);
+    });
+    opt.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); themeOpts[(i + 1) % themeOpts.length].focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); themeOpts[(i - 1 + themeOpts.length) % themeOpts.length].focus(); }
+      else if (e.key === "Home") { e.preventDefault(); themeOpts[0].focus(); }
+      else if (e.key === "End") { e.preventDefault(); themeOpts[themeOpts.length - 1].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); closeMenu(true); }
+    });
+  });
+  themeMenu.addEventListener("focusout", function (e) {
+    var next = e.relatedTarget;
+    if (!next || (!themeMenu.contains(next) && next !== themeBtn)) closeMenu(false);
+  });
+  document.addEventListener("click", function (e) {
+    if (!themeMenu.hidden && !themeMenu.contains(e.target) && e.target !== themeBtn) closeMenu(false);
+  });
+
+  // A #theme=<id> in the URL wins; otherwise restore the visitor's last choice (shared across
+  // all three docs pages via the same localStorage key); otherwise open on the untouched default.
+  function hashTheme() {
+    var m = /(?:^|[#&])theme=([a-z]*)/.exec(location.hash);
+    return m ? m[1] : null;
+  }
+  var fromHash = hashTheme();
+  var savedTheme = null;
+  if (fromHash === null) { try { savedTheme = localStorage.getItem("mm-theme"); } catch (e) {} }
+  var initialTheme = fromHash !== null && LABEL.hasOwnProperty(fromHash) ? fromHash : savedTheme;
+  if (initialTheme !== null && LABEL.hasOwnProperty(initialTheme)) {
+    applyTheme(initialTheme, false);
+  } else {
+    themeBtn.textContent = LABEL[""];
+  }
+
+  window.addEventListener("load", function () {
+    setTimeout(function () { root.classList.add("skin-anim"); }, 60);
+  });
+})();
+</script>
 
 </body>
 </html>
