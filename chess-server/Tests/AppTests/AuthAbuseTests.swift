@@ -111,6 +111,81 @@ final class AuthAbuseTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(row).count, 3, "counter saturates at limit + 1")
     }
 
+    func testLimiterFailsClosedWhenStoreIsUnavailable() async throws {
+        // A store that can't be queried must refuse to vouch for a verdict
+        // rather than silently admitting — the check throws instead of
+        // returning `.allowed`.
+        let limiter = SlidingWindowRateLimiter(limit: 5, window: 60)
+        let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+        try await sql.raw(#"DROP TABLE "auth_rate_windows""#).run()
+
+        do {
+            _ = try await limiter.check("ip", on: app.db, now: bucketStart)
+            XCTFail("a query against a missing table must throw, not admit")
+        } catch {
+            // Any thrown error is fail-closed; the specific type is the
+            // driver's own "no such table" / "relation does not exist".
+        }
+
+        // A shared, persistent database (unlike per-test in-memory SQLite)
+        // must not stay broken for whichever test runs next.
+        try await CreateAuthRateWindow().prepare(on: app.db)
+    }
+
+    func testMiddlewareFailsClosedWhenStoreIsUnavailable() async throws {
+        // The HTTP-facing half of the same guarantee: a broken store must
+        // turn into a non-2xx response before the route handler runs, not
+        // a quietly-admitted request.
+        app.authRateLimiter = SlidingWindowRateLimiter(limit: 5, window: 60)
+        let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+        try await sql.raw(#"DROP TABLE "auth_rate_windows""#).run()
+
+        let usersBefore = try await User.query(on: app.db).count()
+        try await app.test(.POST, "auth/register", beforeRequest: { req in
+            try req.content.encode(RegisterRequest(displayName: nil), as: .json)
+        }, afterResponse: { res async in
+            XCTAssertFalse((200...299).contains(Int(res.status.code)),
+                           "a limiter that can't count must not let the request through")
+        })
+        let usersAfter = try await User.query(on: app.db).count()
+        XCTAssertEqual(usersBefore, usersAfter, "no account is created when the store is down")
+
+        // A shared, persistent database (unlike per-test in-memory SQLite)
+        // must not stay broken for whichever test runs next.
+        try await CreateAuthRateWindow().prepare(on: app.db)
+    }
+
+    func testConcurrentRequestsShareOneAtomicBudget() async throws {
+        // Sequential awaits (the tests above) can't catch a check-then-act
+        // race: a non-atomic "SELECT count, then INSERT/UPDATE" store would
+        // let concurrent requests all read the same stale count and all
+        // proceed. Firing real concurrent requests at one shared connection
+        // pool is the only way to exercise that race, and the single atomic
+        // upsert (INSERT … ON CONFLICT … DO UPDATE … RETURNING) must hold
+        // the budget to exactly `limit` admissions regardless of ordering.
+        let limiter = SlidingWindowRateLimiter(limit: 10, window: 60)
+        let attempts = 40
+        let db = app.db
+        let now = bucketStart
+
+        let verdicts = try await withThrowingTaskGroup(of: SlidingWindowRateLimiter.Verdict.self) { group in
+            for _ in 0..<attempts {
+                group.addTask {
+                    try await limiter.check("shared-ip", on: db, now: now)
+                }
+            }
+            var collected: [SlidingWindowRateLimiter.Verdict] = []
+            for try await verdict in group {
+                collected.append(verdict)
+            }
+            return collected
+        }
+
+        let allowedCount = verdicts.filter { $0 == .allowed }.count
+        XCTAssertEqual(allowedCount, 10, "exactly the configured limit is admitted, no matter the race")
+        XCTAssertEqual(verdicts.count, attempts)
+    }
+
     func testStaleBucketsAreSweptFromTheStore() async throws {
         let limiter = SlidingWindowRateLimiter(limit: 5, window: 60)
 

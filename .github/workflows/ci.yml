@@ -46,6 +46,45 @@ jobs:
       - name: Run server tests
         run: swift test --package-path chess-server
 
+  # Validates the auth rate limiter's raw SQL (INSERT … ON CONFLICT … DO
+  # UPDATE … RETURNING, #182) against a real Postgres, not just SQLite —
+  # the `server` job above always runs against in-memory SQLite since
+  # DATABASE_URL is unset there, and dialect differences (e.g. UPSERT
+  # semantics) only surface against the real driver.
+  #
+  # NOT a required check: same pattern as `lint` and the `iOS` workflow —
+  # informational, so a flaky or slow local-Postgres setup here can't
+  # destabilize the required `Server tests` gate (flipping it to required
+  # is the orchestrator's call). Filtered to the rate-limiter test group
+  # rather than the whole suite: unrelated tests elsewhere in this file
+  # assert global table counts, which only hold under SQLite's per-test
+  # fresh in-memory database — a real Postgres instance is shared and
+  # persistent across the whole job, so those assertions don't transfer.
+  server-postgres:
+    name: Server tests (Postgres)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install and start Postgres
+        run: |
+          brew install postgresql@16
+          LC_ALL="en_US.UTF-8" "$(brew --prefix postgresql@16)/bin/pg_ctl" \
+            -D "$(brew --prefix)/var/postgresql@16" -l /tmp/postgres.log start
+          "$(brew --prefix postgresql@16)/bin/createdb" chess_ci
+      - name: Cache SwiftPM build
+        uses: actions/cache@v6
+        with:
+          path: chess-server/.build
+          key: server-pg-spm-${{ runner.os }}-${{ hashFiles('chess-server/Package.swift', 'chess-server/Package.resolved') }}
+          restore-keys: server-pg-spm-${{ runner.os }}-
+      - name: Run rate-limiter tests against Postgres
+        env:
+          DATABASE_URL: postgres://runner@localhost:5432/chess_ci
+        run: >
+          swift test --package-path chess-server
+          --filter 'AuthAbuseTests/test(Limiter|WindowBoundaryBurst|LimitIsSharedAcrossLimiterInstances|Refusals|StaleBuckets|Concurrent|AuthEndpointsReturn429|ProxyHeaderKeys|MiddlewareFailsClosed)'
+
   # Fast, cheap style gate (issue #100). Runs on ubuntu with pinned prebuilt
   # binaries — no toolchain build, finishes in well under two minutes.
   # NOT a required check: flipping it to enforcing is the orchestrator's call
