@@ -19,13 +19,21 @@
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
     --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
+    /* theme engine: cultural worlds override these three below --serif/--mono.
+       every skin sets only these vars (+ swaps the ornament pattern + canvas palette in JS) --
+       component rules never hardcode a font or a tracking value, they read these. */
+    --display:          var(--serif);
+    --display-tracking: -.01em;
+    --texture:          none;
+    --orn-opacity:      .15;
+
     --measure: 40rem;
     --edge: clamp(1.25rem, 5vw, 4rem);
   }
 
-  /* Codex skin (no data-skin attribute) follows the OS light/dark preference */
+  /* Codex skin (no data-theme attribute) follows the OS light/dark preference */
   @media (prefers-color-scheme: light) {
-    :root:not([data-skin]) {
+    :root:not([data-theme]) {
       --ground:   #e7e2d3;
       --ground-2: #eeeade;
       --ground-3: #f4f0e6;
@@ -42,38 +50,73 @@
     }
   }
 
-  /* ==== the lineage skins : the traditions the game travelled through ==== */
-  /* Chaturanga -- India : Mughal-miniature gold, lapis, madder on warm dark */
-  :root[data-skin="chaturanga"] {
-    --ground:#1c1013; --ground-2:#251821; --ground-3:#2d1f29;
-    --hair:rgba(230,169,58,.18); --hair-2:rgba(230,169,58,.09);
-    --bone:#f4e8cf; --bone-dim:#c9b393; --bone-faint:#96795f;
-    --gold:#e6a93a; --gold-deep:#c2871f; --jade:#7f92e6; --flare:#d1503f; --merged:#77b085;
+  /* ==== the cultural worlds : opt-in via data-theme, default view untouched ==== */
+
+  /* Arabic -- geometric kufic-influenced ornament, deep indigo + gold */
+  :root[data-theme="arabic"] {
+    --ground:#0d1233; --ground-2:#131a45; --ground-3:#182050;
+    --hair:rgba(212,175,55,.18); --hair-2:rgba(212,175,55,.09);
+    --bone:#ece7d6; --bone-dim:#b9b8cb; --bone-faint:#7d7f9c;
+    --gold:#d4af37; --gold-deep:#a8862a; --jade:#4fb0c4; --flare:#c1523f; --merged:#6bab7d;
+    --display: "Futura", "Century Gothic", "Avenir Next", "Segoe UI", sans-serif;
+    --display-tracking: .02em;
+    --orn-opacity: .16;
   }
-  /* Shatranj -- Persia : manuscript illumination, cobalt + turquoise + gold */
-  :root[data-skin="persia"] {
-    --ground:#0a1730; --ground-2:#0f1f3d; --ground-3:#13284a;
-    --hair:rgba(226,183,94,.18); --hair-2:rgba(226,183,94,.09);
-    --bone:#efe6cf; --bone-dim:#b4b3a2; --bone-faint:#7f8291;
-    --gold:#e2b75e; --gold-deep:#c1963a; --jade:#43c7d6; --flare:#d1694a; --merged:#6bbf8f;
+  /* Japanese -- sumi-e minimalism, ma (negative space), washi ground, single vermillion seal */
+  :root[data-theme="japanese"] {
+    --ground:#f4efe4; --ground-2:#efe8d8; --ground-3:#e9e0cc;
+    --hair:rgba(42,42,40,.10); --hair-2:rgba(42,42,40,.05);
+    --bone:#2a2a28; --bone-dim:#5c5a52; --bone-faint:#8b887c;
+    --gold:#9c8355; --gold-deep:#7c6740; --jade:#6b8f87; --flare:#c94a35; --merged:#6f8f6a;
+    --display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", "Songti SC", Georgia, "Times New Roman", serif;
+    --display-tracking: .01em;
+    --orn-opacity: .05;
+    --texture: radial-gradient(ellipse at 15% 20%, rgba(42,42,40,.025), transparent 55%), radial-gradient(ellipse at 85% 75%, rgba(42,42,40,.02), transparent 50%);
   }
-  /* Shatranj -- al-Andalus : Islamic geometric, pine-teal + brass + turquoise */
-  :root[data-skin="andalus"] {
-    --ground:#08211d; --ground-2:#0c2a24; --ground-3:#10322b;
-    --hair:rgba(217,169,78,.17); --hair-2:rgba(217,169,78,.09);
-    --bone:#f0e9d6; --bone-dim:#bcb59a; --bone-faint:#8a856a;
-    --gold:#d9a94e; --gold-deep:#b98a34; --jade:#46c2b0; --flare:#cf6b4a; --merged:#6bbf8f;
+  /* Indian -- ornamental jewel tones, marigold + peacock + deep red, mandala/paisley */
+  :root[data-theme="indian"] {
+    --ground:#2a0f14; --ground-2:#37151b; --ground-3:#421a21;
+    --hair:rgba(232,160,32,.20); --hair-2:rgba(232,160,32,.1);
+    --bone:#f7ead0; --bone-dim:#d2b48c; --bone-faint:#96806a;
+    --gold:#e8a020; --gold-deep:#c07f14; --jade:#2bb3ad; --flare:#c81d3a; --merged:#5a9d5f;
+    --display: "Didot", "Bodoni MT", "Playfair Display", Georgia, "Times New Roman", serif;
+    --display-tracking: 0;
+    --orn-opacity: .17;
   }
-  /* The Terminal -- now : the machine present, phosphor green on near-black */
-  :root[data-skin="terminal"] {
+  /* Codex -- illuminated manuscript, parchment + rubrication + blackletter, its own deliberate world */
+  :root[data-theme="codex"] {
+    --ground:#ece0c0; --ground-2:#e4d5ad; --ground-3:#dccb9c;
+    --hair:rgba(43,32,19,.14); --hair-2:rgba(43,32,19,.07);
+    --bone:#2b2013; --bone-dim:#5a4a30; --bone-faint:#8a7852;
+    --gold:#af8a2e; --gold-deep:#8a6a1e; --jade:#3f7a6e; --flare:#a3241c; --merged:#5c7a4a;
+    --display: "Old English Text MT", "Cloister Black", "Blackmoor LET", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --display-tracking: 0;
+    --orn-opacity: .12;
+    --texture: radial-gradient(ellipse at 12% 15%, rgba(138,106,30,.07), transparent 50%), radial-gradient(ellipse at 88% 85%, rgba(138,106,30,.06), transparent 55%), radial-gradient(ellipse at 60% 40%, rgba(43,32,19,.03), transparent 60%);
+  }
+  /* El-Andalus (Moorish) -- azulejo tilework, horseshoe-arch geometry, turquoise + terracotta + gold */
+  :root[data-theme="andalus"] {
+    --ground:#062a28; --ground-2:#0a3532; --ground-3:#0e403c;
+    --hair:rgba(201,150,60,.18); --hair-2:rgba(201,150,60,.09);
+    --bone:#f0e6d2; --bone-dim:#c2b294; --bone-faint:#8d8267;
+    --gold:#c9963c; --gold-deep:#a2761f; --jade:#2fb3a6; --flare:#c1633f; --merged:#5f9d6e;
+    --display: "Avenir Next", "Century Gothic", "Futura", sans-serif;
+    --display-tracking: .01em;
+    --orn-opacity: .17;
+  }
+  /* The Terminal -- now : CRT phosphor green on near-black, monospace everywhere */
+  :root[data-theme="terminal"] {
     --ground:#080b0a; --ground-2:#0d120f; --ground-3:#111814;
     --hair:rgba(80,220,120,.16); --hair-2:rgba(80,220,120,.08);
     --bone:#c9d6c9; --bone-dim:#7f9a83; --bone-faint:#4f6654;
     --gold:#48d06a; --gold-deep:#33a552; --jade:#59d0c0; --flare:#e0574a; --merged:#48d06a;
+    --display: var(--mono);
+    --display-tracking: -.02em;
+    --orn-opacity: .1;
   }
 
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; background: var(--ground); }
+  html { -webkit-text-size-adjust: 100%; background-color: var(--ground); background-image: var(--texture); }
   body {
     margin: 0;
     background: transparent;
@@ -86,17 +129,25 @@
     overflow-x: hidden;
   }
 
-  /* ornament : a fixed pattern layer, its motif chosen per skin */
+  /* ornament : a fixed pattern layer, its motif chosen per theme -- strokes read var(--gold)/var(--orn-opacity) so one set of defs recolors for every world */
   .ornament { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; display: none; }
-  :root[data-skin="chaturanga"] .ornament,
-  :root[data-skin="persia"] .ornament,
-  :root[data-skin="andalus"] .ornament,
-  :root[data-skin="terminal"] .ornament { display: block; }
+  :root[data-theme="arabic"] .ornament,
+  :root[data-theme="japanese"] .ornament,
+  :root[data-theme="indian"] .ornament,
+  :root[data-theme="codex"] .ornament,
+  :root[data-theme="andalus"] .ornament,
+  :root[data-theme="terminal"] .ornament { display: block; }
   .orn-rect { fill: none; }
-  :root[data-skin="chaturanga"] .orn-rect { fill: url(#jaali); }
-  :root[data-skin="persia"] .orn-rect { fill: url(#hex6); }
-  :root[data-skin="andalus"] .orn-rect { fill: url(#star8); }
-  :root[data-skin="terminal"] .orn-rect { fill: url(#scan); }
+  :root[data-theme="arabic"]   .orn-rect { fill: url(#hex6); }
+  :root[data-theme="japanese"] .orn-rect { fill: url(#ensoFaint); }
+  :root[data-theme="indian"]   .orn-rect { fill: url(#jaali); }
+  :root[data-theme="codex"]    .orn-rect { fill: url(#vine); }
+  :root[data-theme="andalus"]  .orn-rect { fill: url(#star8); }
+  :root[data-theme="terminal"] .orn-rect { fill: url(#scan); }
+  /* one set of pattern defs, every theme recolors them through these two rules */
+  .orn-g { stroke: var(--gold); stroke-opacity: var(--orn-opacity); stroke-width: 1; fill: none; }
+  .orn-scan-a { fill: var(--gold); fill-opacity: calc(var(--orn-opacity) * .5); }
+  .orn-scan-b { fill: var(--gold); fill-opacity: var(--orn-opacity); }
 
   /* prose self-caps at --measure; the section shell is wider so multi-column blocks breathe */
   .wrap { max-width: 62rem; margin-inline: auto; padding-inline: var(--edge); }
@@ -123,10 +174,12 @@
     color: #ece6d3;
     border-bottom: 1px solid rgba(216,180,92,.22);
   }
-  :root[data-skin="chaturanga"] .hero { background: #1c1013; border-bottom-color: rgba(230,169,58,.30); }
-  :root[data-skin="persia"]     .hero { background: #0a1730; border-bottom-color: rgba(226,183,94,.30); }
-  :root[data-skin="andalus"]    .hero { background: #08211d; border-bottom-color: rgba(217,169,78,.30); }
-  :root[data-skin="terminal"]   .hero { background: #080b0a; border-bottom-color: rgba(72,208,106,.28); }
+  :root[data-theme="arabic"]   .hero { background: #0d1233; border-bottom-color: rgba(212,175,55,.30); }
+  :root[data-theme="japanese"] .hero { background: #f4efe4; border-bottom-color: rgba(42,42,40,.16); }
+  :root[data-theme="indian"]   .hero { background: #2a0f14; border-bottom-color: rgba(232,160,32,.32); }
+  :root[data-theme="codex"]    .hero { background: #ece0c0; border-bottom-color: rgba(163,36,28,.30); }
+  :root[data-theme="andalus"]  .hero { background: #062a28; border-bottom-color: rgba(201,150,60,.30); }
+  :root[data-theme="terminal"] .hero { background: #080b0a; border-bottom-color: rgba(72,208,106,.28); }
   #board { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .hero-scrim {
     position: absolute; inset: 0;
@@ -135,19 +188,27 @@
       linear-gradient(to top, rgba(11,18,15,.96) 0%, rgba(11,18,15,.55) 32%, transparent 62%);
     pointer-events: none;
   }
-  :root[data-skin="chaturanga"] .hero-scrim {
-    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(28,16,19,.34) 55%, rgba(28,16,19,.9) 100%),
-      linear-gradient(to top, rgba(28,16,19,.96) 0%, rgba(28,16,19,.55) 32%, transparent 62%);
+  :root[data-theme="arabic"] .hero-scrim {
+    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(13,18,51,.34) 55%, rgba(13,18,51,.9) 100%),
+      linear-gradient(to top, rgba(13,18,51,.96) 0%, rgba(13,18,51,.55) 32%, transparent 62%);
   }
-  :root[data-skin="persia"] .hero-scrim {
-    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(10,23,48,.34) 55%, rgba(10,23,48,.9) 100%),
-      linear-gradient(to top, rgba(10,23,48,.96) 0%, rgba(10,23,48,.55) 32%, transparent 62%);
+  :root[data-theme="japanese"] .hero-scrim {
+    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(244,239,228,.4) 55%, rgba(244,239,228,.92) 100%),
+      linear-gradient(to top, rgba(244,239,228,.96) 0%, rgba(244,239,228,.6) 32%, transparent 62%);
   }
-  :root[data-skin="andalus"] .hero-scrim {
-    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(8,33,29,.34) 55%, rgba(8,33,29,.9) 100%),
-      linear-gradient(to top, rgba(8,33,29,.96) 0%, rgba(8,33,29,.55) 32%, transparent 62%);
+  :root[data-theme="indian"] .hero-scrim {
+    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(42,15,20,.34) 55%, rgba(42,15,20,.9) 100%),
+      linear-gradient(to top, rgba(42,15,20,.96) 0%, rgba(42,15,20,.55) 32%, transparent 62%);
   }
-  :root[data-skin="terminal"] .hero-scrim {
+  :root[data-theme="codex"] .hero-scrim {
+    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(236,224,192,.4) 55%, rgba(236,224,192,.92) 100%),
+      linear-gradient(to top, rgba(236,224,192,.96) 0%, rgba(236,224,192,.6) 32%, transparent 62%);
+  }
+  :root[data-theme="andalus"] .hero-scrim {
+    background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(6,42,40,.34) 55%, rgba(6,42,40,.9) 100%),
+      linear-gradient(to top, rgba(6,42,40,.96) 0%, rgba(6,42,40,.55) 32%, transparent 62%);
+  }
+  :root[data-theme="terminal"] .hero-scrim {
     background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(8,11,10,.34) 55%, rgba(8,11,10,.9) 100%),
       linear-gradient(to top, rgba(8,11,10,.96) 0%, rgba(8,11,10,.55) 32%, transparent 62%);
   }
@@ -160,18 +221,22 @@
     width: 100%;
   }
   .hero .eyebrow { color: #d8b45c; }
-  :root[data-skin="chaturanga"] .hero .eyebrow { color: #e6a93a; }
-  :root[data-skin="persia"]     .hero .eyebrow { color: #e2b75e; }
-  :root[data-skin="andalus"]    .hero .eyebrow { color: #d9a94e; }
-  :root[data-skin="terminal"]   .hero .eyebrow { color: #48d06a; }
+  :root[data-theme="arabic"]   .hero .eyebrow { color: #d4af37; }
+  :root[data-theme="japanese"] .hero .eyebrow { color: #9c8355; }
+  :root[data-theme="indian"]   .hero .eyebrow { color: #e8a020; }
+  :root[data-theme="codex"]    .hero .eyebrow { color: #8a6a1e; }
+  :root[data-theme="andalus"]  .hero .eyebrow { color: #c9963c; }
+  :root[data-theme="terminal"] .hero .eyebrow { color: #48d06a; }
   .kicker-row { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
   .kicker-row .dot { width: 6px; height: 6px; border-radius: 50%; background: #77d9c1; box-shadow: 0 0 10px #77d9c1; }
-  :root[data-skin="chaturanga"] .kicker-row .dot { background: #7f92e6; box-shadow: 0 0 10px #7f92e6; }
-  :root[data-skin="persia"]     .kicker-row .dot { background: #43c7d6; box-shadow: 0 0 10px #43c7d6; }
-  :root[data-skin="andalus"]    .kicker-row .dot { background: #46c2b0; box-shadow: 0 0 10px #46c2b0; }
-  :root[data-skin="terminal"]   .kicker-row .dot { background: #59d0c0; box-shadow: 0 0 10px #59d0c0; }
+  :root[data-theme="arabic"]   .kicker-row .dot { background: #4fb0c4; box-shadow: 0 0 10px #4fb0c4; }
+  :root[data-theme="japanese"] .kicker-row .dot { background: #c94a35; box-shadow: 0 0 6px #c94a35; }
+  :root[data-theme="indian"]   .kicker-row .dot { background: #2bb3ad; box-shadow: 0 0 10px #2bb3ad; }
+  :root[data-theme="codex"]    .kicker-row .dot { background: #a3241c; box-shadow: 0 0 8px rgba(163,36,28,.5); }
+  :root[data-theme="andalus"]  .kicker-row .dot { background: #2fb3a6; box-shadow: 0 0 10px #2fb3a6; }
+  :root[data-theme="terminal"] .kicker-row .dot { background: #59d0c0; box-shadow: 0 0 10px #59d0c0; }
   h1 {
-    font-family: var(--serif);
+    font-family: var(--display);
     font-weight: 600;
     font-size: clamp(2.7rem, 8vw, 5.4rem);
     line-height: .98;
@@ -181,10 +246,16 @@
     color: #f3eeddff;
   }
   h1 em { font-style: italic; color: #d8b45c; }
-  :root[data-skin="chaturanga"] h1 em { color: #f0be5a; }
-  :root[data-skin="persia"]     h1 em { color: #f0c86e; }
-  :root[data-skin="andalus"]    h1 em { color: #e6c06e; }
-  :root[data-skin="terminal"]   h1 em { color: #6ee08a; font-style: normal; }
+  :root[data-theme="arabic"]   h1 em { color: #e6c454; }
+  :root[data-theme="japanese"] h1 em { color: #c94a35; font-style: normal; }
+  :root[data-theme="indian"]   h1 em { color: #f0b840; }
+  :root[data-theme="codex"]    h1 em { color: #a3241c; font-style: normal; }
+  :root[data-theme="andalus"]  h1 em { color: #dcb15a; }
+  :root[data-theme="terminal"] h1 em { color: #6ee08a; font-style: normal; }
+  /* the two parchment/washi worlds run a light hero -- flip the hardcoded cream hero text to ink */
+  :root[data-theme="japanese"] h1, :root[data-theme="codex"] h1 { color: #2a2018; }
+  :root[data-theme="japanese"] .standfirst, :root[data-theme="codex"] .standfirst { color: #5b5346; }
+  :root[data-theme="japanese"] .standfirst b, :root[data-theme="codex"] .standfirst b { color: #211c14; }
   .standfirst {
     max-width: 34rem;
     margin: 1.4rem 0 0;
@@ -205,7 +276,7 @@
   @media (max-width: 720px){ .manifest ul { grid-template-columns: repeat(2,1fr); } }
   @media (min-width:721px) and (max-width: 960px){ .manifest ul { grid-template-columns: repeat(3,1fr); } }
   .stat .fig {
-    font-family: var(--serif); font-weight: 600;
+    font-family: var(--display); font-weight: 600;
     font-size: clamp(2rem, 3.5vw, 2.9rem); line-height: 1;
     color: var(--bone); font-variant-numeric: tabular-nums;
     display: flex; align-items: baseline; gap: .18em;
@@ -222,14 +293,16 @@
     font-family: var(--mono); font-size: .74rem; letter-spacing: .24em;
     text-transform: uppercase; color: var(--gold); margin: 0 0 1rem;
   }
-  :root[data-skin="chaturanga"] .lede-h::before { content: "\273F  "; }
-  :root[data-skin="persia"]     .lede-h::before { content: "\2736  "; }
-  :root[data-skin="andalus"]    .lede-h::before { content: "\2734  "; }
-  :root[data-skin="terminal"]   .lede-h::before { content: "\276F  "; }
+  :root[data-theme="arabic"]   .lede-h::before { content: "\2736  "; }
+  :root[data-theme="japanese"] .lede-h::before { content: "\25EF  "; }
+  :root[data-theme="indian"]   .lede-h::before { content: "\2740  "; }
+  :root[data-theme="codex"]    .lede-h::before { content: "\2766  "; }
+  :root[data-theme="andalus"]  .lede-h::before { content: "\2734  "; }
+  :root[data-theme="terminal"] .lede-h::before { content: "\276F  "; }
   h2 {
-    font-family: var(--serif); font-weight: 600;
+    font-family: var(--display); font-weight: 600;
     font-size: clamp(1.7rem, 3.6vw, 2.55rem);
-    line-height: 1.08; letter-spacing: -.01em;
+    line-height: 1.08; letter-spacing: var(--display-tracking);
     margin: 0 0 1.1rem; text-wrap: balance;
   }
   h2 em { font-style: italic; color: var(--gold); }
@@ -242,7 +315,7 @@
   @media (min-width: 780px){ .roles { grid-template-columns: repeat(3,1fr); } }
   .role { background: var(--ground-2); padding: clamp(1.5rem,3vw,2rem); display: flex; flex-direction: column; gap: .5rem; }
   .role .glyph { font-family: var(--serif); font-size: 2.4rem; line-height: 1; color: var(--gold); }
-  .role h3 { font-family: var(--serif); font-weight: 600; font-size: 1.34rem; margin: .5rem 0 0; }
+  .role h3 { font-family: var(--display); font-weight: 600; font-size: 1.34rem; margin: .5rem 0 0; }
   .role .role-sub { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--jade); }
   .role p { font-size: .98rem; color: var(--bone-dim); margin: .35rem 0 0; }
   .role .spoke { margin-top: auto; padding-top: 1rem; font-family: var(--mono); font-size: .72rem; color: var(--bone-faint); border-top: 1px dashed var(--hair); }
@@ -254,7 +327,7 @@
   .chan { border: 1px solid var(--hair); border-radius: 4px; padding: clamp(1.4rem,3vw,1.9rem); background: var(--ground-2); }
   .chan.volatile { border-left: 3px solid var(--jade); }
   .chan.durable  { border-left: 3px solid var(--gold); }
-  .chan h3 { margin: 0; font-size: 1.24rem; font-family: var(--serif); font-weight: 600; display: flex; align-items: baseline; gap: .6rem; }
+  .chan h3 { margin: 0; font-size: 1.24rem; font-family: var(--display); font-weight: 600; display: flex; align-items: baseline; gap: .6rem; }
   .chan h3 span { font-family: var(--mono); font-size: .64rem; letter-spacing: .13em; text-transform: uppercase; color: var(--bone-faint); }
   .chan > p { font-size: .96rem; color: var(--bone-dim); margin: .6rem 0 1rem; }
   .chan ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .55rem; }
@@ -266,7 +339,7 @@
   .ledger { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--hair); }
   .inc { display: grid; grid-template-columns: 3.2rem 1fr; gap: clamp(1rem,3vw,2rem); padding: clamp(1.5rem,3.5vw,2.2rem) 0; border-bottom: 1px solid var(--hair); align-items: start; }
   .inc .idx { font-family: var(--mono); font-size: .82rem; color: var(--flare); letter-spacing: .05em; padding-top: .35rem; font-variant-numeric: tabular-nums; }
-  .inc h3 { font-family: var(--serif); font-weight: 600; font-size: 1.28rem; margin: 0 0 .5rem; line-height: 1.15; }
+  .inc h3 { font-family: var(--display); font-weight: 600; font-size: 1.28rem; margin: 0 0 .5rem; line-height: 1.15; }
   .inc .refs { font-family: var(--mono); font-size: .68rem; color: var(--bone-faint); letter-spacing: .04em; }
   .inc p { font-size: 1rem; color: var(--bone-dim); margin: .1rem 0 0; max-width: 42rem; }
   .inc .law { margin-top: .9rem; font-family: var(--serif); font-style: italic; color: var(--bone); font-size: 1.02rem; display: flex; gap: .6rem; align-items: baseline; }
@@ -275,7 +348,7 @@
   /* the meta callout */
   .callout { border: 1px solid var(--gold-deep); border-radius: 4px; padding: clamp(1.6rem,4vw,2.4rem); background: linear-gradient(180deg, color-mix(in oklab, var(--gold) 8%, var(--ground-2)), var(--ground-2)); margin-top: 2.4rem; }
   .callout .eyebrow { color: var(--flare); }
-  .callout h3 { font-family: var(--serif); font-weight: 600; font-size: 1.5rem; margin: .7rem 0 .6rem; }
+  .callout h3 { font-family: var(--display); font-weight: 600; font-size: 1.5rem; margin: .7rem 0 .6rem; }
   .callout p { color: var(--bone-dim); font-size: 1.02rem; margin: 0; }
   .callout .law { margin-top: 1rem; font-family: var(--serif); font-style: italic; color: var(--bone); font-size: 1.06rem; }
 
@@ -286,7 +359,7 @@
   .law-item:last-child { border-bottom: 1px solid var(--hair); }
   .law-item .n { counter-increment: law; font-family: var(--mono); font-size: .8rem; color: var(--gold); font-variant-numeric: tabular-nums; }
   .law-item .n::before { content: counter(law, upper-roman); }
-  .law-item blockquote { margin: 0; font-family: var(--serif); font-weight: 600; font-size: clamp(1.35rem, 3.2vw, 2rem); line-height: 1.12; letter-spacing: -.01em; color: var(--bone); text-wrap: balance; }
+  .law-item blockquote { margin: 0; font-family: var(--display); font-weight: 600; font-size: clamp(1.35rem, 3.2vw, 2rem); line-height: 1.12; letter-spacing: var(--display-tracking); color: var(--bone); text-wrap: balance; }
   .law-item .gloss { margin: .6rem 0 0; font-size: .96rem; color: var(--bone-dim); max-width: 40rem; }
 
   /* stand-down */
@@ -300,31 +373,74 @@
 
   footer { border-top: 1px solid var(--hair); padding: 2rem var(--edge); text-align: center; font-family: var(--mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--bone-faint); }
 
-  /* The Terminal skin sets its type in monospace -- the machine's own hand */
-  :root[data-skin="terminal"] h1,
-  :root[data-skin="terminal"] h2,
-  :root[data-skin="terminal"] .stat .fig,
-  :root[data-skin="terminal"] .role h3,
-  :root[data-skin="terminal"] .chan h3,
-  :root[data-skin="terminal"] .inc h3,
-  :root[data-skin="terminal"] .callout h3,
-  :root[data-skin="terminal"] .law-item blockquote { font-family: var(--mono); letter-spacing: -.02em; }
+  /* h1 carries a hardcoded tracking value and .stat/.role/.chan/.inc/.callout headings carry none at all --
+     h2 and law-item blockquote already read --display-tracking, everything else needs Terminal's tight kerning spelled out here */
+  :root[data-theme="terminal"] h1,
+  :root[data-theme="terminal"] .stat .fig,
+  :root[data-theme="terminal"] .role h3,
+  :root[data-theme="terminal"] .chan h3,
+  :root[data-theme="terminal"] .inc h3,
+  :root[data-theme="terminal"] .callout h3 { letter-spacing: -.02em; }
 
-  /* lineage dial (was the theme toggle) */
-  .toggle { position: fixed; top: 1rem; right: 1rem; z-index: 20; font-family: var(--mono); font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; color: #cbcfc2; background: rgba(11,18,15,.5); border: 1px solid rgba(216,180,92,.35); border-radius: 999px; padding: .5rem .85rem; cursor: pointer; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); min-width: 9.5rem; text-align: center; }
+  /* ---------- theme switcher : a menu button, its default look is the unmodified original toggle ---------- */
+  .theme-switcher { position: fixed; top: 1rem; right: 1rem; z-index: 20; }
+  .toggle { font-family: var(--mono); font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; color: #cbcfc2; background: rgba(11,18,15,.5); border: 1px solid rgba(216,180,92,.35); border-radius: 999px; padding: .5rem .85rem; cursor: pointer; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); min-width: 9.5rem; text-align: center; display: block; }
   .toggle:hover { color: #d8b45c; border-color: #d8b45c; }
   .toggle:focus-visible { outline: 2px solid var(--jade); outline-offset: 2px; }
-  :root[data-skin="terminal"] .toggle { border-color: rgba(72,208,106,.4); color: #bfe8c8; }
-  :root[data-skin="terminal"] .toggle:hover { color: #6ee08a; border-color: #6ee08a; }
+  :root[data-theme="terminal"] .toggle { border-color: rgba(72,208,106,.4); color: #bfe8c8; }
+  :root[data-theme="terminal"] .toggle:hover { color: #6ee08a; border-color: #6ee08a; }
+  :root[data-theme="arabic"] .toggle { border-color: rgba(212,175,55,.45); color: #cdd0ea; border-radius: 3px; }
+  :root[data-theme="arabic"] .toggle:hover { color: #d4af37; border-color: #d4af37; }
+  :root[data-theme="japanese"] .toggle { background: rgba(244,239,228,.72); border-color: rgba(42,42,40,.22); color: #4a4842; border-radius: 0; }
+  :root[data-theme="japanese"] .toggle:hover { color: #c94a35; border-color: #c94a35; }
+  :root[data-theme="indian"] .toggle { border-color: rgba(232,160,32,.5); color: #e7cba4; }
+  :root[data-theme="indian"] .toggle:hover { color: #e8a020; border-color: #e8a020; }
+  :root[data-theme="codex"] .toggle { background: rgba(236,224,192,.75); border: 1px double rgba(163,36,28,.55); color: #5a4a30; border-radius: 2px; }
+  :root[data-theme="codex"] .toggle:hover { color: #a3241c; border-color: #a3241c; }
+  :root[data-theme="andalus"] .toggle { border-color: rgba(201,150,60,.45); color: #cdeae4; border-radius: 3px; }
+  :root[data-theme="andalus"] .toggle:hover { color: #2fb3a6; border-color: #2fb3a6; }
 
-  /* palette crossfade between eras -- enabled by JS after first paint so load doesn't flash */
+  .theme-menu {
+    list-style: none; margin: 0; position: absolute; top: calc(100% + .55rem); right: 0; min-width: 11.5rem;
+    background: rgba(15,22,18,.92); border: 1px solid rgba(216,180,92,.3); border-radius: 12px;
+    padding: .4rem; display: flex; flex-direction: column; gap: .1rem;
+    box-shadow: 0 12px 30px rgba(0,0,0,.35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .theme-menu[hidden] { display: none; }
+  .theme-opt {
+    all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: .55rem;
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .07em; text-transform: uppercase;
+    color: #b7bcae; padding: .5rem .65rem; border-radius: 7px; width: 100%;
+  }
+  .theme-opt .glyph { width: 1.1em; text-align: center; flex: none; }
+  .theme-opt:hover, .theme-opt:focus-visible { background: rgba(216,180,92,.14); color: #ece6d3; outline: none; }
+  .theme-opt[aria-checked="true"] { color: #d8b45c; }
+  :root[data-theme="terminal"] .theme-menu { background: rgba(8,11,10,.94); border-color: rgba(72,208,106,.35); border-radius: 2px; }
+  :root[data-theme="terminal"] .theme-opt:hover, :root[data-theme="terminal"] .theme-opt:focus-visible { background: rgba(72,208,106,.14); color: #d8ffe0; }
+  :root[data-theme="terminal"] .theme-opt[aria-checked="true"] { color: #6ee08a; }
+  :root[data-theme="japanese"] .theme-menu { background: rgba(244,239,228,.95); border-color: rgba(42,42,40,.16); border-radius: 0; box-shadow: 0 10px 24px rgba(42,42,40,.16); }
+  :root[data-theme="japanese"] .theme-opt { color: #6b675c; }
+  :root[data-theme="japanese"] .theme-opt:hover, :root[data-theme="japanese"] .theme-opt:focus-visible { background: rgba(42,42,40,.06); color: #2a2a28; }
+  :root[data-theme="japanese"] .theme-opt[aria-checked="true"] { color: #c94a35; }
+  :root[data-theme="codex"] .theme-menu { background: rgba(236,224,192,.96); border: 1px double rgba(163,36,28,.5); border-radius: 2px; }
+  :root[data-theme="codex"] .theme-opt { color: #5a4a30; }
+  :root[data-theme="codex"] .theme-opt:hover, :root[data-theme="codex"] .theme-opt:focus-visible { background: rgba(163,36,28,.1); color: #2b2013; }
+  :root[data-theme="codex"] .theme-opt[aria-checked="true"] { color: #a3241c; }
+  :root[data-theme="arabic"] .theme-menu { border-radius: 3px; border-color: rgba(212,175,55,.35); }
+  :root[data-theme="arabic"] .theme-opt[aria-checked="true"] { color: #d4af37; }
+  :root[data-theme="indian"] .theme-menu { border-color: rgba(232,160,32,.4); background: rgba(42,15,20,.94); }
+  :root[data-theme="indian"] .theme-opt[aria-checked="true"] { color: #e8a020; }
+  :root[data-theme="andalus"] .theme-menu { border-radius: 3px; border-color: rgba(201,150,60,.35); background: rgba(6,42,40,.94); }
+  :root[data-theme="andalus"] .theme-opt[aria-checked="true"] { color: #2fb3a6; }
+
+  /* palette crossfade between themes -- enabled by JS after first paint so load doesn't flash */
   @media (prefers-reduced-motion: no-preference) {
     .skin-anim body, .skin-anim body *:not(.era-toast) {
       transition: background-color .45s ease, color .45s ease, border-color .45s ease, fill .45s ease;
     }
   }
 
-  /* era caption that fades in under the dial on each switch */
+  /* theme caption that fades in under the switcher on each change */
   .era-toast {
     position: fixed; top: 3.5rem; right: 1rem; z-index: 19;
     font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase;
@@ -339,12 +455,26 @@
   a:focus-visible, button:focus-visible { outline: 2px solid var(--jade); outline-offset: 3px; }
 
   @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+
+  /* ---------- Codex flourish : a rubricated illuminated drop cap on the standfirst, opt-in only ---------- */
+  :root[data-theme="codex"] .standfirst::first-letter {
+    float: left; font-family: var(--display); font-size: 3.4em; line-height: .78; font-weight: 600;
+    color: #a3241c; padding: .04em .08em 0 0; margin-top: .04em;
+  }
+
+  /* ---------- Terminal flourish : a blinking cursor block after the kicker text ---------- */
+  :root[data-theme="terminal"] .eyebrow::after { content: "\2588"; margin-left: .4em; animation: mm-blink 1.05s steps(1) infinite; }
+  @keyframes mm-blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    :root[data-theme="terminal"] .eyebrow::after { animation: none; }
+  }
 </style>
 
 <svg class="ornament" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <!-- andalus : azulejo / Alhambra 8-point star lattice -->
     <pattern id="star8" width="72" height="72" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="#d9a94e" stroke-opacity="0.15" stroke-width="1">
+      <g class="orn-g">
         <rect x="14" y="14" width="44" height="44"/>
         <rect x="14" y="14" width="44" height="44" transform="rotate(45 36 36)"/>
         <rect x="27" y="27" width="18" height="18" transform="rotate(45 36 36)"/>
@@ -354,8 +484,9 @@
         <rect x="50" y="50" width="44" height="44" transform="rotate(45 72 72)"/>
       </g>
     </pattern>
+    <!-- indian : jaali lattice screen -->
     <pattern id="jaali" width="64" height="64" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="#e6a93a" stroke-opacity="0.14" stroke-width="1">
+      <g class="orn-g">
         <circle cx="0" cy="0" r="32"/>
         <circle cx="64" cy="0" r="32"/>
         <circle cx="0" cy="64" r="32"/>
@@ -364,8 +495,9 @@
         <circle cx="32" cy="32" r="9"/>
       </g>
     </pattern>
+    <!-- arabic : six-fold interlace rosette -->
     <pattern id="hex6" width="66" height="66" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="#e2b75e" stroke-opacity="0.14" stroke-width="1" transform="translate(33 33)">
+      <g class="orn-g" transform="translate(33 33)">
         <circle r="11"/>
         <circle cx="19" cy="0" r="11"/>
         <circle cx="9.5" cy="16.45" r="11"/>
@@ -375,15 +507,42 @@
         <circle cx="9.5" cy="-16.45" r="11"/>
       </g>
     </pattern>
+    <!-- terminal : CRT scanlines -->
     <pattern id="scan" width="5" height="5" patternUnits="userSpaceOnUse">
-      <rect x="0" y="0" width="5" height="1" fill="#48d06a" fill-opacity="0.05"/>
-      <rect x="0" y="0" width="1" height="1" fill="#48d06a" fill-opacity="0.10"/>
+      <rect x="0" y="0" width="5" height="1" class="orn-scan-a"/>
+      <rect x="0" y="0" width="1" height="1" class="orn-scan-b"/>
+    </pattern>
+    <!-- japanese : ensō, wide-spaced and incomplete -- ma, the negative space, is the point -->
+    <pattern id="ensoFaint" width="150" height="150" patternUnits="userSpaceOnUse">
+      <g class="orn-g" stroke-linecap="round">
+        <circle cx="75" cy="75" r="30" stroke-dasharray="148 40" stroke-dashoffset="14"/>
+      </g>
+    </pattern>
+    <!-- codex : illuminated marginalia, a vine with leaf ticks -->
+    <pattern id="vine" width="130" height="130" patternUnits="userSpaceOnUse">
+      <g class="orn-g" stroke-linecap="round">
+        <path d="M0 68 C 22 24, 43 112, 65 68 C 87 24, 108 112, 130 68"/>
+        <circle cx="22" cy="34" r="2.6"/>
+        <circle cx="65" cy="68" r="2.6"/>
+        <circle cx="108" cy="34" r="2.6"/>
+      </g>
     </pattern>
   </defs>
   <rect class="orn-rect" width="100%" height="100%"/>
 </svg>
 
-<button class="toggle" id="skinBtn" aria-label="Switch visual tradition">&#10022; The Codex</button>
+<div class="theme-switcher">
+  <button class="toggle" id="themeBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="themeMenu">&#10022; Default</button>
+  <ul class="theme-menu" id="themeMenu" role="menu" aria-label="Visual theme" hidden>
+    <li role="none"><button role="menuitemradio" aria-checked="true"  class="theme-opt" data-theme=""><span class="glyph">&#10022;</span>Default</button></li>
+    <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="arabic"><span class="glyph">&#10038;</span>Arabic</button></li>
+    <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="japanese"><span class="glyph">&#9711;</span>Japanese</button></li>
+    <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="indian"><span class="glyph">&#10048;</span>Indian</button></li>
+    <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="codex"><span class="glyph">&#10086;</span>Codex</button></li>
+    <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="andalus"><span class="glyph">&#10036;</span>El-Andalus</button></li>
+    <li role="none"><button role="menuitemradio" aria-checked="false" class="theme-opt" data-theme="terminal"><span class="glyph">&#10095;</span>Terminal</button></li>
+  </ul>
+</div>
 <div class="era-toast" id="eraToast" aria-live="polite"></div>
 
 <header class="hero">
@@ -606,46 +765,19 @@
   "use strict";
 
   var root = document.documentElement;
-  var skinBtn = document.getElementById("skinBtn");
+  var themeBtn = document.getElementById("themeBtn");
+  var themeMenu = document.getElementById("themeMenu");
+  var themeOpts = Array.prototype.slice.call(themeMenu.querySelectorAll(".theme-opt"));
   var eraToast = document.getElementById("eraToast");
   var canvas = document.getElementById("board");
   var ctx = canvas.getContext("2d");
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* ---------- the lineage the game travelled ---------- */
+  /* ---------- the cultural worlds ---------- */
   var SKINS = {
-    chaturanga: {
-      label: "Chaturanga", glyph: "\u273F", motif: "lotus",
-      bg: "#1c1013", fade: "rgba(28,16,19,0.20)",
-      boardTile: "rgba(230,169,58,0.02)", boardLine: "rgba(230,169,58,0.05)", filament: "rgba(230,169,58,0.08)",
-      packet: "#8ea0ea", packetTrail: "rgba(127,146,230,0.5)", packetGlow: "rgba(127,146,230,0.28)",
-      node: "rgba(127,146,230,0.6)", nodeCore: "rgba(160,178,244,0.9)",
-      reviewer: "rgba(230,169,58,0.55)",
-      gate: "rgba(230,169,58,0.9)", gateOuter: "rgba(230,169,58,0.32)", gateCore: "rgba(242,192,92,0.95)",
-      pulseGold: "230,169,58", pulseFlare: "209,80,63"
-    },
-    persia: {
-      label: "Persia", glyph: "\u2736", motif: "star6",
-      bg: "#0a1730", fade: "rgba(10,23,48,0.20)",
-      boardTile: "rgba(226,183,94,0.02)", boardLine: "rgba(226,183,94,0.05)", filament: "rgba(226,183,94,0.08)",
-      packet: "#5fd6e0", packetTrail: "rgba(67,199,214,0.5)", packetGlow: "rgba(67,199,214,0.28)",
-      node: "rgba(67,199,214,0.6)", nodeCore: "rgba(130,224,232,0.9)",
-      reviewer: "rgba(226,183,94,0.55)",
-      gate: "rgba(226,183,94,0.9)", gateOuter: "rgba(226,183,94,0.32)", gateCore: "rgba(242,200,110,0.95)",
-      pulseGold: "226,183,94", pulseFlare: "209,105,74"
-    },
-    andalus: {
-      label: "al-Andalus", glyph: "\u2734", motif: "star8",
-      bg: "#08211d", fade: "rgba(8,33,29,0.20)",
-      boardTile: "rgba(217,169,78,0.02)", boardLine: "rgba(217,169,78,0.06)", filament: "rgba(217,169,78,0.09)",
-      packet: "#63d8c4", packetTrail: "rgba(70,194,176,0.5)", packetGlow: "rgba(70,194,176,0.28)",
-      node: "rgba(70,194,176,0.6)", nodeCore: "rgba(130,224,208,0.9)",
-      reviewer: "rgba(217,169,78,0.55)",
-      gate: "rgba(217,169,78,0.9)", gateOuter: "rgba(217,169,78,0.32)", gateCore: "rgba(232,192,110,0.95)",
-      pulseGold: "217,169,78", pulseFlare: "207,107,74"
-    },
-    codex: {
-      label: "The Codex", glyph: "\u2726", motif: null,
+    "": {
+      /* the untouched default -- must stay byte-for-byte what "codex" used to be before this theme existed */
+      label: "Default", glyph: "\u2726", motif: null,
       bg: "#0b120f", fade: "rgba(11,18,15,0.19)",
       boardTile: "rgba(232,226,205,0.018)", boardLine: "rgba(232,226,205,0.04)", filament: "rgba(216,180,92,0.06)",
       packet: "#7fe0c8", packetTrail: "rgba(127,224,200,0.5)", packetGlow: "rgba(127,224,200,0.28)",
@@ -654,8 +786,58 @@
       gate: "rgba(216,180,92,0.85)", gateOuter: "rgba(216,180,92,0.3)", gateCore: "rgba(216,180,92,0.95)",
       pulseGold: "216,180,92", pulseFlare: "224,104,85"
     },
+    arabic: {
+      label: "Arabic", glyph: "\u2736", motif: "hex6",
+      bg: "#0d1233", fade: "rgba(13,18,51,0.20)",
+      boardTile: "rgba(212,175,55,0.02)", boardLine: "rgba(212,175,55,0.05)", filament: "rgba(212,175,55,0.08)",
+      packet: "#6bc0d4", packetTrail: "rgba(79,176,196,0.5)", packetGlow: "rgba(79,176,196,0.28)",
+      node: "rgba(79,176,196,0.6)", nodeCore: "rgba(150,220,232,0.9)",
+      reviewer: "rgba(212,175,55,0.55)",
+      gate: "rgba(212,175,55,0.9)", gateOuter: "rgba(212,175,55,0.32)", gateCore: "rgba(230,196,84,0.95)",
+      pulseGold: "212,175,55", pulseFlare: "193,82,63"
+    },
+    japanese: {
+      label: "Japanese", glyph: "\u25EF", motif: "enso",
+      bg: "#f4efe4", fade: "rgba(244,239,228,0.20)",
+      boardTile: "rgba(42,42,40,0.02)", boardLine: "rgba(42,42,40,0.05)", filament: "rgba(42,42,40,0.05)",
+      packet: "#c94a35", packetTrail: "rgba(201,74,53,0.5)", packetGlow: "rgba(201,74,53,0.22)",
+      node: "rgba(42,42,40,0.35)", nodeCore: "rgba(42,42,40,0.55)",
+      reviewer: "rgba(156,131,85,0.5)",
+      gate: "rgba(201,74,53,0.85)", gateOuter: "rgba(201,74,53,0.28)", gateCore: "rgba(201,74,53,0.95)",
+      pulseGold: "156,131,85", pulseFlare: "201,74,53"
+    },
+    indian: {
+      label: "Indian", glyph: "\u2740", motif: "lotus",
+      bg: "#2a0f14", fade: "rgba(42,15,20,0.20)",
+      boardTile: "rgba(232,160,32,0.02)", boardLine: "rgba(232,160,32,0.05)", filament: "rgba(232,160,32,0.09)",
+      packet: "#3ecad0", packetTrail: "rgba(43,179,173,0.5)", packetGlow: "rgba(43,179,173,0.28)",
+      node: "rgba(43,179,173,0.6)", nodeCore: "rgba(140,230,220,0.9)",
+      reviewer: "rgba(232,160,32,0.55)",
+      gate: "rgba(232,160,32,0.9)", gateOuter: "rgba(232,160,32,0.32)", gateCore: "rgba(240,190,80,0.95)",
+      pulseGold: "232,160,32", pulseFlare: "200,29,58"
+    },
+    codex: {
+      label: "Codex", glyph: "\u2766", motif: null,
+      bg: "#ece0c0", fade: "rgba(236,224,192,0.20)",
+      boardTile: "rgba(43,32,19,0.02)", boardLine: "rgba(43,32,19,0.05)", filament: "rgba(175,138,46,0.08)",
+      packet: "#a3241c", packetTrail: "rgba(163,36,28,0.5)", packetGlow: "rgba(163,36,28,0.22)",
+      node: "rgba(63,122,110,0.5)", nodeCore: "rgba(63,122,110,0.75)",
+      reviewer: "rgba(175,138,46,0.55)",
+      gate: "rgba(163,36,28,0.85)", gateOuter: "rgba(163,36,28,0.28)", gateCore: "rgba(163,36,28,0.95)",
+      pulseGold: "175,138,46", pulseFlare: "163,36,28"
+    },
+    andalus: {
+      label: "El-Andalus", glyph: "\u2734", motif: "star8",
+      bg: "#062a28", fade: "rgba(6,42,40,0.20)",
+      boardTile: "rgba(201,150,60,0.02)", boardLine: "rgba(201,150,60,0.06)", filament: "rgba(201,150,60,0.09)",
+      packet: "#4fd4c2", packetTrail: "rgba(47,179,166,0.5)", packetGlow: "rgba(47,179,166,0.28)",
+      node: "rgba(47,179,166,0.6)", nodeCore: "rgba(140,230,216,0.9)",
+      reviewer: "rgba(201,150,60,0.55)",
+      gate: "rgba(201,150,60,0.9)", gateOuter: "rgba(201,150,60,0.32)", gateCore: "rgba(224,186,100,0.95)",
+      pulseGold: "201,150,60", pulseFlare: "193,99,63"
+    },
     terminal: {
-      label: "The Terminal", glyph: "\u276F", motif: "plus",
+      label: "Terminal", glyph: "\u276F", motif: "plus",
       bg: "#080b0a", fade: "rgba(8,11,10,0.22)",
       boardTile: "rgba(72,208,106,0.015)", boardLine: "rgba(72,208,106,0.05)", filament: "rgba(72,208,106,0.08)",
       packet: "#6ee08a", packetTrail: "rgba(72,208,106,0.5)", packetGlow: "rgba(72,208,106,0.26)",
@@ -665,10 +847,10 @@
       pulseGold: "72,208,106", pulseFlare: "224,87,74"
     }
   };
-  // walk forward through the game's history; the dial starts at the Codex (today's look)
-  var order = ["chaturanga", "persia", "andalus", "codex", "terminal"];
-  var skinIdx = 3;
-  var S = SKINS.codex;
+  // the dial starts at the untouched default -- everything else is opt-in
+  var order = ["", "arabic", "japanese", "indian", "codex", "andalus", "terminal"];
+  var skinIdx = 0;
+  var S = SKINS[""];
 
   var W = 0, H = 0, DPR = 1, board = null;
 
@@ -685,7 +867,7 @@
 
   function P(nx, ny) { return { x: nx * W, y: ny * H }; }
 
-  // ---- the per-skin board motifs, each an echo of that tradition's ornament ----
+  // ---- the per-theme board motifs, each an echo of that world's ornament ----
   function miniStar8(b, x, y, r) {
     b.save(); b.translate(x, y);
     b.strokeRect(-r, -r, 2 * r, 2 * r);
@@ -701,7 +883,7 @@
     }
     b.closePath(); b.stroke();
   }
-  function miniStar6(b, x, y, r) { polyStroke(b, x, y, 3, r, -Math.PI / 2); polyStroke(b, x, y, 3, r, Math.PI / 2); }
+  function miniHex6(b, x, y, r) { polyStroke(b, x, y, 6, r, -Math.PI / 2); }
   function miniLotus(b, x, y, r) {
     b.beginPath(); b.arc(x, y, r * 0.55, 0, 6.2832); b.stroke();
     b.save(); b.translate(x, y); b.rotate(Math.PI / 4);
@@ -713,11 +895,15 @@
     b.moveTo(x, y - r); b.lineTo(x, y + r);
     b.stroke();
   }
+  function miniEnso(b, x, y, r) {
+    b.beginPath(); b.arc(x, y, r * 0.7, -Math.PI * 0.42, Math.PI * 1.2); b.stroke();
+  }
   function drawMotif(b, x, y, r) {
     if (S.motif === "star8") miniStar8(b, x, y, r);
-    else if (S.motif === "star6") miniStar6(b, x, y, r);
+    else if (S.motif === "hex6") miniHex6(b, x, y, r);
     else if (S.motif === "lotus") miniLotus(b, x, y, r);
     else if (S.motif === "plus") miniPlus(b, x, y, r * 1.2);
+    else if (S.motif === "enso") miniEnso(b, x, y, r);
   }
 
   function buildBoard() {
@@ -916,46 +1102,93 @@
     if (reduce) staticFrame(); else step();
   }
 
-  /* ---------- lineage dial ---------- */
-  var ERA = {
-    chaturanga: "Chaturanga \u00b7 India \u00b7 ~6th c.",
-    persia:     "Shatranj \u00b7 Persia \u00b7 9th c.",
-    andalus:    "Shatranj \u00b7 al-Andalus \u00b7 10th c.",
-    codex:      "The Codex \u00b7 Europe \u00b7 15th c.",
-    terminal:   "The Terminal \u00b7 now \u00b7 2026"
+  /* ---------- theme switcher : menu-button + menuitemradio, 7 options ---------- */
+  var BLURB = {
+    "":       "Default \u00b7 the untouched view",
+    arabic:   "Arabic \u00b7 kufic geometry, indigo + gold",
+    japanese: "Japanese \u00b7 sumi-e minimalism, washi + vermillion",
+    indian:   "Indian \u00b7 ornamental jewel tones",
+    codex:    "Codex \u00b7 illuminated manuscript",
+    andalus:  "El-Andalus \u00b7 azulejo + horseshoe geometry",
+    terminal: "Terminal \u00b7 CRT phosphor"
   };
   var toastTimer;
   function showEra(id) {
     if (!eraToast) return;
-    eraToast.textContent = ERA[id];
+    eraToast.textContent = BLURB[id];
     eraToast.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { eraToast.classList.remove("show"); }, 2600);
   }
+  function closeMenu(refocusBtn) {
+    themeMenu.hidden = true;
+    themeBtn.setAttribute("aria-expanded", "false");
+    if (refocusBtn) themeBtn.focus();
+  }
+  function openMenu() {
+    themeMenu.hidden = false;
+    themeBtn.setAttribute("aria-expanded", "true");
+    (themeOpts[skinIdx] || themeOpts[0]).focus();
+  }
   function applySkin(id, announce) {
     S = SKINS[id];
     skinIdx = order.indexOf(id);
-    if (id === "codex") root.removeAttribute("data-skin");
-    else root.setAttribute("data-skin", id);
-    skinBtn.textContent = S.glyph + "  " + S.label;
-    try { localStorage.setItem("mm-era", id); } catch (e) {}
+    if (id === "") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", id);
+    themeBtn.textContent = S.glyph + "  " + S.label;
+    themeOpts.forEach(function (opt) {
+      opt.setAttribute("aria-checked", opt.getAttribute("data-theme") === id ? "true" : "false");
+    });
+    try { localStorage.setItem("mm-theme", id); } catch (e) {}
     if (announce) showEra(id);
     paintFirst();
     if (!reduce) start();
   }
-  skinBtn.addEventListener("click", function () {
-    applySkin(order[(skinIdx + 1) % order.length], true);
+
+  themeBtn.addEventListener("click", function () {
+    if (themeMenu.hidden) openMenu(); else closeMenu(false);
+  });
+  themeBtn.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); openMenu(); }
+    else if (e.key === "Escape") { closeMenu(false); }
+  });
+  themeOpts.forEach(function (opt, i) {
+    opt.addEventListener("click", function () {
+      applySkin(opt.getAttribute("data-theme"), true);
+      closeMenu(true);
+    });
+    opt.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); themeOpts[(i + 1) % themeOpts.length].focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); themeOpts[(i - 1 + themeOpts.length) % themeOpts.length].focus(); }
+      else if (e.key === "Home") { e.preventDefault(); themeOpts[0].focus(); }
+      else if (e.key === "End") { e.preventDefault(); themeOpts[themeOpts.length - 1].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); closeMenu(true); }
+    });
+  });
+  themeMenu.addEventListener("focusout", function (e) {
+    var next = e.relatedTarget;
+    if (!next || (!themeMenu.contains(next) && next !== themeBtn)) closeMenu(false);
+  });
+  document.addEventListener("click", function (e) {
+    if (!themeMenu.hidden && !themeMenu.contains(e.target) && e.target !== themeBtn) closeMenu(false);
   });
 
-  // Restore the visitor's last chosen era; otherwise open on the Codex.
-  var savedEra = null;
-  try { savedEra = localStorage.getItem("mm-era"); } catch (e) {}
-  if (savedEra && SKINS[savedEra]) {
-    applySkin(savedEra, false);
+  // A #theme=<id> in the URL wins (shareable links, and how the launch screenshots were taken);
+  // otherwise restore the visitor's last choice; otherwise open on the untouched default.
+  function hashTheme() {
+    var m = /(?:^|[#&])theme=([a-z]*)/.exec(location.hash);
+    return m ? m[1] : null;
+  }
+  var fromHash = hashTheme();
+  var savedTheme = null;
+  if (fromHash === null) { try { savedTheme = localStorage.getItem("mm-theme"); } catch (e) {} }
+  var initialTheme = fromHash !== null && SKINS.hasOwnProperty(fromHash) ? fromHash : savedTheme;
+  if (initialTheme !== null && SKINS.hasOwnProperty(initialTheme)) {
+    applySkin(initialTheme, false);
   } else {
     paintFirst();
     if (!reduce) start();
-    skinBtn.textContent = S.glyph + "  " + S.label;
+    themeBtn.textContent = S.glyph + "  " + S.label;
   }
 
   window.addEventListener("load", function () {
