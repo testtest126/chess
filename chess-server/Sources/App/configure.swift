@@ -79,5 +79,14 @@ public func configure(_ app: Application) async throws {
 
     app.gameCoordinator = GameCoordinator(app: app)
 
+    // MARK: Response hardening
+
+    // `.beginning` so this wraps Vapor's default ErrorMiddleware rather than
+    // being wrapped by it: at `.end` (the default position), an error thrown
+    // by routing or a handler unwinds straight past this middleware without
+    // running its header-setting code, so 404s/401s/429s/500s would ship
+    // without these headers — exactly the responses where they matter most.
+    app.middleware.use(SecurityHeadersMiddleware(), at: .beginning)
+
     try routes(app)
 }
