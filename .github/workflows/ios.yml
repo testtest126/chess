@@ -19,6 +19,13 @@ on:
       - ".github/workflows/ios.yml"
   workflow_dispatch:
 
+# Least-privilege default (matches ci.yml/docker.yml/nightly.yml): this
+# workflow only checks out the repo and runs local builds/tests, so read-only
+# is sufficient. Explicit here rather than relying on the org/repo default so
+# a future change to that default can't silently widen this workflow's token.
+permissions:
+  contents: read
+
 # Superseded pushes to a PR cancel that PR's running checks, but pushes to
 # main must never cancel each other: back-to-back merges would leave the
 # earlier merge unvalidated (this let a non-compiling commit land unnoticed).
