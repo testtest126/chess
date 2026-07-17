@@ -17,6 +17,19 @@ to nine.
   breakage.
 - **Worker sessions** — implement issues in isolated worktrees, one issue at a
   time, claimed before started.
+- **The Assayer** — the independent verifier. Tests a worker's claim of
+  done/fixed/passing/merged/safe against primary evidence before that claim
+  reaches the human, and returns UNVERIFIED or REFUTED rather than let an
+  unproven claim pass as fact. Full charter: `docs/the-fleet/THE-ASSAYER.md`.
+
+A claim only reaches Yakiv after it clears both gates in order: the worker
+reports it, the Assayer tests it, and the orchestrator relays it onward —
+but only a VERIFIED verdict, or an UNVERIFIED/REFUTED one the keeper has
+explicitly and logged-ly overridden, ever gets called fact. This adds a gate
+in front of the human; it doesn't move any of the others. Merge authority
+still sits with the orchestrator alone, `orchestrator-approval` still means
+exactly what CLAUDE.md rule 4 says it means, and security-sensitive review
+under rule 5 is untouched.
 
 ## Starting work
 
