@@ -90,7 +90,9 @@
   --hero-stat-b:#f3eedd; --hero-stat-span:#b9b8cb;
   --wire-line: rgba(212,175,55,.5); --wire-end-bg:#182050;
   --code-bg:#0a0e26; --code-ink:#cdd0ea; --code-key:#d4af37; --code-str:#8fd0e0; --code-num:#e6c454;
-  --orn-opacity: .16;
+  /* .16 read as noise directly behind small prose (66px hex6 tile, high edge density);
+     cut toward the enso/vine baseline that never got a legibility complaint (see docs/the-fleet/). */
+  --orn-opacity: .07;
 }
 :root[data-theme="japanese"]{
   --bg:#f4efe4; --surface:#efe8d8; --surface-2:#e9e0cc;
@@ -124,7 +126,9 @@
   --hero-stat-b:#f7ead0; --hero-stat-span:#d2b48c;
   --wire-line: rgba(232,160,32,.5); --wire-end-bg:#421a21;
   --code-bg:#210a0d; --code-ink:#f7ead0; --code-key:#e8a020; --code-str:#2bb3ad; --code-num:#f0b840;
-  --orn-opacity: .17;
+  /* .17 was the densest overlap of any theme (64px tile, six large overlapping
+     circles) -- cut toward the enso/vine baseline that never got a legibility complaint. */
+  --orn-opacity: .07;
 }
 :root[data-theme="codex"]{
   --bg:#ece0c0; --surface:#e4d5ad; --surface-2:#dccb9c;
@@ -158,7 +162,9 @@
   --hero-stat-b:#f0e6d2; --hero-stat-span:#c2b294;
   --wire-line: rgba(201,150,60,.5); --wire-end-bg:#0e403c;
   --code-bg:#04201e; --code-ink:#cdeae4; --code-key:#c9963c; --code-str:#2fb3a6; --code-num:#e0ba6a;
-  --orn-opacity: .17;
+  /* .17 on a 72px tile of bold rotated squares -- straight edges at many angles
+     compete hard with letterforms; cut toward the enso/vine baseline. */
+  --orn-opacity: .07;
 }
 :root[data-theme="terminal"]{
   --bg:#080b0a; --surface:#0d120f; --surface-2:#111814;
@@ -175,7 +181,10 @@
   --hero-stat-b:#c9d6c9; --hero-stat-span:#7f9a83;
   --wire-line: rgba(72,208,106,.5); --wire-end-bg:#111814;
   --code-bg:#050807; --code-ink:#c9d6c9; --code-key:#48d06a; --code-str:#59d0c0; --code-num:#8fe0a0;
-  --orn-opacity: .1;
+  /* .1 is already low, but the scan tile repeats every 5px -- close to a text
+     stroke's own width, so it reads as noise regardless of opacity. Widened the
+     tile below (see #scan) and trimmed opacity a little further to match. */
+  --orn-opacity: .05;
 }
 
 html{scroll-behavior:smooth}
@@ -415,6 +424,11 @@ footer .prov{font-size:12.5px;color:var(--ink-soft);margin-top:22px}
 .orn-g{stroke:var(--accent);stroke-opacity:var(--orn-opacity);stroke-width:1;fill:none}
 .orn-scan-a{fill:var(--accent);fill-opacity:calc(var(--orn-opacity) * .5)}
 .orn-scan-b{fill:var(--accent);fill-opacity:var(--orn-opacity)}
+/* legibility backstop for the four densest motifs (hex6/jaali/star8/scan), same fix as
+   docs/the-fleet/: everything in .col/.mod/.inspector/.stage/.stepdesc/.tabs/.msg/.judge/.dec
+   already sits on an opaque --surface and doesn't need this -- only the bare section
+   intros/headings and the footer provenance line sit directly over the ornament layer. */
+:root:is([data-theme="arabic"],[data-theme="indian"],[data-theme="andalus"],[data-theme="terminal"]) :is(section h2,p.intro,p.prov){text-shadow:0 0 2px var(--bg),0 0 4px var(--bg),0 0 7px var(--bg)}
 
 /* switcher lives inline in the sticky nav, not fixed -- the nav already claims that strip */
 .theme-switcher{position:relative;margin-left:auto;flex:none}
@@ -482,9 +496,10 @@ footer .prov{font-size:12.5px;color:var(--ink-soft);margin-top:22px}
         <circle cx="9.5" cy="-16.45" r="11"/>
       </g>
     </pattern>
-    <!-- terminal : CRT scanlines -->
-    <pattern id="scan" width="5" height="5" patternUnits="userSpaceOnUse">
-      <rect x="0" y="0" width="5" height="1" class="orn-scan-a"/>
+    <!-- terminal : CRT scanlines (widened from a 5px repeat -- that was close enough to a
+         text stroke's own width to alias against glyph edges rather than just sit behind them) -->
+    <pattern id="scan" width="6" height="10" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="6" height="1" class="orn-scan-a"/>
       <rect x="0" y="0" width="1" height="1" class="orn-scan-b"/>
     </pattern>
     <!-- japanese : ensō, wide-spaced and incomplete -- ma, the negative space, is the point -->
