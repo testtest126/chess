@@ -56,7 +56,10 @@
   :root[data-theme="arabic"] {
     --ground:#0d1233; --ground-2:#131a45; --ground-3:#182050;
     --hair:rgba(212,175,55,.18); --hair-2:rgba(212,175,55,.09);
-    --bone:#ece7d6; --bone-dim:#b9b8cb; --bone-faint:#7d7f9c;
+    --bone:#ece7d6; --bone-dim:#b9b8cb;
+    /* lifted from #7d7f9c: at .07 orn-opacity that still only cleared 4.24:1 worst-case
+       against the pattern's own color -- short of AA on the math alone, halo notwithstanding. */
+    --bone-faint:#8688a3;
     --gold:#d4af37; --gold-deep:#a8862a; --jade:#4fb0c4; --flare:#c1523f; --merged:#6bab7d;
     --display: "Futura", "Century Gothic", "Avenir Next", "Segoe UI", sans-serif;
     --display-tracking: .02em;
@@ -79,7 +82,9 @@
   :root[data-theme="indian"] {
     --ground:#2a0f14; --ground-2:#37151b; --ground-3:#421a21;
     --hair:rgba(232,160,32,.20); --hair-2:rgba(232,160,32,.1);
-    --bone:#f7ead0; --bone-dim:#d2b48c; --bone-faint:#96806a;
+    --bone:#f7ead0; --bone-dim:#d2b48c;
+    /* lifted from #96806a: 4.25:1 worst-case pre-fix, short of AA on the math alone. */
+    --bone-faint:#a0886f;
     --gold:#e8a020; --gold-deep:#c07f14; --jade:#2bb3ad; --flare:#c81d3a; --merged:#5a9d5f;
     --display: "Didot", "Bodoni MT", "Playfair Display", Georgia, "Times New Roman", serif;
     --display-tracking: 0;
@@ -102,7 +107,9 @@
   :root[data-theme="andalus"] {
     --ground:#062a28; --ground-2:#0a3532; --ground-3:#0e403c;
     --hair:rgba(201,150,60,.18); --hair-2:rgba(201,150,60,.09);
-    --bone:#f0e6d2; --bone-dim:#c2b294; --bone-faint:#8d8267;
+    --bone:#f0e6d2; --bone-dim:#c2b294;
+    /* lifted from #8d8267: only 3.66:1 worst-case pre-fix -- the biggest gap of the four. */
+    --bone-faint:#a3967a;
     --gold:#c9963c; --gold-deep:#a2761f; --jade:#2fb3a6; --flare:#c1633f; --merged:#5f9d6e;
     --display: "Avenir Next", "Century Gothic", "Futura", sans-serif;
     --display-tracking: .01em;
@@ -114,7 +121,11 @@
   :root[data-theme="terminal"] {
     --ground:#080b0a; --ground-2:#0d120f; --ground-3:#111814;
     --hair:rgba(80,220,120,.16); --hair-2:rgba(80,220,120,.08);
-    --bone:#c9d6c9; --bone-dim:#7f9a83; --bone-faint:#4f6654;
+    --bone:#c9d6c9; --bone-dim:#7f9a83;
+    /* lifted from #4f6654: only 2.98:1 worst-case pre-fix -- the token that started this
+       follow-up. The 5px->6x10 scan widening in #scan below still helps, but this value
+       now clears AA on the color math alone, independent of the halo. */
+    --bone-faint:#6e8772;
     --gold:#48d06a; --gold-deep:#33a552; --jade:#59d0c0; --flare:#e0574a; --merged:#48d06a;
     --display: var(--mono);
     --display-tracking: -.02em;
