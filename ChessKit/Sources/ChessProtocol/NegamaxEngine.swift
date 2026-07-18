@@ -42,6 +42,8 @@ public struct NegamaxEngine: ChessEngine {
             return SearchResult(bestMove: bookMove, scoreCentipawns: 0, depth: 0, nodes: 0)
         }
 
+        search.seedRepetitionPath(with: board)
+
         let rootMoves = board.legalMoves()
         guard !rootMoves.isEmpty else {
             // Terminal position: report the game-theoretic score, no move.
@@ -169,6 +171,8 @@ final class Search {
     private static let maxKillerPly = 128
     /// Null-move depth reduction (R = 2, applied on top of the normal -1).
     private static let nullMoveReduction = 2
+    /// Deepest ply tracked for repetition detection.
+    private static let maxPathPly = 256
 
     enum Bound {
         case exact, lower, upper
@@ -195,6 +199,14 @@ final class Search {
     private var killers = [(Move?, Move?)](repeating: (nil, nil), count: maxKillerPly)
     /// Quiet-move history scores indexed by from*64+to, bumped on cutoffs.
     private var history = [Int](repeating: 0, count: 64 * 64)
+    /// Zobrist keys of the positions on the current search line, indexed by
+    /// ply. A position recurs only with the same side to move, so only
+    /// same-parity ancestors are meaningful. Depth-first search overwrites a
+    /// node's slot as it descends, so slots shallower than the current ply
+    /// always hold the live ancestors. Quiescence never repeats (its moves are
+    /// captures and promotions, both irreversible), so only the main search
+    /// maintains this.
+    private var pathKeys = [UInt64](repeating: 0, count: maxPathPly)
 
     private let maxNodes: Int?
     private let deadline: ContinuousClock.Instant?
@@ -215,6 +227,12 @@ final class Search {
         self.generation = generation
         self.maxNodes = limit.maxNodes
         self.deadline = limit.moveTime.map { ContinuousClock.now + .seconds($0) }
+    }
+
+    /// Records the root position at ply 0 of the repetition path, so a line
+    /// that returns to the starting position is seen as a repetition.
+    func seedRepetitionPath(with board: Board) {
+        pathKeys[0] = Zobrist.key(for: board)
     }
 
     /// Checks limits (time and the stop signal only every 1024 nodes — clock
@@ -339,6 +357,24 @@ final class Search {
         // if it searched at least as deep; otherwise keep its best move for
         // ordering.
         let key = Zobrist.key(for: b)
+
+        // Draw by repetition within the search line: this exact position
+        // (placement, side to move, castling, en passant) already occurs among
+        // this node's ancestors. Since a position recurs only with the same
+        // side to move, only even-distance ancestors can match. Scoring a
+        // repeat as a draw — before trusting the transposition table, whose
+        // score is path-agnostic — stops the search from valuing a won-but-
+        // repeating line as still winning (so it makes progress instead), and
+        // lets a losing side steer into a saving repetition.
+        if ply >= 2, ply < Self.maxPathPly {
+            var ancestor = ply - 2
+            while ancestor >= 0 {
+                if pathKeys[ancestor] == key { return 0 }
+                ancestor -= 2
+            }
+        }
+        if ply < Self.maxPathPly { pathKeys[ply] = key }
+
         var ttMove: Move?
         if let entry = table[key] {
             ttMove = entry.move

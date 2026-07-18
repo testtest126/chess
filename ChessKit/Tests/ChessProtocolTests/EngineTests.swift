@@ -25,6 +25,19 @@ final class EngineTests: XCTestCase {
         XCTAssertGreaterThan(result.scoreCentipawns, 0)
     }
 
+    func testRecognizesPerpetualCheckAsDraw() {
+        // White is down a rook and a pawn, but the black king is confined to
+        // g8/h8 and White has a forced perpetual check — 1.Qg6+ Kh8 2.Qh6+ Kg8
+        // returns to the start position. Without repetition awareness the search
+        // values the line by material and reports White as lost; recognizing the
+        // repeat scores that line a draw, the best White has, so the engine no
+        // longer reports a loss. (Position confirmed drawn by an independent
+        // engine at both shallow and deep search.)
+        let board = Board(fen: "6k1/8/3K3Q/q7/p7/8/1r6/8 w - - 0 1")!
+        let result = engine.search(board, limit: SearchLimit(depth: 8))
+        XCTAssertGreaterThan(result.scoreCentipawns, -50, "a forced perpetual check is a draw, not a loss")
+    }
+
     func testTerminalPositionReturnsNoMove() {
         // Fool's-mate final position: black to move is checkmated? No — set an
         // actual checkmate with white to move and mated.

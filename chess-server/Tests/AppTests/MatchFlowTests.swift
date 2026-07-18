@@ -243,6 +243,48 @@ final class MatchFlowTests: XCTestCase {
         try await match.black.close()
     }
 
+    func testReconnectDoesNotCancelAbsentOpponentsForfeit() async throws {
+        // Sub-second grace so the abandonment forfeit resolves quickly.
+        app.gameCoordinator = GameCoordinator(app: app, abandonGracePeriod: .milliseconds(1500))
+
+        let match = try await startMatch()
+
+        // Both players drop — White first, then Black. Under a single shared
+        // abandon task, the field would now hold Black's forfeit, not White's.
+        try await match.white.close()
+        try await Task.sleep(for: .milliseconds(250))
+        try await match.black.close()
+        try await Task.sleep(for: .milliseconds(250))
+
+        // White returns inside the grace window on a fresh socket. This must
+        // cancel only White's own pending forfeit.
+        let whiteBack = try await TestSocket.connect(
+            port: port, token: match.whiteAuth.accessToken, on: app.eventLoopGroup
+        )
+
+        // Black never came back: its abandonment forfeit must still fire, and
+        // White (reconnected) must be told they won. Pre-fix, White's reconnect
+        // cancelled Black's forfeit, so no game_over ever arrived and the game
+        // hung until Black's clock happened to expire.
+        var result: String?
+        var reason: String?
+        drain: for _ in 0..<6 {
+            do {
+                if case .gameOver(let over) = try await whiteBack.next(timeoutSeconds: 4) {
+                    result = over.result
+                    reason = over.reason
+                    break drain
+                }
+            } catch TestSocketError.timeout {
+                break drain
+            }
+        }
+        XCTAssertEqual(result, "1-0", "absent opponent must forfeit despite our reconnect")
+        XCTAssertEqual(reason, "abandoned")
+
+        try await whiteBack.close()
+    }
+
     func testMatchmakingIsolatesTimeControls() async throws {
         // Four players, two controls, interleaved joins: bullet players pair
         // only with each other, rapid players only with each other, and each

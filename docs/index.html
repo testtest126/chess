@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>How MateMate Works</title>
+<style>body{margin:0;padding:0}img{max-width:100%}</style>
+</head>
+<body>
+
+<style>
+:root{
+  --green:#2C6E52; --green-deep:#1C4A37; --green-hero:#173D2E;
+  --buff:#E7D3A4; --buff-soft:#EFE2C0;
+  --bg:#F3F4EE; --surface:#FCFCF8; --surface-2:#EEEFE6;
+  --ink:#1C231F; --ink-soft:#5B665F; --line:#D9DCCF; --line-soft:#E6E8DD;
+  --accent:#2C6E52; --accent-ink:#F1E9D2;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --serif:"Iowan Old Style",Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F1512; --surface:#161E19; --surface-2:#1C2620;
+    --ink:#E8EBE3; --ink-soft:#98A59B; --line:#2A362E; --line-soft:#222D26;
+    --accent:#82CBA6; --accent-ink:#0F1512;
+    --buff:#D9C186; --buff-soft:#3A3323;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#F3F4EE; --surface:#FCFCF8; --surface-2:#EEEFE6;
+  --ink:#1C231F; --ink-soft:#5B665F; --line:#D9DCCF; --line-soft:#E6E8DD;
+  --accent:#2C6E52; --accent-ink:#F1E9D2; --buff:#E7D3A4; --buff-soft:#EFE2C0;
+}
+:root[data-theme="dark"]{
+  --bg:#0F1512; --surface:#161E19; --surface-2:#1C2620;
+  --ink:#E8EBE3; --ink-soft:#98A59B; --line:#2A362E; --line-soft:#222D26;
+  --accent:#82CBA6; --accent-ink:#0F1512; --buff:#D9C186; --buff-soft:#3A3323;
+}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);line-height:1.6;margin:0;
+  font-size:17px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{text-wrap:balance;margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* ---------- shared cross-page nav ---------- */
+nav{position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line-soft)}
+nav .wrap{display:flex;align-items:center;gap:8px 16px;padding-top:10px;padding-bottom:10px;overflow-x:auto}
+nav .brand{font-family:var(--serif);font-weight:700;font-size:16px;white-space:nowrap;color:var(--ink);text-decoration:none;flex:none}
+nav .brand .kn{color:var(--accent)}
+nav .sitenav{display:flex;gap:6px;flex:none}
+nav a.site{font-family:var(--sans);font-size:12.5px;letter-spacing:.01em;text-decoration:none;
+  color:var(--ink-soft);white-space:nowrap;padding:5px 11px;border-radius:99px;border:1px solid transparent}
+nav a.site:hover{color:var(--accent);border-color:var(--line)}
+nav a.site[aria-current="page"]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent);font-weight:600}
+
+/* ---------- hero (deliberately green in both themes) ---------- */
+header.hero{background:linear-gradient(168deg,#1B4736 0%,#143527 58%,#102B20 100%);color:#EFE9D6;position:relative;overflow:hidden}
+header.hero::before{content:"";position:absolute;inset:0;opacity:.10;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 72px, #E7D3A4 72px 73px),
+    repeating-linear-gradient(90deg, transparent 0 72px, #E7D3A4 72px 73px)}
+.hero .wrap{position:relative;padding-top:92px;padding-bottom:76px}
+.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#CBB98A}
+.hero h1{font-size:clamp(40px,6.4vw,66px);line-height:1.06;font-weight:700;margin:14px 0 0;max-width:13em}
+.hero h1 em{font-style:italic;color:#E7D3A4}
+.hero p.lede{font-size:clamp(17px,2.2vw,20px);max-width:38em;color:#D8DCC9;margin:22px 0 0}
+.hero .glyphrow{margin-top:30px;font-size:26px;letter-spacing:.28em;color:#E7D3A4;opacity:.85}
+
+/* ---------- entry cards (question-based) ---------- */
+.entries{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:-44px;position:relative;z-index:5}
+.entry{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:30px 30px 28px;
+  text-decoration:none;color:var(--ink);display:flex;flex-direction:column;
+  box-shadow:0 10px 34px -18px rgba(0,0,0,.30);transition:transform .18s,border-color .18s,box-shadow .18s}
+.entry:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 16px 40px -18px rgba(0,0,0,.4)}
+.entry .glyph{font-size:32px;color:var(--accent);line-height:1}
+.entry .q{font-family:var(--sans);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);
+  font-weight:600;margin:16px 0 6px}
+.entry h2{font-size:clamp(24px,3vw,30px);font-weight:700;line-height:1.12}
+.entry p{font-size:16px;color:var(--ink-soft);margin:12px 0 0}
+.entry ul{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+.entry li{font-family:var(--sans);font-size:13.5px;color:var(--ink);display:flex;gap:10px;align-items:baseline;line-height:1.4}
+.entry li .pc{color:var(--accent);font-size:13px;flex:none}
+.entry .cta{margin-top:22px;font-family:var(--sans);font-size:14px;font-weight:650;color:var(--accent);
+  display:inline-flex;align-items:center;gap:7px}
+.entry:hover .cta .arw{transform:translateX(4px)}
+.entry .cta .arw{transition:transform .18s}
+
+/* ---------- at a glance ---------- */
+.glance{margin-top:64px;padding:34px 0 8px;border-top:1px solid var(--line)}
+.glance .sec-eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.glance h3{font-size:22px;font-weight:700;margin:8px 0 24px}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 20px}
+.fact b{display:block;font-family:var(--sans);font-size:24px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.fact span{font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);display:block;margin-top:4px;line-height:1.4}
+.glance p.note{font-family:var(--sans);font-size:13px;color:var(--ink-soft);margin:22px 0 0;max-width:52em}
+.glance p.note code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:4px;padding:0 4px}
+
+/* ---------- footer ---------- */
+footer{margin-top:72px;border-top:1px solid var(--line);padding:32px 0 56px;font-family:var(--sans)}
+footer .prov{font-size:12.5px;color:var(--ink-soft);max-width:52em;line-height:1.6}
+footer .prov code{font-family:var(--mono)}
+footer .prov b{color:var(--ink);font-weight:600}
+
+@media (max-width:760px){
+  .entries{grid-template-columns:1fr;margin-top:-30px}
+  .facts{grid-template-columns:1fr 1fr}
+}
+</style>
+
+<nav aria-label="MateMate — how it works">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="kn">♞</span> MateMate</a>
+    <div class="sitenav">
+      <a class="site" href="./" aria-current="page">Overview</a>
+      <a class="site" href="architecture/">What is it?</a>
+      <a class="site" href="the-fleet/">How it was built?</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">MateMate · How it works</div>
+    <h1>How <em>MateMate</em> works.</h1>
+    <p class="lede">A small chess app with a real multiplayer backend — and a story about how it
+      was built. Two questions, two guided tours: what the thing <em>is</em>, and how a fleet of
+      AI agents put it together without stepping on each other.</p>
+    <div class="glyphrow" aria-hidden="true">♟ ♞ ♝ ♜ ♛ ♚</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="entries">
+    <a class="entry" href="architecture/">
+      <div class="glyph">♚</div>
+      <div class="q">Question one</div>
+      <h2>What is MateMate?</h2>
+      <p>An all-Swift chess stack: a SwiftUI iPhone app, a hand-written engine, and a Vapor
+        multiplayer server that share one package — so the client, the server, and the wire can
+        never disagree about what chess is.</p>
+      <ul>
+        <li><span class="pc">♔</span> The server is authoritative — every online move is checked before it counts</li>
+        <li><span class="pc">♖</span> One wire protocol, compiled into both app and server</li>
+        <li><span class="pc">♘</span> A deterministic engine, testable down to exact node counts</li>
+      </ul>
+      <span class="cta">Explore the architecture <span class="arw">→</span></span>
+    </a>
+
+    <a class="entry" href="the-fleet/">
+      <div class="glyph">♞</div>
+      <div class="q">Question two</div>
+      <h2>How was it built?</h2>
+      <p>By a fleet of concurrent Claude sessions sharing one repository. They claim work before
+        starting it, build in isolated worktrees, and let exactly one session press merge — so
+        nine writers move fast without overwriting each other.</p>
+      <ul>
+        <li><span class="pc">♙</span> Claim before you build — a four-way check that the work is free</li>
+        <li><span class="pc">♜</span> Isolated worktrees, so no two sessions share a working copy</li>
+        <li><span class="pc">♔</span> One merge authority, and a gate every change has to pass</li>
+      </ul>
+      <span class="cta">See how the agents talked <span class="arw">→</span></span>
+    </a>
+  </div>
+
+  <div class="glance">
+    <div class="sec-eyebrow">At a glance</div>
+    <h3>One package, three programs, nine builders</h3>
+    <div class="facts">
+      <div class="fact"><b>3</b><span>build products from one Swift package</span></div>
+      <div class="fact"><b>9 + 11</b><span>wire messages, client / server</span></div>
+      <div class="fact"><b>2 → 9</b><span>agent sessions, scaled in a day</span></div>
+      <div class="fact"><b>1</b><span>session allowed to press merge</span></div>
+    </div>
+    <p class="note">Each tour is a single self-contained page — no external fonts, scripts, or
+      trackers — and follows your <code>light</code> / <code>dark</code> theme. Start with either
+      question; this page is the shared way in.</p>
+  </div>
+
+  <footer>
+    <p class="prov">MateMate is a demonstration chess project. Every fact in these pages is read
+      from the repository itself — <b>file names, line counts, wire strings, and the coordination
+      rules</b> all come from the source, not marketing. Published with GitHub Pages from the
+      project's <code>docs/</code> directory.</p>
+  </footer>
+
+</main>
+
+</body>
+</html>
