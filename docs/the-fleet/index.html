@@ -56,11 +56,16 @@
   :root[data-theme="arabic"] {
     --ground:#0d1233; --ground-2:#131a45; --ground-3:#182050;
     --hair:rgba(212,175,55,.18); --hair-2:rgba(212,175,55,.09);
-    --bone:#ece7d6; --bone-dim:#b9b8cb; --bone-faint:#7d7f9c;
+    --bone:#ece7d6; --bone-dim:#b9b8cb;
+    /* lifted from #7d7f9c: at .07 orn-opacity that still only cleared 4.24:1 worst-case
+       against the pattern's own color -- short of AA on the math alone, halo notwithstanding. */
+    --bone-faint:#8688a3;
     --gold:#d4af37; --gold-deep:#a8862a; --jade:#4fb0c4; --flare:#c1523f; --merged:#6bab7d;
     --display: "Futura", "Century Gothic", "Avenir Next", "Segoe UI", sans-serif;
     --display-tracking: .02em;
-    --orn-opacity: .16;
+    /* .16 read as noise directly behind small prose (66px hex6 tile, high edge density);
+       cut toward the enso/vine baseline that never got a legibility complaint. */
+    --orn-opacity: .07;
   }
   /* Japanese -- sumi-e minimalism, ma (negative space), washi ground, single vermillion seal */
   :root[data-theme="japanese"] {
@@ -77,11 +82,15 @@
   :root[data-theme="indian"] {
     --ground:#2a0f14; --ground-2:#37151b; --ground-3:#421a21;
     --hair:rgba(232,160,32,.20); --hair-2:rgba(232,160,32,.1);
-    --bone:#f7ead0; --bone-dim:#d2b48c; --bone-faint:#96806a;
+    --bone:#f7ead0; --bone-dim:#d2b48c;
+    /* lifted from #96806a: 4.25:1 worst-case pre-fix, short of AA on the math alone. */
+    --bone-faint:#a0886f;
     --gold:#e8a020; --gold-deep:#c07f14; --jade:#2bb3ad; --flare:#c81d3a; --merged:#5a9d5f;
     --display: "Didot", "Bodoni MT", "Playfair Display", Georgia, "Times New Roman", serif;
     --display-tracking: 0;
-    --orn-opacity: .17;
+    /* .17 was the densest overlap of any theme (64px tile, six large overlapping
+       circles) -- cut toward the enso/vine baseline that never got a legibility complaint. */
+    --orn-opacity: .07;
   }
   /* Codex -- illuminated manuscript, parchment + rubrication + blackletter, its own deliberate world */
   :root[data-theme="codex"] {
@@ -98,21 +107,32 @@
   :root[data-theme="andalus"] {
     --ground:#062a28; --ground-2:#0a3532; --ground-3:#0e403c;
     --hair:rgba(201,150,60,.18); --hair-2:rgba(201,150,60,.09);
-    --bone:#f0e6d2; --bone-dim:#c2b294; --bone-faint:#8d8267;
+    --bone:#f0e6d2; --bone-dim:#c2b294;
+    /* lifted from #8d8267: only 3.66:1 worst-case pre-fix -- the biggest gap of the four. */
+    --bone-faint:#a3967a;
     --gold:#c9963c; --gold-deep:#a2761f; --jade:#2fb3a6; --flare:#c1633f; --merged:#5f9d6e;
     --display: "Avenir Next", "Century Gothic", "Futura", sans-serif;
     --display-tracking: .01em;
-    --orn-opacity: .17;
+    /* .17 on a 72px tile of bold rotated squares -- straight edges at many angles
+       compete hard with letterforms; cut toward the enso/vine baseline. */
+    --orn-opacity: .07;
   }
   /* The Terminal -- now : CRT phosphor green on near-black, monospace everywhere */
   :root[data-theme="terminal"] {
     --ground:#080b0a; --ground-2:#0d120f; --ground-3:#111814;
     --hair:rgba(80,220,120,.16); --hair-2:rgba(80,220,120,.08);
-    --bone:#c9d6c9; --bone-dim:#7f9a83; --bone-faint:#4f6654;
+    --bone:#c9d6c9; --bone-dim:#7f9a83;
+    /* lifted from #4f6654: only 2.98:1 worst-case pre-fix -- the token that started this
+       follow-up. The 5px->6x10 scan widening in #scan below still helps, but this value
+       now clears AA on the color math alone, independent of the halo. */
+    --bone-faint:#6e8772;
     --gold:#48d06a; --gold-deep:#33a552; --jade:#59d0c0; --flare:#e0574a; --merged:#48d06a;
     --display: var(--mono);
     --display-tracking: -.02em;
-    --orn-opacity: .1;
+    /* .1 is already low, but the scan tile repeats every 5px -- close to a text
+       stroke's own width, so it reads as noise regardless of opacity. Widened the
+       tile below (see #scan) and trimmed opacity a little further to match. */
+    --orn-opacity: .05;
   }
 
   * { box-sizing: border-box; }
@@ -148,6 +168,16 @@
   .orn-g { stroke: var(--gold); stroke-opacity: var(--orn-opacity); stroke-width: 1; fill: none; }
   .orn-scan-a { fill: var(--gold); fill-opacity: calc(var(--orn-opacity) * .5); }
   .orn-scan-b { fill: var(--gold); fill-opacity: var(--orn-opacity); }
+
+  /* legibility backstop for the four densest motifs (hex6/jaali/star8/scan): a tight
+     ground-colored halo on the prose that has no card behind it (everything inside
+     .role/.chan/.callout/.manifest/.laws-sec already sits on an opaque --ground-2 and
+     doesn't need this). Lower --orn-opacity above does most of the work; this covers
+     the residual edges right at the glyph boundary where density alone won't. */
+  :root:is([data-theme="arabic"], [data-theme="indian"], [data-theme="andalus"], [data-theme="terminal"])
+    :is(.lede-h, h2, .section-lede, .inc .idx, .inc h3, .inc .refs, .inc p, .inc .law, .standdown .final, .sig, footer) {
+    text-shadow: 0 0 2px var(--ground), 0 0 4px var(--ground), 0 0 7px var(--ground);
+  }
 
   /* prose self-caps at --measure; the section shell is wider so multi-column blocks breathe */
   .wrap { max-width: 62rem; margin-inline: auto; padding-inline: var(--edge); }
@@ -507,9 +537,10 @@
         <circle cx="9.5" cy="-16.45" r="11"/>
       </g>
     </pattern>
-    <!-- terminal : CRT scanlines -->
-    <pattern id="scan" width="5" height="5" patternUnits="userSpaceOnUse">
-      <rect x="0" y="0" width="5" height="1" class="orn-scan-a"/>
+    <!-- terminal : CRT scanlines (widened from a 5px repeat -- that was close enough to a
+         text stroke's own width to alias against glyph edges rather than just sit behind them) -->
+    <pattern id="scan" width="6" height="10" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="6" height="1" class="orn-scan-a"/>
       <rect x="0" y="0" width="1" height="1" class="orn-scan-b"/>
     </pattern>
     <!-- japanese : ensō, wide-spaced and incomplete -- ma, the negative space, is the point -->
