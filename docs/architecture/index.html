@@ -203,7 +203,12 @@ button{font-family:var(--sans);cursor:pointer}
 /* ---------- nav ---------- */
 nav{position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--bg) 86%, transparent);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line-soft)}
-nav .wrap{display:flex;align-items:baseline;gap:22px;padding-top:11px;padding-bottom:11px;overflow-x:auto}
+nav .wrap{display:flex;align-items:baseline;gap:22px;padding-top:11px;padding-bottom:11px}
+/* the section links scroll horizontally on narrow widths; the theme switcher sits outside
+   this box on purpose so its open dropdown is never clipped by an overflow:auto ancestor
+   (overflow-x:auto forces overflow-y to auto too -- that clipped the whole menu, not just
+   the links) */
+nav .nav-links{display:flex;align-items:baseline;gap:22px;overflow-x:auto;min-width:0}
 nav .brand{font-family:var(--serif);font-weight:700;font-size:16px;white-space:nowrap;color:var(--ink);text-decoration:none}
 nav .brand .kn{color:var(--accent)}
 nav a.sec{font-family:var(--sans);font-size:12.5px;letter-spacing:.04em;text-decoration:none;
@@ -524,12 +529,14 @@ footer .prov{font-size:12.5px;color:var(--ink-soft);margin-top:22px}
 
 <nav aria-label="Sections">
   <div class="wrap">
-    <a class="brand" href="#top"><span class="kn">♞</span> MateMate · Architecture</a>
-    <a class="sec" href="#map">System map</a>
-    <a class="sec" href="#move">Life of a move</a>
-    <a class="sec" href="#wire">The wire</a>
-    <a class="sec" href="#engine">The engine</a>
-    <a class="sec" href="#decisions">Decisions</a>
+    <div class="nav-links">
+      <a class="brand" href="#top"><span class="kn">♞</span> MateMate · Architecture</a>
+      <a class="sec" href="#map">System map</a>
+      <a class="sec" href="#move">Life of a move</a>
+      <a class="sec" href="#wire">The wire</a>
+      <a class="sec" href="#engine">The engine</a>
+      <a class="sec" href="#decisions">Decisions</a>
+    </div>
     <div class="theme-switcher">
       <button class="toggle" id="themeBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="themeMenu">&#10022; Default</button>
       <ul class="theme-menu" id="themeMenu" role="menu" aria-label="Visual theme" hidden>
