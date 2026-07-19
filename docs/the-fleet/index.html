@@ -286,6 +286,12 @@
     font-family: var(--mono); font-size: .68rem; letter-spacing: .13em;
     text-transform: uppercase; color: var(--bone-dim); margin-top: .55rem; line-height: 1.35;
   }
+  .stat { position: relative; }
+  .stat .chapter {
+    position: absolute; bottom: 100%; left: 0; margin-bottom: .35rem;
+    font-family: var(--mono); font-size: .6rem; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--gold); line-height: 1; white-space: nowrap;
+  }
 
   /* ------------- SECTIONS ------------- */
   section { padding-block: clamp(3.4rem, 9vh, 6.5rem); }
@@ -560,7 +566,7 @@
 
 <div class="manifest">
   <ul>
-    <li class="stat"><div class="fig num">3<small>days</small></div><div class="cap">Jul 9 &rarr; Jul 12,<br>2026</div></li>
+    <li class="stat"><div class="chapter">Night One</div><div class="fig num">3<small>days</small></div><div class="cap">Jul 9 &rarr; Jul 12,<br>2026</div></li>
     <li class="stat"><div class="fig num">85</div><div class="cap">pull requests<br>merged</div></li>
     <li class="stat"><div class="fig num">93</div><div class="cap">commits on<br>main</div></li>
     <li class="stat"><div class="fig num">9</div><div class="cap">minds at<br>peak</div></li>
