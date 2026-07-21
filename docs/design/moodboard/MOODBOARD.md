@@ -28,11 +28,27 @@ Copy: plain, warm, unhurried. No exclamation marks.
 - Sign in with Apple: exactly stock, always.
 - Motion: default SwiftUI springs only; pieces slide, never bounce. If Settings.app wouldn't animate it, MateMate doesn't.
 
+### App icon & brand mark (AppIcon.appiconset; repo issue #89)
+- The mark: a chess king crowned with a gold checkmark — "check · mate," read twice. Light + dark + tinted 1024 masters ship in the asset catalog; the checkmark's gold = the brass/gold accent.
+- Wordmark: plain SF, heavy — never a custom logotype. The ✓ takes the current mode's accent (brass light / gold dark) and never appears without the name.
+- Wherever the brand appears, a real board appears with it.
+
 ### Piece design & notation (BoardView.swift · MoveAnnouncer.swift)
 - Pieces: Unicode figurines, **filled glyph for both colors**, tinted white(.99) / white(.13) — outline glyphs render inconsistently. Every glyph carries U+FE0E (else the pawn turns emoji and ignores tint). Glyph 0.78× square; dragged piece lifts to 1.4×; white pieces get the stronger shadow (.5 vs .25).
 - Board chrome: 14pt continuous corners, soft drop shadow. Coordinates 0.22× semibold, contrast-validated per theme, black halo on dark squares.
 - Square states: selected yellow .45 · last move yellow .30 · hint blue .35 · legal target = black .22 dot (ring on captures) · check = red radial glow.
 - Notation: SAN from ChessKit (`Board.san`) — `e4 Nf3 exd5 O-O a8=Q Nge2 R1a4 Qxe5+` — always mono on screen. Spoken = built from the move, never raw SAN: "White: Knight to f3, check" / "Black: pawn takes on d5" / "castles kingside" / "pawn promotes to Queen on e1". Every part localized in the app layer.
+
+### Engine strengths & review (GameSession.swift · GameReview)
+- Difficulty presets: Beginner d1/1k nodes · Casual d2/0.5s · Club d4/1.0s · Expert d6/2.5s. Opening book: all but Beginner. Ponders on the player's time: Club + Expert. Random lapse: 30% / 10% / 0 / 0 — erratic like the humans they imitate.
+- The engine never answers instantly: every reply takes ≥400ms, because instant feels broken.
+- Review judgments by centipawn loss: Best ♛ `#1E7A46` <25 · Good ♝ `#71992F` <60 · Inaccuracy ♘ `#C2951C` <120 · Mistake ♞ `#CF7118` <250 · Blunder ♟︎ `#BB3A2C` ≥250. Shows the evaluator's preferred SAN when it differs. Judgment colors are their own scale — never the outcome green/red.
+
+### Online play & clocks (ChessOnline · chess-server)
+- Time controls: Bullet 1+0 (60s) · Blitz 5+3 (default — peers that predate time controls always played 5+3) · Rapid 10+5. Notation always minutes+increment.
+- "The mirror renders the game; the server *is* the game." Local ChessKit mirror for SAN/highlights/instant feel; every online move legality-checked server-side. Vapor owns auth, matchmaking, clocks, ratings.
+- Guests play as `Guest-NNNN`; Sign in with Apple recovers an account, never gates play.
+- Clocks server-authoritative: every `movePlayed` carries ClockState with both remaining times — the phone displays, never decides. Increment flashes green after a side's move; active side wears the quiet accent ring; tenths only under a minute.
 
 ### Web skins (docs pages only — the iOS app never wears a costume)
 Same roles everywhere: ground / bone / gold / jade / flare.
@@ -84,6 +100,12 @@ A sleep aid that stops behaving like software. Not a scary game on a phone — t
 Mood-anchor images are tonal references — the ceiling, not the target. Never reproduced literally. No new sensors; same consent gate and panic switch as THE EYE.
 - **THE MIRROR** (`mirror-and-still-here.md`) — a surface that should show you yourself, lying. Ladder: clear → lag → drift → independence → contact (ceiling). Reflection = player's own live feed, desaturated + contrast-crushed, behind a growing frame-delay buffer; anything past drift is a canned authored asset caught on look-back, never live generation. Motif: "I AM STILL HERE" — persistent utterance that infects existing Poe copy; fogged, half-wiped, under-shown; full scrawl once at the ceiling, if at all. One true silence before the ceiling.
 - **THE IDOL** (`the-idol-and-kintsugi.md`) — beauty quietly breaking, not gore; she is never made whole, she is made *more finished*. Ladder (on EyeSession.Phase): clear → hairline → spreading → gold-bleed → eyes open (ceiling). Cracks = hand-authored vector masks revealed in layers (no fracture sim); gold renders additive — light escaping, not paint. Each *return* of attention advances a crack. The orb = a gilded, distorted read of the player's own camera feed — she is holding you. The gold never resets: the repair IS the haunting. A porcelain tick per crack; silence before the eyes open. Cracks stay material — glass, ceramic, stone — never flesh.
+
+### The haunt — the "cloud" (docs/concept.md §04; later, and gated)
+- "What happened to you happened to someone else, tonight, on their own phone." Story shifts between sessions, responds, is subtly shared. Its on-screen voice: `1 OTHER IS ALSO AWAKE`.
+- Maps onto MateMate's Vapor server/sessions/realtime — already solved. LULL's first network touch, and exactly where chess's security rigor returns: a server handling player data earns real gating.
+- Persistence candidates: a shared "I AM STILL HERE"; gilding a previous player left on the idol. Neither depends on it — local one-sitting versions ship first.
+- No PII in repo, logs, or telemetry — ever. The fear stays legibly fiction, even over the wire.
 
 ### The one rule — horror by permission (PILLARS.md)
 ✓ consent explicit, explained, revocable per sensor · ✓ panic switch instant from any phase · ✓ dread over gore · ✓ the game may lie to its fiction, never to the player about what the app does.
