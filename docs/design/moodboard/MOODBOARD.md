@@ -3,6 +3,10 @@
 Style reference for agents working in these repos. Two games, one maker, opposite moods — never blend them.
 Visual boards: `chess-moodboard.html` / `lull-moodboard.html` (self-contained, open in any browser).
 
+**Contents**
+- 01 · MateMate — Color · Type & voice · Rules · App icon & brand mark · Piece design & notation · Engine strengths & review · Online play & clocks · Accessibility & VoiceOver · Web skins
+- 02 · LULL — Color · Type · Voice · Structure & motion · Named mechanics · Ideation art (Mirror, Idol) · The haunt · The one rule
+
 ---
 
 ## 01 · MateMate (github.com/testtest126/chess)
@@ -16,6 +20,8 @@ Feels like it shipped with iOS, warmed by the walnut of the classic board.
 - Surfaces: cream `#F6EFE2` / card `#FFFDF8` (light); walnut `#171109` / card `#251C11` (dark). (`WarmBackground.colorset`)
 - Outcomes: won `#34C759` · lost `#FF3B30` · draw/ongoing `#8E8E93`.
 - Board themes (`BoardTheme.swift`, light/dark squares): Classic `#F0D9B5/#B58763` · Green `#EDEDD1/#759657` · Blue `#DEE5EE/#6B8CAD` · Gray `#E0E0E0/#8C8C91`.
+
+- Dark mode: accent brass → gold, cream → walnut `#171109`, cards near-black `#251C11`, CTA labels white → `#1F1F1F`, SIWA inverts to stock white. Never flips: board square colors (player's theme choice) and outcome green/red/gray. The ✓ always wears the current mode's accent.
 
 ### Type & voice
 SF / system only. Large Title 34 heavy · body 17 · row headline 15 semibold + outcome dot · detail 12 `#8E8E93`.
@@ -49,6 +55,21 @@ Copy: plain, warm, unhurried. No exclamation marks.
 - "The mirror renders the game; the server *is* the game." Local ChessKit mirror for SAN/highlights/instant feel; every online move legality-checked server-side. Vapor owns auth, matchmaking, clocks, ratings.
 - Guests play as `Guest-NNNN`; Sign in with Apple recovers an account, never gates play.
 - Clocks server-authoritative: every `movePlayed` carries ClockState with both remaining times — the phone displays, never decides. Increment flashes green after a side's move; active side wears the quiet accent ring; tenths only under a minute.
+
+### Leaderboard & ratings (User.swift · GameCoordinator.swift)
+- Standard Elo, server-owned: everyone starts at 1200, K=32, expected = 1/(1+10^(Δ/400)). Deltas ride the `gameOver` message (`ratingDeltaWhite/Black`) — never computed client-side; shown as green +N / red −N.
+- Leaderboard (`GET /leaderboard`): top 50 by Elo, players with ≥1 finished game; reached from the trophy button on Home. Rank gold only for #1.
+- Matchmaking: mutual window — fresh entrant accepts ±100 Elo, widens per second waited, uncapped; a pair forms only when each window covers the gap.
+- Rematch offer window 60s; colors swap; new game uses post-Elo ratings. Profiles (rating + record) visible to signed-in players; game contents are not.
+
+### Accessibility & VoiceOver (audit #83; tested, not aspirational)
+- Every square is a VoiceOver button: label = "e4, White Knight"; identifier `square_e4`; value mirrors every visual highlight — selected · possible move · last move · hint · in check — and states compose ("possible move, last move"). Whole matrix unit-tested.
+- Takebacks announce "Move taken back"; moves speak plain English, never raw SAN.
+- Coordinate contrast unit-tested per theme: light squares ≥4.5:1 (AA small text); mid-tone dark squares can't reach 4.5:1 with any color → white ≥3.0:1 + halo shadow; new scheme must strictly beat the old opposite-square-color labels everywhere.
+- Xcode accessibility audit runs on demand across home/game/review — evidence attachments, not a CI gate.
+- Constraints live in code and tests (`BoardTheme.coordinateColor`, `BrandCTALabelColor`), never as guidance.
+
+- Sounds (`SoundPlayer.swift`): exactly three — `move.wav` · `capture.wav` · `game_end.wav`, fixed 0.6 volume. Session is `.ambient + .mixWithOthers`: the silent switch always wins; other apps' audio keeps playing. Capture vs move decided from the board (en passant included); same sounds vs engine and online.
 
 ### Web skins (docs pages only — the iOS app never wears a costume)
 Same roles everywhere: ground / bone / gold / jade / flare.
@@ -106,6 +127,10 @@ Mood-anchor images are tonal references — the ceiling, not the target. Never r
 - Maps onto MateMate's Vapor server/sessions/realtime — already solved. LULL's first network touch, and exactly where chess's security rigor returns: a server handling player data earns real gating.
 - Persistence candidates: a shared "I AM STILL HERE"; gilding a previous player left on the idol. Neither depends on it — local one-sitting versions ship first.
 - No PII in repo, logs, or telemetry — ever. The fear stays legibly fiction, even over the wire.
+
+### App icon & wordmark (design/app-icon.svg · AppIcon-1024)
+- The mark is a lens, not a cartoon eye — the device's own front camera looking back. Near-black radial ground, catchlight upper-left, one red: an ember ring at the rim `#c0322c` with a faint echo around the pupil. Never blinks, never animates.
+- Wordmark: LULL in mono, tracking .32em, usually beside the ● REC line. No logotype. Working-title alts on record: HUSH / VIGIL / SOMNUS — whatever the name, the lens stays.
 
 ### The one rule — horror by permission (PILLARS.md)
 ✓ consent explicit, explained, revocable per sensor · ✓ panic switch instant from any phase · ✓ dread over gore · ✓ the game may lie to its fiction, never to the player about what the app does.
