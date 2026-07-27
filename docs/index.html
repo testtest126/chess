@@ -11,32 +11,39 @@
 
 <style>
 :root{
-  --green:#2C6E52; --green-deep:#1C4A37; --green-hero:#173D2E;
-  --buff:#E7D3A4; --buff-soft:#EFE2C0;
-  --bg:#F3F4EE; --surface:#FCFCF8; --surface-2:#EEEFE6;
-  --ink:#1C231F; --ink-soft:#5B665F; --line:#D9DCCF; --line-soft:#E6E8DD;
-  --accent:#2C6E52; --accent-ink:#F1E9D2;
+  /* MateMate identity (docs/design/moodboard): brass light / gold dark,
+     cream/walnut surfaces — never default iOS blue, never an invented hue. */
+  --bg:#F6EFE2; --surface:#FFFDF8; --surface-2:#EEE4CE;
+  --ink:#241C12; --ink-soft:#6B5A42; --line:#E2D3B3; --line-soft:#ECE1C8;
+  --accent:#8A6216; --accent-ink:#FFFFFF;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --serif:"Iowan Old Style",Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+
+  /* The hero is a permanently dark, walnut-toned surface in both page themes
+     — like the app's own dark mode, so it always pairs with gold (the
+     dark-surface half of the accent), never brass. Deliberately walnut in
+     both themes, the way the original hero was deliberately green in both. */
+  --hero-grad:linear-gradient(168deg,#2C1D0F 0%,#20160C 58%,#171109 100%);
+  --hero-pattern:#E7BA5C; --hero-ink:#EFE4CD; --hero-eyebrow:#C7A465;
+  --hero-em:#E7BA5C; --hero-lede:#D9CBAE; --hero-glyph:#E7BA5C;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#0F1512; --surface:#161E19; --surface-2:#1C2620;
-    --ink:#E8EBE3; --ink-soft:#98A59B; --line:#2A362E; --line-soft:#222D26;
-    --accent:#82CBA6; --accent-ink:#0F1512;
-    --buff:#D9C186; --buff-soft:#3A3323;
+    --bg:#171109; --surface:#251C11; --surface-2:#2E2213;
+    --ink:#EFE6D3; --ink-soft:#B0A088; --line:#3B2C18; --line-soft:#2A2013;
+    --accent:#E7BA5C; --accent-ink:#1F1F1F;
   }
 }
 :root[data-theme="light"]{
-  --bg:#F3F4EE; --surface:#FCFCF8; --surface-2:#EEEFE6;
-  --ink:#1C231F; --ink-soft:#5B665F; --line:#D9DCCF; --line-soft:#E6E8DD;
-  --accent:#2C6E52; --accent-ink:#F1E9D2; --buff:#E7D3A4; --buff-soft:#EFE2C0;
+  --bg:#F6EFE2; --surface:#FFFDF8; --surface-2:#EEE4CE;
+  --ink:#241C12; --ink-soft:#6B5A42; --line:#E2D3B3; --line-soft:#ECE1C8;
+  --accent:#8A6216; --accent-ink:#FFFFFF;
 }
 :root[data-theme="dark"]{
-  --bg:#0F1512; --surface:#161E19; --surface-2:#1C2620;
-  --ink:#E8EBE3; --ink-soft:#98A59B; --line:#2A362E; --line-soft:#222D26;
-  --accent:#82CBA6; --accent-ink:#0F1512; --buff:#D9C186; --buff-soft:#3A3323;
+  --bg:#171109; --surface:#251C11; --surface-2:#2E2213;
+  --ink:#EFE6D3; --ink-soft:#B0A088; --line:#3B2C18; --line-soft:#2A2013;
+  --accent:#E7BA5C; --accent-ink:#1F1F1F;
 }
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion: reduce){
@@ -62,18 +69,18 @@ nav a.site{font-family:var(--sans);font-size:12.5px;letter-spacing:.01em;text-de
 nav a.site:hover{color:var(--accent);border-color:var(--line)}
 nav a.site[aria-current="page"]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent);font-weight:600}
 
-/* ---------- hero (deliberately green in both themes) ---------- */
-header.hero{background:linear-gradient(168deg,#1B4736 0%,#143527 58%,#102B20 100%);color:#EFE9D6;position:relative;overflow:hidden}
+/* ---------- hero (deliberately walnut in both themes) ---------- */
+header.hero{background:var(--hero-grad);color:var(--hero-ink);position:relative;overflow:hidden}
 header.hero::before{content:"";position:absolute;inset:0;opacity:.10;pointer-events:none;
   background:
-    repeating-linear-gradient(0deg, transparent 0 72px, #E7D3A4 72px 73px),
-    repeating-linear-gradient(90deg, transparent 0 72px, #E7D3A4 72px 73px)}
+    repeating-linear-gradient(0deg, transparent 0 72px, var(--hero-pattern) 72px 73px),
+    repeating-linear-gradient(90deg, transparent 0 72px, var(--hero-pattern) 72px 73px)}
 .hero .wrap{position:relative;padding-top:92px;padding-bottom:76px}
-.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#CBB98A}
+.eyebrow{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--hero-eyebrow)}
 .hero h1{font-size:clamp(40px,6.4vw,66px);line-height:1.06;font-weight:700;margin:14px 0 0;max-width:13em}
-.hero h1 em{font-style:italic;color:#E7D3A4}
-.hero p.lede{font-size:clamp(17px,2.2vw,20px);max-width:38em;color:#D8DCC9;margin:22px 0 0}
-.hero .glyphrow{margin-top:30px;font-size:26px;letter-spacing:.28em;color:#E7D3A4;opacity:.85}
+.hero h1 em{font-style:italic;color:var(--hero-em)}
+.hero p.lede{font-size:clamp(17px,2.2vw,20px);max-width:38em;color:var(--hero-lede);margin:22px 0 0}
+.hero .glyphrow{margin-top:30px;font-size:26px;letter-spacing:.28em;color:var(--hero-glyph);opacity:.85}
 
 /* ---------- entry cards (question-based) ---------- */
 .entries{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:-44px;position:relative;z-index:5}
