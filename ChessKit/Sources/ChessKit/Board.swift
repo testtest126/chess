@@ -108,10 +108,11 @@ public struct Board: Equatable, Hashable, Sendable {
 
     // MARK: - Attack detection
 
-    private static let knightOffsets: [(Int, Int)] = [(1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1), (-2, 1), (-1, 2)]
-    private static let kingOffsets: [(Int, Int)] = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
-    private static let bishopDirs: [(Int, Int)] = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
-    private static let rookDirs: [(Int, Int)] = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+    // Internal (not private) so Evaluation.swift can reuse them for mobility scans.
+    static let knightOffsets: [(Int, Int)] = [(1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1), (-2, 1), (-1, 2)]
+    static let kingOffsets: [(Int, Int)] = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
+    static let bishopDirs: [(Int, Int)] = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
+    static let rookDirs: [(Int, Int)] = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
     /// Is `square` attacked by any piece of `attacker`?
     public func isAttacked(_ square: Int, by attacker: PieceColor) -> Bool {
@@ -381,12 +382,6 @@ public struct Board: Equatable, Hashable, Sendable {
         return copy
     }
 
-    /// Used only by the evaluator to measure opponent mobility.
-    mutating func flipSideForEvaluation() {
-        sideToMove = sideToMove.opposite
-        enPassantSquare = nil
-    }
-
     /// The position with the move passed to the opponent ("null move").
     /// Not a legal chess move — used by search pruning. Must not be called
     /// while the side to move is in check.
@@ -488,46 +483,10 @@ public struct Board: Equatable, Hashable, Sendable {
         return result
     }
 
-    // MARK: - Evaluation (heuristic, for game review)
-
-    /// Static evaluation in centipawns from White's perspective.
-    /// Material + piece-square tables + mobility. Includes terminal-state
-    /// detection (a full legal-move generation), so it's comparatively
-    /// expensive — search hot paths that already know the position isn't
-    /// terminal should use ``evaluateFast()``.
-    public func evaluate() -> Int {
-        switch status {
-        case .checkmate(let winner): return winner == .white ? 100_000 : -100_000
-        case .stalemate, .fiftyMoveDraw, .insufficientMaterial: return 0
-        case .ongoing: break
-        }
-
-        var score = evaluateFast()
-
-        // Mobility (small nudge).
-        var mobilityBoard = self
-        let myMobility = mobilityBoard.pseudoLegalMoves().count
-        mobilityBoard.flipSideForEvaluation()
-        let theirMobility = mobilityBoard.pseudoLegalMoves().count
-        let mobilityDiff = sideToMove == .white ? myMobility - theirMobility : theirMobility - myMobility
-        score += mobilityDiff * 2
-
-        return score
-    }
-
-    /// Material + piece-square tables only: the cheap core of ``evaluate()``,
-    /// with no move generation at all. Callers are responsible for handling
-    /// terminal positions (checkmate/stalemate/draws) themselves.
-    public func evaluateFast() -> Int {
-        var score = 0
-        for (i, piece) in squares.enumerated() {
-            guard let piece else { continue }
-            var value = piece.kind.centipawnValue
-            value += PST.bonus(for: piece, at: i)
-            score += piece.color == .white ? value : -value
-        }
-        return score
-    }
+    // MARK: - Evaluation
+    //
+    // ``evaluate()``, ``evaluateFast()``, and the piece-square tables live in
+    // Evaluation.swift — this file stays focused on rules and move generation.
 
     /// One-ply-deep "best reply aware" evaluation: minimax over legal moves using static eval.
     /// From White's perspective. Used for review accuracy classification.
@@ -542,84 +501,5 @@ public struct Board: Equatable, Hashable, Sendable {
             if sideToMove == .white { best = max(best, value) } else { best = min(best, value) }
         }
         return best
-    }
-}
-
-// MARK: - Piece-square tables
-
-enum PST {
-    // Tables are from White's perspective, index by square (a1 = 0).
-    static let pawn: [Int] = [
-        0, 0, 0, 0, 0, 0, 0, 0,
-        5, 10, 10, -20, -20, 10, 10, 5,
-        5, -5, -10, 0, 0, -10, -5, 5,
-        0, 0, 0, 20, 20, 0, 0, 0,
-        5, 5, 10, 25, 25, 10, 5, 5,
-        10, 10, 20, 30, 30, 20, 10, 10,
-        50, 50, 50, 50, 50, 50, 50, 50,
-        0, 0, 0, 0, 0, 0, 0, 0,
-    ]
-    static let knight: [Int] = [
-        -50, -40, -30, -30, -30, -30, -40, -50,
-        -40, -20, 0, 5, 5, 0, -20, -40,
-        -30, 5, 10, 15, 15, 10, 5, -30,
-        -30, 0, 15, 20, 20, 15, 0, -30,
-        -30, 5, 15, 20, 20, 15, 5, -30,
-        -30, 0, 10, 15, 15, 10, 0, -30,
-        -40, -20, 0, 0, 0, 0, -20, -40,
-        -50, -40, -30, -30, -30, -30, -40, -50,
-    ]
-    static let bishop: [Int] = [
-        -20, -10, -10, -10, -10, -10, -10, -20,
-        -10, 5, 0, 0, 0, 0, 5, -10,
-        -10, 10, 10, 10, 10, 10, 10, -10,
-        -10, 0, 10, 10, 10, 10, 0, -10,
-        -10, 5, 5, 10, 10, 5, 5, -10,
-        -10, 0, 5, 10, 10, 5, 0, -10,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -20, -10, -10, -10, -10, -10, -10, -20,
-    ]
-    static let rook: [Int] = [
-        0, 0, 0, 5, 5, 0, 0, 0,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        5, 10, 10, 10, 10, 10, 10, 5,
-        0, 0, 0, 0, 0, 0, 0, 0,
-    ]
-    static let queen: [Int] = [
-        -20, -10, -10, -5, -5, -10, -10, -20,
-        -10, 0, 5, 0, 0, 0, 0, -10,
-        -10, 5, 5, 5, 5, 5, 0, -10,
-        0, 0, 5, 5, 5, 5, 0, -5,
-        -5, 0, 5, 5, 5, 5, 0, -5,
-        -10, 0, 5, 5, 5, 5, 0, -10,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -20, -10, -10, -5, -5, -10, -10, -20,
-    ]
-    static let king: [Int] = [
-        20, 30, 10, 0, 0, 10, 30, 20,
-        20, 20, 0, 0, 0, 0, 20, 20,
-        -10, -20, -20, -20, -20, -20, -20, -10,
-        -20, -30, -30, -40, -40, -30, -30, -20,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-    ]
-
-    static func bonus(for piece: Piece, at square: Int) -> Int {
-        // Mirror vertically for black.
-        let idx = piece.color == .white ? square : Sq.index(file: Sq.file(square), rank: 7 - Sq.rank(square))
-        switch piece.kind {
-        case .pawn: return pawn[idx]
-        case .knight: return knight[idx]
-        case .bishop: return bishop[idx]
-        case .rook: return rook[idx]
-        case .queen: return queen[idx]
-        case .king: return king[idx]
-        }
     }
 }
