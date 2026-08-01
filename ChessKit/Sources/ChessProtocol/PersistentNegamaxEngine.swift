@@ -72,11 +72,12 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
         name: String = "ChessKit-Negamax-TT",
         author: String = "ChessKit",
         book: OpeningBook? = nil,
+        bookSeed: UInt64 = .random(in: .min ... .max),
         evaluator: any PositionEvaluator = DefaultEvaluator(),
         maxTableEntries: Int = PersistentNegamaxEngine.defaultMaxTableEntries
     ) {
         precondition(maxTableEntries > 0, "maxTableEntries must be positive")
-        self.core = NegamaxEngine(name: name, author: author, book: book, evaluator: evaluator)
+        self.core = NegamaxEngine(name: name, author: author, book: book, bookSeed: bookSeed, evaluator: evaluator)
         self.maxTableEntries = maxTableEntries
     }
 

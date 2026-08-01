@@ -4,14 +4,19 @@ import ChessKit
 /// An alpha-beta negamax search over ChessKit's evaluation, with iterative
 /// deepening, aspiration windows, a transposition table, null-move pruning,
 /// MVV-LVA + killer + history move ordering, check extensions, and quiescence
-/// search. Deterministic when no node or time limit cuts the search short and
-/// no opening book is attached.
+/// search. Deterministic when no node or time limit cuts the search short —
+/// including when an opening book is attached, given the same `bookSeed`.
 public struct NegamaxEngine: ChessEngine {
     public let name: String
     public let author: String
     /// When set, positions found in the book are answered instantly with a
-    /// (uniformly random) book move instead of searching.
+    /// book move (weighted by popularity) instead of searching.
     public let book: OpeningBook?
+    /// Seeds book move selection. The same book, position, and seed always
+    /// pick the same move; the default draws a fresh seed per engine
+    /// instance so ordinary play still varies game to game, while a caller
+    /// that wants reproducible play (tests, replaying a game) can fix it.
+    public let bookSeed: UInt64
     /// The static evaluator consulted at every quiescence leaf. Defaults to
     /// the shipping ``DefaultEvaluator``; a measurement harness can pass a
     /// different one to compare evaluation functions without any shared
@@ -28,11 +33,13 @@ public struct NegamaxEngine: ChessEngine {
         name: String = "ChessKit-Negamax",
         author: String = "ChessKit",
         book: OpeningBook? = nil,
+        bookSeed: UInt64 = .random(in: .min ... .max),
         evaluator: any PositionEvaluator = DefaultEvaluator()
     ) {
         self.name = name
         self.author = author
         self.book = book
+        self.bookSeed = bookSeed
         self.evaluator = evaluator
     }
 
@@ -45,7 +52,7 @@ public struct NegamaxEngine: ChessEngine {
     /// survives across calls. The public `search` always passes a fresh
     /// session, keeping the value-type engine deterministic.
     func search(_ board: Board, limit: SearchLimit, session search: Search) -> SearchResult {
-        if let bookMove = book?.moves(for: board).randomElement(), board.isLegal(bookMove) {
+        if let bookMove = book?.randomMove(for: board, seed: bookSeed), board.isLegal(bookMove) {
             return SearchResult(bestMove: bookMove, scoreCentipawns: 0, depth: 0, nodes: 0)
         }
 

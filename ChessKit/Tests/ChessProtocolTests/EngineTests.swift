@@ -123,6 +123,42 @@ final class EngineTests: XCTestCase {
         XCTAssertNotNil(result.bestMove)
     }
 
+    func testBookMoveSelectionIsDeterministicGivenSameSeed() {
+        let a = NegamaxEngine(book: .standard, bookSeed: 12345)
+        let b = NegamaxEngine(book: .standard, bookSeed: 12345)
+        let board = Board()
+        let resultA = a.search(board, limit: .default)
+        let resultB = b.search(board, limit: .default)
+        XCTAssertEqual(resultA.bestMove, resultB.bestMove)
+        XCTAssertEqual(resultA.nodes, 0)
+        XCTAssertEqual(resultB.nodes, 0)
+
+        // Same engine instance, repeated calls: still the same move (not
+        // reseeded or advanced per call).
+        let again = a.search(board, limit: .default)
+        XCTAssertEqual(resultA.bestMove, again.bestMove)
+    }
+
+    func testLargeBookMoveIsInstantAndLegal() {
+        let bookEngine = NegamaxEngine(book: .large, bookSeed: 1)
+        let board = Board()
+        let result = bookEngine.search(board, limit: .default)
+        XCTAssertEqual(result.nodes, 0, "book hits shouldn't search")
+        let move = try! XCTUnwrap(result.bestMove)
+        XCTAssertTrue(board.isLegal(move))
+    }
+
+    func testLargeBookOutOfBookFallsBackToSearch() {
+        let bookEngine = NegamaxEngine(book: .large, bookSeed: 1)
+        // The generated book only covers the first 10 plies (see
+        // tools/opening-book/); a much deeper, unusual position falls
+        // through to a real search.
+        let board = Board(fen: "r1bqk2r/pp1n1ppp/2p1pn2/3p4/2PP4/2N1PN2/PP2BPPP/R1BQ1RK1 w kq - 0 8")!
+        let result = bookEngine.search(board, limit: SearchLimit(depth: 2))
+        XCTAssertGreaterThan(result.nodes, 0)
+        XCTAssertNotNil(result.bestMove)
+    }
+
     func testSearchEfficiency() {
         // Node-count regression guard: ordering + TT + null move should keep
         // fixed-depth searches small. Deterministic, so bounds aren't flaky —
