@@ -9,9 +9,13 @@ public enum CLI {
     engine-lab — ChessKit-Negamax measurement harness
 
     USAGE:
-      engine-lab bench  [--nodes N | --depth D]
-      engine-lab match  [--depth-a D] [--depth-b D] [--nodes-a N] [--nodes-b N]
-                        [--games G] [--max-plies P]
+      engine-lab bench   [--nodes N | --depth D]
+      engine-lab match   [--depth-a D] [--depth-b D] [--nodes-a N] [--nodes-b N]
+                         [--games G] [--max-plies P]
+      engine-lab abtest  [--depth D] [--baseline-depth D] [--candidate-depth D]
+                         [--elo0 E0] [--elo1 E1] [--alpha A] [--beta B]
+                         [--draw-prob P] [--games G] [--max-plies P]
+                         [--epd PATH [--sample N [--seed S]]]
 
     bench   Search the fixed 20-position suite under one reproducible limit and
             print total nodes, nodes/sec, and a behavioral signature. Default
@@ -21,6 +25,15 @@ public enum CLI {
             report W/D/L, score %, and Elo(A - B) with a 95% margin. Configs A
             and B default to depth 4. All limits are fixed nodes/depth, so runs
             are reproducible.
+
+    abtest  Play a candidate evaluator (MaterialOnlyEvaluator, by default)
+            against a fixed baseline (DefaultEvaluator) across many openings,
+            both colors, checking an SPRT after every game so a confident
+            result can stop before the full schedule. Reports W/D/L, score %,
+            Elo with a 95% margin, and the SPRT verdict. `--epd` points at an
+            EPD opening suite (e.g. from testtest126/books) instead of the
+            built-in set; `--sample N` (with `--seed S`) deterministically
+            samples N positions from it.
     """
 
     /// Entry point. `arguments` is the full `CommandLine.arguments` (with the
@@ -38,6 +51,8 @@ public enum CLI {
             return runBench(args)
         case "match":
             return runMatch(args)
+        case "abtest":
+            return runABTest(args)
         case "-h", "--help", "help":
             print(usage)
             return 0
@@ -117,13 +132,14 @@ public enum CLI {
     }
 
     static func config(
-        depthKey: String, nodesKey: String, defaultDepth: Int, options: [String: String]
+        depthKey: String, nodesKey: String, defaultDepth: Int, options: [String: String],
+        label: String? = nil, evaluator: any PositionEvaluator = DefaultEvaluator()
     ) -> EngineConfig {
         if let nodes = options[nodesKey].flatMap(Int.init) {
-            return EngineConfig(label: "nodes-\(nodes)", limit: Bench.nodeLimit(nodes))
+            return EngineConfig(label: label ?? "nodes-\(nodes)", limit: Bench.nodeLimit(nodes), evaluator: evaluator)
         }
         let depth = options[depthKey].flatMap(Int.init) ?? defaultDepth
-        return EngineConfig(label: "depth-\(depth)", limit: SearchLimit(depth: depth))
+        return EngineConfig(label: label ?? "depth-\(depth)", limit: SearchLimit(depth: depth), evaluator: evaluator)
     }
 
     static func format(_ result: MatchResult, openings: Int) -> String {
@@ -138,6 +154,85 @@ public enum CLI {
         lines.append(
             "Elo(A - B): \(signedString(Int(result.eloDelta.rounded()))) "
                 + "± \(Int(result.eloMargin.rounded()))  (95%)"
+        )
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - abtest
+
+    static func runABTest(_ args: [String]) -> Int32 {
+        let options = parseOptions(args)
+        let sharedDepth = options["depth"].flatMap(Int.init) ?? 3
+        let baseline = config(
+            depthKey: "baseline-depth", nodesKey: "baseline-nodes", defaultDepth: sharedDepth, options: options,
+            label: "baseline (DefaultEvaluator)", evaluator: DefaultEvaluator()
+        )
+        let candidate = config(
+            depthKey: "candidate-depth", nodesKey: "candidate-nodes", defaultDepth: sharedDepth, options: options,
+            label: "candidate (MaterialOnlyEvaluator)", evaluator: MaterialOnlyEvaluator()
+        )
+        let maxPlies = options["max-plies"].flatMap(Int.init) ?? SelfPlay.defaultMaxPlies
+        let maxGames = options["games"].flatMap(Int.init)
+
+        var openings = Openings.standard
+        if let epdPath = options["epd"] {
+            let loaded = EPD.loadOpenings(from: epdPath)
+            if loaded.isEmpty {
+                print("engine-lab: no usable positions loaded from '\(epdPath)'")
+                return 1
+            }
+            if let sampleCount = options["sample"].flatMap(Int.init) {
+                let seed = options["seed"].flatMap(UInt64.init) ?? 1
+                openings = EPD.sample(loaded, count: sampleCount, seed: seed)
+            } else {
+                openings = loaded
+            }
+        }
+
+        let sprtParameters = SPRT.Parameters(
+            elo0: options["elo0"].flatMap(Double.init) ?? 0,
+            elo1: options["elo1"].flatMap(Double.init) ?? 10,
+            alpha: options["alpha"].flatMap(Double.init) ?? 0.05,
+            beta: options["beta"].flatMap(Double.init) ?? 0.05,
+            assumedDrawProbability: options["draw-prob"].flatMap(Double.init) ?? 0.5
+        )
+        guard sprtParameters.isValid else {
+            print(
+                "engine-lab: --draw-prob \(sprtParameters.assumedDrawProbability) is too large for "
+                    + "elo0=\(sprtParameters.elo0)/elo1=\(sprtParameters.elo1) "
+                    + "(implied win or loss probability would go negative)"
+            )
+            return 1
+        }
+
+        let abConfig = ABTestConfig(
+            baseline: baseline, candidate: candidate, openings: openings,
+            maxPlies: maxPlies, sprt: sprtParameters, maxGames: maxGames
+        )
+        let result = ABTest.run(abConfig)
+        print(format(result))
+        return 0
+    }
+
+    static func format(_ result: ABTestResult) -> String {
+        var lines: [String] = []
+        lines.append("A/B eval measurement")
+        lines.append("candidate: \(result.candidateLabel)    baseline: \(result.baselineLabel)")
+        let stoppedNote = result.sprtDecidedAtGame.map { _ in " — SPRT decided here" } ?? ""
+        lines.append("games: \(result.gamesPlayed)\(stoppedNote)")
+        lines.append(
+            "candidate results: +\(result.wins) =\(result.draws) -\(result.losses)   "
+                + "score: \(percent(result.scoreCandidate))"
+        )
+        lines.append(
+            "Elo(candidate - baseline): \(signedString(Int(result.eloDelta.rounded()))) "
+                + "± \(Int(result.eloMargin.rounded()))  (95%)"
+        )
+        lines.append(
+            "SPRT: llr \(String(format: "%.2f", result.sprt.llr))"
+                + " (bounds \(String(format: "%.2f", result.sprt.lowerBound))"
+                + " .. \(String(format: "%.2f", result.sprt.upperBound)))"
+                + " -> \(result.sprt.decision.rawValue)"
         )
         return lines.joined(separator: "\n")
     }
