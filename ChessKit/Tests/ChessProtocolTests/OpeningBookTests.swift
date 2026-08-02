@@ -125,7 +125,7 @@ final class OpeningBookTests: XCTestCase {
         let lines = Array(repeating: "e2e4", count: 9) + ["c2c4"]
         let book = OpeningBook(lines: lines)
         var e4Count = 0
-        for seed: UInt64 in (0..<500) {
+        for seed: UInt64 in 0..<500 {
             if book.randomMove(for: Board(), seed: seed)?.uci == "e2e4" { e4Count += 1 }
         }
         XCTAssertGreaterThan(e4Count, 350, "e2e4 (weight 9) should be picked far more than c2c4 (weight 1)")
