@@ -41,11 +41,14 @@ public struct EngineConfig: Sendable {
     public let label: String
     public let limit: SearchLimit
     public let book: OpeningBook?
+    /// TEMPORARY measurement-only knob, see `Eval.legacyMaterialAndPSTOnly`. Revert before merging.
+    public let legacyEval: Bool
 
-    public init(label: String, limit: SearchLimit, book: OpeningBook? = nil) {
+    public init(label: String, limit: SearchLimit, book: OpeningBook? = nil, legacyEval: Bool = false) {
         self.label = label
         self.limit = limit
         self.book = book
+        self.legacyEval = legacyEval
     }
 
     func makeEngine() -> NegamaxEngine {
@@ -144,6 +147,7 @@ public enum SelfPlay {
 
             let config = board.sideToMove == .white ? white : black
             let engine = board.sideToMove == .white ? whiteEngine : blackEngine
+            Eval.legacyMaterialAndPSTOnly = config.legacyEval
             let search = engine.search(board, limit: config.limit)
             guard let move = search.bestMove, let next = board.making(move) else {
                 // `status` was `.ongoing`, so a legal move exists; reaching here

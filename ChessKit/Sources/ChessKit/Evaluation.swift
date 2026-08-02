@@ -34,7 +34,12 @@ extension Board {
 /// Middlegame and endgame terms are accumulated separately and blended by
 /// `phase` (Fruit-style tapering), so evaluation shifts smoothly across the
 /// game instead of jumping at a hard phase boundary.
-enum Eval {
+public enum Eval {
+    /// TEMPORARY measurement toggle — not part of the shipped engine. Set to
+    /// `true` to fall back to flat material + single-table PST (the pre-change
+    /// evaluation), for an A/B self-play comparison. Revert before merging.
+    nonisolated(unsafe) public static var legacyMaterialAndPSTOnly = false
+
     /// Phase weight per piece kind, summed over the whole board. Full
     /// material (4N + 4B + 4R*2 + 2Q*4) = 24; an empty-ish endgame is near 0.
     private static func phaseWeight(_ kind: PieceKind) -> Int {
@@ -52,6 +57,16 @@ enum Eval {
     private static let mobilityWeight = 2
 
     static func score(_ b: Board) -> Int {
+        if legacyMaterialAndPSTOnly {
+            var score = 0
+            for i in 0..<64 {
+                guard let piece = b[i] else { continue }
+                let value = piece.kind.centipawnValue + PST.bonus(for: piece, at: i)
+                score += piece.color == .white ? value : -value
+            }
+            return score
+        }
+
         var mg = 0
         var eg = 0
         var phase = 0
