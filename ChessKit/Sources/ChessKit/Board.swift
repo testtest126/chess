@@ -515,18 +515,124 @@ public struct Board: Equatable, Hashable, Sendable {
         return score
     }
 
-    /// Material + piece-square tables only: the cheap core of ``evaluate()``,
-    /// with no move generation at all. Callers are responsible for handling
-    /// terminal positions (checkmate/stalemate/draws) themselves.
+    /// Material + piece-square tables, pawn structure, and king safety: the
+    /// cheap core of ``evaluate()``, with no move generation at all (aside
+    /// from the fixed-radius king-shield lookups, which are direct square
+    /// indexing, not movegen). Callers are responsible for handling terminal
+    /// positions (checkmate/stalemate/draws) themselves.
+    ///
+    /// One pass over the board collects material/PST plus the per-file pawn
+    /// bookkeeping that both the pawn-structure and king-safety terms need,
+    /// so those additions cost a handful of per-pawn/per-king checks, not a
+    /// second board scan. The king's own PST bonus is deferred until after
+    /// the pass, once the game phase (needed to blend the middlegame/endgame
+    /// king tables) is known.
     public func evaluateFast() -> Int {
         var score = 0
+        var whitePawnFiles = [Int](repeating: 0, count: 8)
+        var blackPawnFiles = [Int](repeating: 0, count: 8)
+        // Per file, the least-advanced white pawn's rank / most-advanced
+        // black pawn's rank — exactly what a passed-pawn check on the other
+        // color needs. Sentinels (8 / -1) mean "no pawn on this file" and
+        // naturally fall out of every passed-pawn comparison as "no blocker".
+        var whiteMinRankOnFile = [Int](repeating: 8, count: 8)
+        var blackMaxRankOnFile = [Int](repeating: -1, count: 8)
+        var whitePawnSquares: [Int] = []
+        var blackPawnSquares: [Int] = []
+        var whiteKingSquare: Int?
+        var blackKingSquare: Int?
+        var phaseWeight = 0
+
         for (i, piece) in squares.enumerated() {
             guard let piece else { continue }
-            var value = piece.kind.centipawnValue
-            value += PST.bonus(for: piece, at: i)
+            switch piece.kind {
+            case .king:
+                // Deferred: the tapered king PST needs `endgameFactor`, which
+                // isn't known until every piece has been seen.
+                if piece.color == .white { whiteKingSquare = i } else { blackKingSquare = i }
+                continue
+            case .pawn:
+                let f = Sq.file(i), r = Sq.rank(i)
+                if piece.color == .white {
+                    whitePawnFiles[f] += 1
+                    whiteMinRankOnFile[f] = min(whiteMinRankOnFile[f], r)
+                    whitePawnSquares.append(i)
+                } else {
+                    blackPawnFiles[f] += 1
+                    blackMaxRankOnFile[f] = max(blackMaxRankOnFile[f], r)
+                    blackPawnSquares.append(i)
+                }
+            default:
+                phaseWeight += piece.kind.phaseWeight
+            }
+
+            let value = piece.kind.centipawnValue + PST.bonus(for: piece, at: i)
             score += piece.color == .white ? value : -value
         }
+
+        let endgameFactor = 1 - min(1, Double(phaseWeight) / Double(PieceKind.maxPhaseWeight))
+
+        if let whiteKingSquare {
+            score += PST.kingBonus(at: whiteKingSquare, color: .white, endgameFactor: endgameFactor)
+        }
+        if let blackKingSquare {
+            score -= PST.kingBonus(at: blackKingSquare, color: .black, endgameFactor: endgameFactor)
+        }
+
+        score += Eval.pawnStructureScore(
+            whitePawnFiles: whitePawnFiles, blackPawnFiles: blackPawnFiles,
+            whiteMinRankOnFile: whiteMinRankOnFile, blackMaxRankOnFile: blackMaxRankOnFile,
+            whitePawnSquares: whitePawnSquares, blackPawnSquares: blackPawnSquares,
+            endgameFactor: endgameFactor
+        )
+
+        // King safety (pawn shield, open/semi-open files) fades out as the
+        // endgame approaches — it stops being a meaningful concept on a
+        // near-empty board, and by then the tapered PST above is already
+        // pulling the king toward the center instead of the corner.
+        let kingSafetyFactor = 1 - endgameFactor
+        if let whiteKingSquare {
+            score += kingSafetyScore(
+                kingSquare: whiteKingSquare, color: .white,
+                ownPawnFiles: whitePawnFiles, enemyPawnFiles: blackPawnFiles,
+                factor: kingSafetyFactor
+            )
+        }
+        if let blackKingSquare {
+            score -= kingSafetyScore(
+                kingSquare: blackKingSquare, color: .black,
+                ownPawnFiles: blackPawnFiles, enemyPawnFiles: whitePawnFiles,
+                factor: kingSafetyFactor
+            )
+        }
+
         return score
+    }
+
+    /// Pawn shield + open/semi-open file exposure for one king, from that
+    /// king's own color's perspective (positive is good for `color`).
+    private func kingSafetyScore(
+        kingSquare: Int, color: PieceColor,
+        ownPawnFiles: [Int], enemyPawnFiles: [Int], factor: Double
+    ) -> Int {
+        let f = Sq.file(kingSquare), r = Sq.rank(kingSquare)
+        let shieldRank = color == .white ? r + 1 : r - 1
+        var raw = 0
+
+        if (0...7).contains(shieldRank) {
+            for shieldFile in max(0, f - 1)...min(7, f + 1) {
+                if let piece = self[Sq.index(file: shieldFile, rank: shieldRank)],
+                   piece.color == color, piece.kind == .pawn {
+                    raw += Eval.kingShieldBonus
+                }
+            }
+        }
+
+        if ownPawnFiles[f] == 0 {
+            raw -= enemyPawnFiles[f] == 0 ? Eval.openFileKingPenalty : Eval.semiOpenFileKingPenalty
+        }
+
+        return Int(Double(raw) * factor)
     }
 
     /// One-ply-deep "best reply aware" evaluation: minimax over legal moves using static eval.
@@ -599,7 +705,9 @@ enum PST {
         -10, 0, 0, 0, 0, 0, 0, -10,
         -20, -10, -10, -5, -5, -10, -10, -20,
     ]
-    static let king: [Int] = [
+    /// Middlegame king safety: reward tucking into a corner behind the pawn
+    /// shield, punish the center where the king is exposed to open lines.
+    static let kingMidgame: [Int] = [
         20, 30, 10, 0, 0, 10, 30, 20,
         20, 20, 0, 0, 0, 0, 20, 20,
         -10, -20, -20, -20, -20, -20, -20, -10,
@@ -608,6 +716,19 @@ enum PST {
         -30, -40, -40, -50, -50, -40, -40, -30,
         -30, -40, -40, -50, -50, -40, -40, -30,
         -30, -40, -40, -50, -50, -40, -40, -30,
+    ]
+    /// Endgame king activity: with queens and most minor/major pieces off the
+    /// board, the king is an attacking piece — reward centralization, the
+    /// opposite of the middlegame table above.
+    static let kingEndgame: [Int] = [
+        -50, -30, -30, -30, -30, -30, -30, -50,
+        -30, -30, 0, 0, 0, 0, -30, -30,
+        -30, -10, 20, 30, 30, 20, -10, -30,
+        -30, -10, 30, 40, 40, 30, -10, -30,
+        -30, -10, 30, 40, 40, 30, -10, -30,
+        -30, -10, 20, 30, 30, 20, -10, -30,
+        -30, -20, -10, 0, 0, -10, -20, -30,
+        -50, -40, -30, -20, -20, -30, -40, -50,
     ]
 
     static func bonus(for piece: Piece, at square: Int) -> Int {
@@ -619,7 +740,80 @@ enum PST {
         case .bishop: return bishop[idx]
         case .rook: return rook[idx]
         case .queen: return queen[idx]
-        case .king: return king[idx]
+        case .king: return kingMidgame[idx]
         }
+    }
+
+    /// Tapered king bonus: blends the middlegame (safety-seeking) and
+    /// endgame (centralizing) tables by how much material has come off the
+    /// board. Kept separate from `bonus(for:at:)` because it needs the game
+    /// phase, which isn't known until the whole board has been scanned.
+    static func kingBonus(at square: Int, color: PieceColor, endgameFactor: Double) -> Int {
+        let idx = color == .white ? square : Sq.index(file: Sq.file(square), rank: 7 - Sq.rank(square))
+        let mg = Double(kingMidgame[idx])
+        let eg = Double(kingEndgame[idx])
+        return Int((mg * (1 - endgameFactor) + eg * endgameFactor).rounded())
+    }
+}
+
+// MARK: - Pawn structure
+
+enum Eval {
+    /// Penalty per pawn beyond the first on a file.
+    static let doubledPawnPenalty = 12
+    /// Penalty for a pawn with no friendly pawn on either adjacent file.
+    static let isolatedPawnPenalty = 14
+    /// Passed-pawn bonus by rank, White's perspective (a black passed pawn
+    /// looks up the mirrored rank, `7 - rank`). Scaled by `1 + endgameFactor`
+    /// in `pawnStructureScore` — an unstoppable passer is worth far more once
+    /// there's no piece play left on the board to compensate for losing it.
+    static let passedPawnByRank: [Int] = [0, 5, 10, 20, 35, 55, 80, 0]
+    static let kingShieldBonus = 9
+    static let semiOpenFileKingPenalty = 10
+    static let openFileKingPenalty = 22
+
+    /// Doubled/isolated/passed pawns. Reuses the per-file bookkeeping
+    /// `evaluateFast()` already collects in its one pass over the board, so
+    /// this adds no further board scan beyond a handful of per-file/per-pawn
+    /// checks.
+    static func pawnStructureScore(
+        whitePawnFiles: [Int], blackPawnFiles: [Int],
+        whiteMinRankOnFile: [Int], blackMaxRankOnFile: [Int],
+        whitePawnSquares: [Int], blackPawnSquares: [Int],
+        endgameFactor: Double
+    ) -> Int {
+        var score = 0
+
+        for f in 0..<8 {
+            if whitePawnFiles[f] > 1 { score -= doubledPawnPenalty * (whitePawnFiles[f] - 1) }
+            if blackPawnFiles[f] > 1 { score += doubledPawnPenalty * (blackPawnFiles[f] - 1) }
+
+            if whitePawnFiles[f] > 0 {
+                let hasNeighbor = (f > 0 && whitePawnFiles[f - 1] > 0) || (f < 7 && whitePawnFiles[f + 1] > 0)
+                if !hasNeighbor { score -= isolatedPawnPenalty * whitePawnFiles[f] }
+            }
+            if blackPawnFiles[f] > 0 {
+                let hasNeighbor = (f > 0 && blackPawnFiles[f - 1] > 0) || (f < 7 && blackPawnFiles[f + 1] > 0)
+                if !hasNeighbor { score += isolatedPawnPenalty * blackPawnFiles[f] }
+            }
+        }
+
+        let passedScale = 1 + endgameFactor
+        for square in whitePawnSquares {
+            let f = Sq.file(square), r = Sq.rank(square)
+            let blocked = (max(0, f - 1)...min(7, f + 1)).contains { blackMaxRankOnFile[$0] > r }
+            if !blocked {
+                score += Int(Double(passedPawnByRank[r]) * passedScale)
+            }
+        }
+        for square in blackPawnSquares {
+            let f = Sq.file(square), r = Sq.rank(square)
+            let blocked = (max(0, f - 1)...min(7, f + 1)).contains { whiteMinRankOnFile[$0] < r }
+            if !blocked {
+                score -= Int(Double(passedPawnByRank[7 - r]) * passedScale)
+            }
+        }
+
+        return score
     }
 }

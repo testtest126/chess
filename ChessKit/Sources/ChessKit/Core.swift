@@ -33,6 +33,22 @@ public enum PieceKind: String, Codable, Sendable, CaseIterable, Hashable {
         case .king: return 0
         }
     }
+
+    /// Contribution to the tapered-evaluation game-phase estimate. Pawns and
+    /// kings don't count — the phase tracks how much *piece* play is left on
+    /// the board, which is what the king-safety/activity tables key off.
+    var phaseWeight: Int {
+        switch self {
+        case .knight, .bishop: return 1
+        case .rook: return 2
+        case .queen: return 4
+        case .pawn, .king: return 0
+        }
+    }
+
+    /// Both sides' starting non-pawn material in `phaseWeight` units:
+    /// (2 knights + 2 bishops + 2 rooks×2 + 1 queen×4) × 2 sides = 24.
+    static let maxPhaseWeight = 24
 }
 
 public struct Piece: Equatable, Hashable, Codable, Sendable {
