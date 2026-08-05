@@ -12,6 +12,11 @@ public struct NegamaxEngine: ChessEngine {
     /// When set, positions found in the book are answered instantly with a
     /// (uniformly random) book move instead of searching.
     public let book: OpeningBook?
+    /// The static evaluator consulted at every quiescence leaf. Defaults to
+    /// the shipping ``DefaultEvaluator``; a measurement harness can pass a
+    /// different one to compare evaluation functions without any shared
+    /// mutable state (see ``PositionEvaluator``).
+    public let evaluator: any PositionEvaluator
 
     /// Score assigned to a checkmate at the root. Mates found deeper are worth
     /// slightly less so the search prefers the fastest one.
@@ -22,15 +27,17 @@ public struct NegamaxEngine: ChessEngine {
     public init(
         name: String = "ChessKit-Negamax",
         author: String = "ChessKit",
-        book: OpeningBook? = nil
+        book: OpeningBook? = nil,
+        evaluator: any PositionEvaluator = DefaultEvaluator()
     ) {
         self.name = name
         self.author = author
         self.book = book
+        self.evaluator = evaluator
     }
 
     public func search(_ board: Board, limit: SearchLimit) -> SearchResult {
-        search(board, limit: limit, session: Search(limit: limit))
+        search(board, limit: limit, session: Search(limit: limit, evaluator: evaluator))
     }
 
     /// The full search driver, parameterized on the mutable session so
@@ -215,18 +222,22 @@ final class Search {
     /// Stamped onto every entry this session stores, so a persistent engine
     /// can evict by age. Left at 0 for the deterministic struct.
     private let generation: UInt32
+    /// Consulted once per quiescence leaf; see ``PositionEvaluator``.
+    private let evaluator: any PositionEvaluator
 
     init(
         limit: SearchLimit,
         table: [UInt64: TTEntry] = [:],
         stop: SearchStopSignal? = nil,
-        generation: UInt32 = 0
+        generation: UInt32 = 0,
+        evaluator: any PositionEvaluator = DefaultEvaluator()
     ) {
         self.table = table
         self.stop = stop
         self.generation = generation
         self.maxNodes = limit.maxNodes
         self.deadline = limit.moveTime.map { ContinuousClock.now + .seconds($0) }
+        self.evaluator = evaluator
     }
 
     /// Records the root position at ply 0 of the repetition path, so a line
@@ -256,7 +267,8 @@ final class Search {
         // Terminal positions are handled before stand-pat, so the cheap
         // movegen-free evaluation is safe here — and it's the difference
         // between a usable and an unusable search speed.
-        b.sideToMove == .white ? b.evaluateFast() : -b.evaluateFast()
+        let score = evaluator.evaluate(b)
+        return b.sideToMove == .white ? score : -score
     }
 
     private func isQuiet(_ move: Move, in board: Board) -> Bool {

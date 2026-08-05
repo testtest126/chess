@@ -72,10 +72,11 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
         name: String = "ChessKit-Negamax-TT",
         author: String = "ChessKit",
         book: OpeningBook? = nil,
+        evaluator: any PositionEvaluator = DefaultEvaluator(),
         maxTableEntries: Int = PersistentNegamaxEngine.defaultMaxTableEntries
     ) {
         precondition(maxTableEntries > 0, "maxTableEntries must be positive")
-        self.core = NegamaxEngine(name: name, author: author, book: book)
+        self.core = NegamaxEngine(name: name, author: author, book: book, evaluator: evaluator)
         self.maxTableEntries = maxTableEntries
     }
 
@@ -145,7 +146,9 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
     /// the duration of the search so the session mutates the dictionary's
     /// sole reference in place instead of triggering a copy-on-write clone.
     private func searchHoldingLock(_ board: Board, limit: SearchLimit) -> SearchResult {
-        let session = Search(limit: limit, table: table, stop: stopSignal, generation: generation)
+        let session = Search(
+            limit: limit, table: table, stop: stopSignal, generation: generation, evaluator: core.evaluator
+        )
         table = [:]
         let result = core.search(board, limit: limit, session: session)
         table = session.table

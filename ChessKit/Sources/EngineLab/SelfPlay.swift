@@ -41,15 +41,23 @@ public struct EngineConfig: Sendable {
     public let label: String
     public let limit: SearchLimit
     public let book: OpeningBook?
+    /// The static evaluator this config's engine plays with. Defaults to the
+    /// shipping evaluation; the A/B harness (`ABTest.swift`) is the intended
+    /// way to plug in a candidate — see ``PositionEvaluator``.
+    public let evaluator: any PositionEvaluator
 
-    public init(label: String, limit: SearchLimit, book: OpeningBook? = nil) {
+    public init(
+        label: String, limit: SearchLimit, book: OpeningBook? = nil,
+        evaluator: any PositionEvaluator = DefaultEvaluator()
+    ) {
         self.label = label
         self.limit = limit
         self.book = book
+        self.evaluator = evaluator
     }
 
     func makeEngine() -> NegamaxEngine {
-        NegamaxEngine(book: book)
+        NegamaxEngine(book: book, evaluator: evaluator)
     }
 }
 
