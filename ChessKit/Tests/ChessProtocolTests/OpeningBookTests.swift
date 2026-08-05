@@ -90,4 +90,90 @@ final class OpeningBookTests: XCTestCase {
         XCTAssertEqual(moves.count, 1)
         XCTAssertEqual(moves[0].uci, "d7d5")
     }
+
+    // MARK: - Weighted moves
+
+    func testRepeatedLineAccumulatesWeight() {
+        let book = OpeningBook(lines: [
+            "e2e4 e7e5",
+            "e2e4 e7e5",
+            "e2e4 c7c5",
+        ])
+        let weighted = book.weightedMoves(for: Board())
+        XCTAssertEqual(weighted.count, 1) // one distinct move: e2e4
+        XCTAssertEqual(weighted[0].weight, 3) // seen in all three lines
+
+        var board = Board()
+        board.apply(Move(uci: "e2e4")!)
+        let replies = Dictionary(uniqueKeysWithValues: book.weightedMoves(for: board).map { ($0.move.uci, $0.weight) })
+        XCTAssertEqual(replies["e7e5"], 2)
+        XCTAssertEqual(replies["c7c5"], 1)
+    }
+
+    func testRandomMoveIsDeterministicForSameSeed() {
+        let book = OpeningBook(lines: ["e2e4 e7e5", "d2d4 d7d5", "g1f3 g8f6"])
+        for seed: UInt64 in [0, 1, 42, .max] {
+            let first = book.randomMove(for: Board(), seed: seed)
+            let second = book.randomMove(for: Board(), seed: seed)
+            XCTAssertEqual(first, second, "seed \(seed) should always pick the same move")
+        }
+    }
+
+    func testRandomMovePrefersHeavierWeightOverManySeeds() {
+        // 9:1 weight split between e2e4 and c2c4 — over many independent
+        // seeds, the heavier move should come out far more often, not ~50/50.
+        let lines = Array(repeating: "e2e4", count: 9) + ["c2c4"]
+        let book = OpeningBook(lines: lines)
+        var e4Count = 0
+        for seed: UInt64 in 0..<500 {
+            if book.randomMove(for: Board(), seed: seed)?.uci == "e2e4" { e4Count += 1 }
+        }
+        XCTAssertGreaterThan(e4Count, 350, "e2e4 (weight 9) should be picked far more than c2c4 (weight 1)")
+    }
+
+    func testRandomMoveOutOfBookReturnsNil() {
+        let book = OpeningBook(lines: ["e2e4 e7e5"])
+        var board = Board()
+        board.apply(Move(uci: "d2d4")!)
+        XCTAssertNil(book.randomMove(for: board, seed: 7))
+    }
+
+    func testCompactRowsBuildsWeightedBookAndSkipsMalformedRows() {
+        let book = OpeningBook(compactRows: [
+            "|e2e4|100",
+            "|d2d4|80",
+            "e2e4|e7e5|60",
+            "not a valid row",
+            "e2e4|zz99|5", // illegal move, skipped
+            "d2d4 g8f6|c2c4|40",
+        ])
+        let root = Dictionary(uniqueKeysWithValues: book.weightedMoves(for: Board()).map { ($0.move.uci, $0.weight) })
+        XCTAssertEqual(root["e2e4"], 100)
+        XCTAssertEqual(root["d2d4"], 80)
+
+        var afterE4 = Board()
+        afterE4.apply(Move(uci: "e2e4")!)
+        XCTAssertEqual(book.weightedMoves(for: afterE4).map(\.move.uci), ["e7e5"])
+
+        var afterD4Nf6 = Board()
+        afterD4Nf6.apply(Move(uci: "d2d4")!)
+        afterD4Nf6.apply(Move(uci: "g8f6")!)
+        XCTAssertEqual(book.weightedMoves(for: afterD4Nf6).map(\.move.uci), ["c2c4"])
+    }
+
+    func testLargeBookHasKnownOpeningWithLegalMoves() {
+        let book = OpeningBook.large
+        XCTAssertGreaterThan(book.positionCount, 100, "the generated book should have real content bundled")
+
+        let startMoves = book.weightedMoves(for: Board())
+        XCTAssertGreaterThan(startMoves.count, 1)
+        // e2e4 is the single most-played first move in the source database.
+        XCTAssertTrue(startMoves.contains { $0.move.uci == "e2e4" })
+
+        let board = Board()
+        for weighted in startMoves {
+            XCTAssertTrue(board.isLegal(weighted.move), "\(weighted.move.uci) should be legal")
+            XCTAssertGreaterThan(weighted.weight, 0)
+        }
+    }
 }

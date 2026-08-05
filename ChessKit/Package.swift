@@ -11,7 +11,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "ChessKit"),
-        .target(name: "ChessProtocol", dependencies: ["ChessKit"]),
+        .target(
+            name: "ChessProtocol",
+            dependencies: ["ChessKit"],
+            resources: [.copy("Resources/opening_book_large.txt")]
+        ),
         .target(name: "ChessOnline"),
         // Engine measurement harness (bench + self-play). Deliberately NOT a
         // library `product`, so it is never linked into the iOS app; it only
