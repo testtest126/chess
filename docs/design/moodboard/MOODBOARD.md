@@ -1,0 +1,163 @@
+# Moodboards — chess (MateMate) & LULL
+
+Style reference for agents working in these repos. Two games, one maker, opposite moods — never blend them.
+Visual boards: `chess-moodboard.html` / `lull-moodboard.html` (self-contained, open in any browser).
+
+**Contents**
+- 01 · MateMate — Color · Type & voice · Rules · App icon & brand mark · Piece design & notation · Engine strengths & review · Online play & clocks · Accessibility & VoiceOver · Web skins
+- 02 · LULL — Color · Type · Voice · Structure & motion · Named mechanics · Ideation art (Mirror, Idol) · The haunt · The one rule
+
+---
+
+## 01 · MateMate (github.com/testtest126/chess)
+
+**Mood:** warm · classical · native-first iOS · quiet craft · one real board, always.
+Feels like it shipped with iOS, warmed by the walnut of the classic board.
+
+### Color
+- Accent: brass `#8A6216` (light) / gold `#E7BA5C` (dark). Never default iOS blue. (`AccentColor.colorset`)
+- Contrast rule (`Styling.swift · BrandCTALabelColor`): labels on gold fill — white in light mode, `#1F1F1F` in dark. White on `#E7BA5C` fails WCAG (<2:1).
+- Surfaces: cream `#F6EFE2` / card `#FFFDF8` (light); walnut `#171109` / card `#251C11` (dark). (`WarmBackground.colorset`)
+- Outcomes: won `#34C759` · lost `#FF3B30` · draw/ongoing `#8E8E93`.
+- Board themes (`BoardTheme.swift`, light/dark squares): Classic `#F0D9B5/#B58763` · Green `#EDEDD1/#759657` · Blue `#DEE5EE/#6B8CAD` · Gray `#E0E0E0/#8C8C91`.
+
+- Dark mode: accent brass → gold, cream → walnut `#171109`, cards near-black `#251C11`, CTA labels white → `#1F1F1F`, SIWA inverts to stock white. Never flips: board square colors (player's theme choice) and outcome green/red/gray. The ✓ always wears the current mode's accent.
+
+### Type & voice
+SF / system only. Large Title 34 heavy · body 17 · row headline 15 semibold + outcome dot · detail 12 `#8E8E93`.
+Copy: plain, warm, unhurried. No exclamation marks.
+
+### Rules
+- Restyle *within* system idioms: real segmented controls, grouped cards, SF type. No web-look, no fantasy chrome in the app.
+- One real board wherever the brand appears (mini boards, position thumbnails, theme tiles).
+- Selection = 2px accent ring, offset −1.
+- Sign in with Apple: exactly stock, always.
+- Motion: default SwiftUI springs only; pieces slide, never bounce. If Settings.app wouldn't animate it, MateMate doesn't.
+
+### App icon & brand mark (AppIcon.appiconset; repo issue #89)
+- The mark: a chess king crowned with a gold checkmark — "check · mate," read twice. Light + dark + tinted 1024 masters ship in the asset catalog; the checkmark's gold = the brass/gold accent.
+- Wordmark: plain SF, heavy — never a custom logotype. The ✓ takes the current mode's accent (brass light / gold dark) and never appears without the name.
+- Wherever the brand appears, a real board appears with it.
+
+### Piece design & notation (BoardView.swift · MoveAnnouncer.swift)
+- Pieces: Unicode figurines, **filled glyph for both colors**, tinted white(.99) / white(.13) — outline glyphs render inconsistently. Every glyph carries U+FE0E (else the pawn turns emoji and ignores tint). Glyph 0.78× square; dragged piece lifts to 1.4×; white pieces get the stronger shadow (.5 vs .25).
+- Board chrome: 14pt continuous corners, soft drop shadow. Coordinates 0.22× semibold, contrast-validated per theme, black halo on dark squares.
+- Square states: selected yellow .45 · last move yellow .30 · hint blue .35 · legal target = black .22 dot (ring on captures) · check = red radial glow.
+- Notation: SAN from ChessKit (`Board.san`) — `e4 Nf3 exd5 O-O a8=Q Nge2 R1a4 Qxe5+` — always mono on screen. Spoken = built from the move, never raw SAN: "White: Knight to f3, check" / "Black: pawn takes on d5" / "castles kingside" / "pawn promotes to Queen on e1". Every part localized in the app layer.
+
+### Promotion picker (BoardView.swift)
+- Stock `confirmationDialog` titled "Promote to", tinted brass — never a custom picker. Triggered by legality: one from→to matching several legal moves means promotion, on tap and drag alike.
+- Options sorted queen → rook → bishop → knight (`promotionOrder`); names localized via `PieceKind.localizedName`.
+- Spoken: "Black: pawn promotes to Queen on e1" ("pawn takes and promotes to …" on captures). Written: SAN `a8=Q`.
+
+### Hints & takebacks (GameSession.swift)
+- Hint = "what would you play for me?" — fixed depth-4/1.0s search regardless of opponent strength; pondering stops first (hint rides the warm table); shown only if the position is unchanged; both squares tint blue and read "hint"; clears on the next move.
+- Take Back rewinds 2 plies (your move + engine's reply). Gated: game not over, engine idle, ≥2 moves, you to move. VoiceOver: "Move taken back." Engine games only — the server doesn't rewind.
+
+### Opening book (OpeningBook.standard)
+- 14 mainlines, first 4–6 moves each: 1.e4 — Ruy Lopez, Italian, Sicilian Open, Sveshnikov-ish, French Classical, Caro-Kann Classical, Scandinavian · 1.d4 — QGD, Slav, KID, Nimzo-Indian, London · 1.c4 — English Reversed Sicilian, English Symmetric.
+- Keyed by position (`repetitionKey`) — transpositions still hit the book. In book, the engine plays a uniformly random book move (variety). Illegal moves end their line at build time. Used by every strength except Beginner; EngineLab benches leave it off for determinism.
+
+### Engine strengths & review (GameSession.swift · GameReview)
+- Difficulty presets: Beginner d1/1k nodes · Casual d2/0.5s · Club d4/1.0s · Expert d6/2.5s. Opening book: all but Beginner. Ponders on the player's time: Club + Expert. Random lapse: 30% / 10% / 0 / 0 — erratic like the humans they imitate.
+- The engine never answers instantly: every reply takes ≥400ms, because instant feels broken.
+- Review judgments by centipawn loss: Best ♛ `#1E7A46` <25 · Good ♝ `#71992F` <60 · Inaccuracy ♘ `#C2951C` <120 · Mistake ♞ `#CF7118` <250 · Blunder ♟︎ `#BB3A2C` ≥250. Shows the evaluator's preferred SAN when it differs. Judgment colors are their own scale — never the outcome green/red.
+
+### Online play & clocks (ChessOnline · chess-server)
+- Time controls: Bullet 1+0 (60s) · Blitz 5+3 (default — peers that predate time controls always played 5+3) · Rapid 10+5. Notation always minutes+increment.
+- "The mirror renders the game; the server *is* the game." Local ChessKit mirror for SAN/highlights/instant feel; every online move legality-checked server-side. Vapor owns auth, matchmaking, clocks, ratings.
+- Guests play as `Guest-NNNN`; Sign in with Apple recovers an account, never gates play.
+- Clocks server-authoritative: every `movePlayed` carries ClockState with both remaining times — the phone displays, never decides. Increment flashes green after a side's move; active side wears the quiet accent ring; tenths only under a minute.
+
+### Accessibility & VoiceOver (audit #83; tested, not aspirational)
+- Every square is a VoiceOver button: label = "e4, White Knight"; identifier `square_e4`; value mirrors every visual highlight — selected · possible move · last move · hint · in check — and states compose ("possible move, last move"). Whole matrix unit-tested.
+- Takebacks announce "Move taken back"; moves speak plain English, never raw SAN.
+- Coordinate contrast unit-tested per theme: light squares ≥4.5:1 (AA small text); mid-tone dark squares can't reach 4.5:1 with any color → white ≥3.0:1 + halo shadow; new scheme must strictly beat the old opposite-square-color labels everywhere.
+- Xcode accessibility audit runs on demand across home/game/review — evidence attachments, not a CI gate.
+- Constraints live in code and tests (`BoardTheme.coordinateColor`, `BrandCTALabelColor`), never as guidance.
+
+- Sounds (`SoundPlayer.swift`): exactly three — `move.wav` · `capture.wav` · `game_end.wav`, fixed 0.6 volume. Session is `.ambient + .mixWithOthers`: the silent switch always wins; other apps' audio keeps playing. Capture vs move decided from the board (en passant included); same sounds vs engine and online.
+
+### Draw offers & resign (GameCoordinator.swift · Messages.swift)
+- Draw lifecycle is server-owned: `offer_draw` → `draw_offered` relayed to the opponent → `accept_draw` ⇒ ½–½ (drawAgreement, gray) / `decline_draw` ⇒ cleared; a played move clears the offer. One pending offer at a time; accepting only works against the opponent's pending offer.
+- Resign: always confirmed, never one tap — the only red action in the app. Engine games settle locally; online it's one `resign` message and the server declares result + Elo. Mid-search resign is safe (engine answer discarded).
+- `Game.EndReason` names every ending: checkmate · stalemate · resignation · timeout · drawAgreement · abandoned.
+
+### Leaderboard & ratings (User.swift · GameCoordinator.swift)
+- Standard Elo, server-owned: everyone starts at 1200, K=32, expected = 1/(1+10^(Δ/400)). Deltas ride the `gameOver` message (`ratingDeltaWhite/Black`) — never computed client-side; shown as green +N / red −N.
+- Leaderboard (`GET /leaderboard`): top 50 by Elo, players with ≥1 finished game; reached from the trophy button on Home. Rank gold only for #1.
+- Matchmaking: mutual window — fresh entrant accepts ±100 Elo, widens per second waited, uncapped; a pair forms only when each window covers the gap.
+- Rematch offer window 60s; colors swap; new game uses post-Elo ratings. Profiles (rating + record) visible to signed-in players; game contents are not.
+
+### Web skins (docs pages only — the iOS app never wears a costume)
+Same roles everywhere: ground / bone / gold / jade / flare.
+- `arabic` — kufic geometry, indigo + gold. ground `#0d1233`, bone `#ece7d6`, gold `#d4af37`, jade `#4fb0c4`, flare `#c1523f`. Display: Futura.
+- `indian` — lac red + marigold, didone. ground `#2a0f14`, bone `#f7ead0`, gold `#e8a020`, jade `#2bb3ad`, flare `#c81d3a`. Display: Didot.
+- `andalus` — azulejo + horseshoe geometry. ground `#062a28`, bone `#f0e6d2`, gold `#c9963c`, jade `#2fb3a6`, flare `#c1633f`. Display: Avenir Next.
+- `terminal` — CRT phosphor. ground `#080b0a`, bone `#c9d6c9`, gold/merged `#48d06a`, jade `#59d0c0`, flare `#e0574a`. Display: mono.
+- Ornaments: one fixed SVG pattern layer at z-index −1; each theme swaps only the pattern and reads `--gold` stroke + `--orn-opacity`. arabic `hex6` six-fold rosette (.07) · japanese `ensoFaint` incomplete ensō (.05) · indian `jaali` lattice (.07) · codex `vine` marginalia (.12) · andalus `star8` Alhambra lattice (.07) · terminal `scan` 10px CRT lines (.05, widened from 5px to stop glyph aliasing). Headings over the layer get a bg-colored text-shadow halo. Default/light themes: no ornament.
+
+---
+
+## 02 · LULL (github.com/testtest126/LULL)
+
+**Mood:** cold · minimal · quiet dread · restraint over spectacle · consent, always.
+A sleep aid that stops behaving like software. Not a scary game on a phone — the scary thing is the phone. "The unease is in the restraint, not the palette." (`Theme.swift`)
+
+### Color
+- App (`Theme.swift`): ink `#07080a` · bone `#d7d5d0` · dim `#82858c` · faint `#494c53` · red `#bb3b3b`.
+- Landing (`docs/index.html`): ink `#090c12` · bone `#d9d2c4` · sepia `#b9a179` · cyan `#7f9aa2` · red `#a8433f`.
+- Icon ember: `#c0322c`.
+- Red appears in exactly one place at a time (REC dot, ember ring, a verdict). Two reds on screen is a bug.
+
+### Type
+- LABEL: caption2 mono, uppercase, tracking .1–.32em (e.g. `● WATCHING`).
+- TITLE: system 44 heavy, lowercase ("it is awake.").
+- BODY: system 17 — honest consent copy, plain, never altered for atmosphere.
+- NARRATION: serif, lowercase, two-breath lines, never a shout.
+
+### Voice (Atmosphere.swift — original prose in each register, never a quotation; no author's name on screen)
+- Kafka — the threshold (seekingConsent, denied): "a file is opening in your name."
+- Beckett — the lull (watching, released): "nothing yet. / that is the idea."
+- Poe — the watch (noticing → awake): "the eye has found you / and will not blink."
+- Bulgakov — the guest (throughline, curdles): "manuscripts, they say, don't burn. / neither, it turns out, do i."
+
+### Structure & motion
+- Phases (`EyeSession.Phase`): dormant → seekingConsent → watching (40s) → noticing (30s) → awake; endings: denied / released (panic switch, honored from any phase).
+- One narration line per 9s beat (`Atmosphere.beatSeconds`). Slow crossfades only, never cuts. Escalation = more stillness, not more motion (2+ beats at awake → paralysis pairing).
+- Status bar on every screen: phase left, `CLOSE THE EYE` right.
+- Consent UI: hairline strokes, no fills; default is deny; declining is always safe and says so.
+
+### Named mechanics — not yet built (docs/concept.md; same pattern: gate → phase machine → voice)
+- **THE ROOM** (`Sensor.microphone`) — "the microphone hears the silence, and what breaks it." Nothing recorded, nothing leaves the device.
+- **THE REACH** (`Sensor.notifications`) — a notification at 3am, while the app is closed; the one mechanic that reaches past the session. Opt-in.
+- **THE PULSE** (`Sensor.haptics`) — a heartbeat in your palm that is not quite yours; dread state drives one shared haptic curve.
+- **THE HOUR** (ambient: time + `Sensor.motion` stillness) — "it plays differently when it is late and the room has gone still." No new permission; 03:33 is a different game than 21:00.
+- **BEHIND YOU** (spatial audio) — "something placed just over your shoulder, in sound alone." A position, not a creature — never shown, never confirmed.
+- New mechanics are new readings of already-granted sensors — never a reason to ask for a new one.
+
+### Ideation art (docs/ideation/ — design notes, not commitments)
+Mood-anchor images are tonal references — the ceiling, not the target. Never reproduced literally. No new sensors; same consent gate and panic switch as THE EYE.
+- **THE MIRROR** (`mirror-and-still-here.md`) — a surface that should show you yourself, lying. Ladder: clear → lag → drift → independence → contact (ceiling). Reflection = player's own live feed, desaturated + contrast-crushed, behind a growing frame-delay buffer; anything past drift is a canned authored asset caught on look-back, never live generation. Motif: "I AM STILL HERE" — persistent utterance that infects existing Poe copy; fogged, half-wiped, under-shown; full scrawl once at the ceiling, if at all. One true silence before the ceiling.
+- **THE IDOL** (`the-idol-and-kintsugi.md`) — beauty quietly breaking, not gore; she is never made whole, she is made *more finished*. Ladder (on EyeSession.Phase): clear → hairline → spreading → gold-bleed → eyes open (ceiling). Cracks = hand-authored vector masks revealed in layers (no fracture sim); gold renders additive — light escaping, not paint. Each *return* of attention advances a crack. The orb = a gilded, distorted read of the player's own camera feed — she is holding you. The gold never resets: the repair IS the haunting. A porcelain tick per crack; silence before the eyes open. Cracks stay material — glass, ceramic, stone — never flesh.
+
+### The haunt — the "cloud" (docs/concept.md §04; later, and gated)
+- "What happened to you happened to someone else, tonight, on their own phone." Story shifts between sessions, responds, is subtly shared. Its on-screen voice: `1 OTHER IS ALSO AWAKE`.
+- Maps onto MateMate's Vapor server/sessions/realtime — already solved. LULL's first network touch, and exactly where chess's security rigor returns: a server handling player data earns real gating.
+- Persistence candidates: a shared "I AM STILL HERE"; gilding a previous player left on the idol. Neither depends on it — local one-sitting versions ship first.
+- No PII in repo, logs, or telemetry — ever. The fear stays legibly fiction, even over the wire.
+
+### App icon & wordmark (design/app-icon.svg · AppIcon-1024)
+- The mark is a lens, not a cartoon eye — the device's own front camera looking back. Near-black radial ground, catchlight upper-left, one red: an ember ring at the rim `#c0322c` with a faint echo around the pupil. Never blinks, never animates.
+- Wordmark: LULL in mono, tracking .32em, usually beside the ● REC line. No logotype. Working-title alts on record: HUSH / VIGIL / SOMNUS — whatever the name, the lens stays.
+
+### The dev loop (run.sh)
+- One command end to end: xcodegen generate → pick simulator (booted iPhone first, else newest runtime) → boot → build Debug → install → launch. Sign-off in register: "LULL is running on iPhone 16. Enjoy — alone, in the dark."
+- The repo stays clean: never touches LULLKit or app/Sources; generates only the gitignored xcodeproj; temp derived-data outside the repo. Requires full Xcode (not CLT); errors die with the exact fix (`brew install xcodegen`, etc). Even tooling keeps the voice — cyan arrows, lowercase calm.
+- The simulator can't see you: the front camera is a no-op there; build to a real device to see THE EYE actually watch.
+
+### The one rule — horror by permission (PILLARS.md)
+✓ consent explicit, explained, revocable per sensor · ✓ panic switch instant from any phase · ✓ dread over gore · ✓ the game may lie to its fiction, never to the player about what the app does.
+✕ photos/contacts/location/health — forbidden forever (no `Sensor` case exists) · ✕ fake "data leaked" · ✕ PII anywhere · ✕ jump-scare cadence, blood, a raised voice.
+
+If a scare only works by breaking this, the scare is wrong — not the rule.
