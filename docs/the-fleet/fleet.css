@@ -1,0 +1,852 @@
+/* ==========================================================================
+   THE FLEET — shared editorial stylesheet
+   --------------------------------------------------------------------------
+   One system for every chapter of the fleet story. Before this file the same
+   ~470 lines of CSS were pasted into each of the twelve pages, and they had
+   drifted: the contrast and ornament-opacity fixes only ever landed on the
+   first two chapters. Everything is now defined once, here.
+
+   Identity is MateMate's (docs/design/moodboard): brass #8A6216 on cream in
+   light, gold #E7BA5C on walnut #171109 in dark, an SF/native scale for the
+   furniture and an old-style serif for the reading. The six cultural worlds
+   below are untouched in behaviour — they still override only the palette
+   tokens, the display face and the ornament motif.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- tokens -- */
+
+:root {
+  /* Walnut is the default ground: the fleet story is a night-time document,
+     and dark is the half of the MateMate accent that pairs with gold. */
+  --ground:    #171109;
+  --ground-2:  #211809;
+  --ground-3:  #2C1F0E;
+  --hair:      rgba(231,186,92,.15);
+  --hair-2:    rgba(231,186,92,.075);
+  --bone:      #F2E9D6;
+  --bone-dim:  #B7A88C;
+  --bone-faint:#8D7E64;
+  --gold:      #E7BA5C;
+  --gold-deep: #C99A3C;
+  --jade:      #74B7A3;
+  --flare:     #DE8A62;
+  --merged:    #8FB587;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --sans:  -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* theme engine: cultural worlds override these four below --serif/--mono.
+     every skin sets only these vars (+ swaps the ornament pattern + canvas
+     palette in JS) -- component rules never hardcode a font or a tracking
+     value, they read these.
+       --display : headline face
+       --meta    : the furniture face (eyebrows, captions, micro-labels).
+                   Native sans by default; a world can pull it back to mono. */
+  --display:          var(--serif);
+  --display-tracking: -.015em;
+  --meta:             var(--sans);
+  --texture:          none;
+  --orn-opacity:      .15;
+
+  /* type scale — fluid, one ratio, every step derived here and nowhere else */
+  --fs-micro: .72rem;
+  --fs-small: .86rem;
+  --fs-base:  clamp(1.05rem, .28vw + .99rem, 1.1875rem);
+  --fs-lede:  clamp(1.14rem, .55vw + 1.02rem, 1.36rem);
+  --fs-h3:    clamp(1.18rem, .55vw + 1.05rem, 1.42rem);
+  --fs-h2:    clamp(1.8rem, 3.1vw, 2.7rem);
+  --fs-h1:    clamp(2.55rem, 7.2vw, 5.2rem);
+  --fs-quote: clamp(1.45rem, 3.2vw, 2.1rem);
+
+  /* spacing scale */
+  --s1: .5rem;  --s2: .875rem; --s3: 1.25rem;
+  --s4: 2rem;   --s5: 3rem;    --s6: clamp(3.5rem, 9vh, 6.5rem);
+
+  --radius:    14px;
+  --radius-sm: 9px;
+  --shadow:    0 14px 40px -22px rgba(0,0,0,.55);
+  --shadow-lg: 0 22px 60px -26px rgba(0,0,0,.62);
+
+  --measure: 38rem;   /* ~66 characters of the serif at --fs-base */
+  --shell:   66rem;   /* the section shell, wider so grids breathe */
+  --edge: clamp(1.25rem, 5vw, 4rem);
+}
+
+/* Default skin, light preference: cream and brass. Same tokens, other half of
+   the identity. Only applies when no cultural world has been chosen. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ground:    #F6EFE2;
+    --ground-2:  #FFFDF8;
+    --ground-3:  #EEE4CE;
+    --hair:      #E2D3B3;
+    --hair-2:    #ECE1C8;
+    --bone:      #241C12;
+    --bone-dim:  #6B5A42;
+    --bone-faint:#877455;
+    --gold:      #8A6216;
+    --gold-deep: #6E4E11;
+    --jade:      #2E7A66;
+    --flare:     #B4502F;
+    --merged:    #47713F;
+    --shadow:    0 14px 40px -24px rgba(60,42,16,.35);
+    --shadow-lg: 0 22px 60px -28px rgba(60,42,16,.42);
+  }
+}
+
+/* ==== the cultural worlds : opt-in via data-theme, default view untouched ==== */
+
+/* Arabic -- geometric kufic-influenced ornament, deep indigo + gold */
+:root[data-theme="arabic"] {
+  --ground:#0d1233; --ground-2:#131a45; --ground-3:#182050;
+  --hair:rgba(212,175,55,.18); --hair-2:rgba(212,175,55,.09);
+  --bone:#ece7d6; --bone-dim:#b9b8cb;
+  /* lifted from #7d7f9c: at .07 orn-opacity that still only cleared 4.24:1 worst-case
+     against the pattern's own color -- short of AA on the math alone, halo notwithstanding. */
+  --bone-faint:#8688a3;
+  --gold:#d4af37; --gold-deep:#a8862a; --jade:#4fb0c4; --flare:#c1523f; --merged:#6bab7d;
+  --display: "Futura", "Century Gothic", "Avenir Next", "Segoe UI", sans-serif;
+  --display-tracking: .02em;
+  /* .16 read as noise directly behind small prose (66px hex6 tile, high edge density);
+     cut toward the enso/vine baseline that never got a legibility complaint. */
+  --orn-opacity: .07;
+}
+/* Japanese -- sumi-e minimalism, ma (negative space), washi ground, single vermillion seal */
+:root[data-theme="japanese"] {
+  --ground:#f4efe4; --ground-2:#efe8d8; --ground-3:#e9e0cc;
+  --hair:rgba(42,42,40,.10); --hair-2:rgba(42,42,40,.05);
+  --bone:#2a2a28; --bone-dim:#5c5a52; --bone-faint:#8b887c;
+  --gold:#9c8355; --gold-deep:#7c6740; --jade:#6b8f87; --flare:#c94a35; --merged:#6f8f6a;
+  --display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", "Songti SC", Georgia, "Times New Roman", serif;
+  --display-tracking: .01em;
+  --orn-opacity: .05;
+  --texture: radial-gradient(ellipse at 15% 20%, rgba(42,42,40,.025), transparent 55%), radial-gradient(ellipse at 85% 75%, rgba(42,42,40,.02), transparent 50%);
+}
+/* Indian -- ornamental jewel tones, marigold + peacock + deep red, mandala/paisley */
+:root[data-theme="indian"] {
+  --ground:#2a0f14; --ground-2:#37151b; --ground-3:#421a21;
+  --hair:rgba(232,160,32,.20); --hair-2:rgba(232,160,32,.1);
+  --bone:#f7ead0; --bone-dim:#d2b48c;
+  /* lifted from #96806a: 4.25:1 worst-case pre-fix, short of AA on the math alone. */
+  --bone-faint:#a0886f;
+  --gold:#e8a020; --gold-deep:#c07f14; --jade:#2bb3ad; --flare:#c81d3a; --merged:#5a9d5f;
+  --display: "Didot", "Bodoni MT", "Playfair Display", Georgia, "Times New Roman", serif;
+  --display-tracking: 0;
+  /* .17 was the densest overlap of any theme (64px tile, six large overlapping
+     circles) -- cut toward the enso/vine baseline that never got a legibility complaint. */
+  --orn-opacity: .07;
+}
+/* Codex -- illuminated manuscript, parchment + rubrication + blackletter, its own deliberate world */
+:root[data-theme="codex"] {
+  --ground:#ece0c0; --ground-2:#e4d5ad; --ground-3:#dccb9c;
+  --hair:rgba(43,32,19,.14); --hair-2:rgba(43,32,19,.07);
+  --bone:#2b2013; --bone-dim:#5a4a30; --bone-faint:#8a7852;
+  --gold:#af8a2e; --gold-deep:#8a6a1e; --jade:#3f7a6e; --flare:#a3241c; --merged:#5c7a4a;
+  --display: "Old English Text MT", "Cloister Black", "Blackmoor LET", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --display-tracking: 0;
+  --orn-opacity: .12;
+  --texture: radial-gradient(ellipse at 12% 15%, rgba(138,106,30,.07), transparent 50%), radial-gradient(ellipse at 88% 85%, rgba(138,106,30,.06), transparent 55%), radial-gradient(ellipse at 60% 40%, rgba(43,32,19,.03), transparent 60%);
+}
+/* El-Andalus (Moorish) -- azulejo tilework, horseshoe-arch geometry, turquoise + terracotta + gold */
+:root[data-theme="andalus"] {
+  --ground:#062a28; --ground-2:#0a3532; --ground-3:#0e403c;
+  --hair:rgba(201,150,60,.18); --hair-2:rgba(201,150,60,.09);
+  --bone:#f0e6d2; --bone-dim:#c2b294;
+  /* lifted from #8d8267: only 3.66:1 worst-case pre-fix -- the biggest gap of the four. */
+  --bone-faint:#a3967a;
+  --gold:#c9963c; --gold-deep:#a2761f; --jade:#2fb3a6; --flare:#c1633f; --merged:#5f9d6e;
+  --display: "Avenir Next", "Century Gothic", "Futura", sans-serif;
+  --display-tracking: .01em;
+  /* .17 on a 72px tile of bold rotated squares -- straight edges at many angles
+     compete hard with letterforms; cut toward the enso/vine baseline. */
+  --orn-opacity: .07;
+}
+/* The Terminal -- now : CRT phosphor green on near-black, monospace everywhere */
+:root[data-theme="terminal"] {
+  --ground:#080b0a; --ground-2:#0d120f; --ground-3:#111814;
+  --hair:rgba(80,220,120,.16); --hair-2:rgba(80,220,120,.08);
+  --bone:#c9d6c9; --bone-dim:#7f9a83;
+  /* lifted from #4f6654: only 2.98:1 worst-case pre-fix -- the token that started this
+     follow-up. The 5px->6x10 scan widening in #scan still helps, but this value
+     now clears AA on the color math alone, independent of the halo. */
+  --bone-faint:#6e8772;
+  --gold:#48d06a; --gold-deep:#33a552; --jade:#59d0c0; --flare:#e0574a; --merged:#48d06a;
+  --display: var(--mono);
+  --display-tracking: -.02em;
+  --meta: var(--mono);      /* the one world that keeps mono furniture */
+  /* .1 is already low, but the scan tile repeats every 5px -- close to a text
+     stroke's own width, so it reads as noise regardless of opacity. The tile is
+     widened in #scan and the opacity trimmed a little further to match. */
+  --orn-opacity: .05;
+}
+
+/* ------------------------------------------------------------------ base -- */
+
+* { box-sizing: border-box; }
+html {
+  -webkit-text-size-adjust: 100%;
+  background-color: var(--ground);
+  background-image: var(--texture);
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: transparent;
+  color: var(--bone);
+  font-family: var(--serif);
+  font-size: var(--fs-base);
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  overflow-x: hidden;
+}
+
+/* ornament : a fixed pattern layer, its motif chosen per theme -- strokes read
+   var(--gold)/var(--orn-opacity) so one set of defs recolors for every world */
+.ornament { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; display: none; }
+:root[data-theme="arabic"] .ornament,
+:root[data-theme="japanese"] .ornament,
+:root[data-theme="indian"] .ornament,
+:root[data-theme="codex"] .ornament,
+:root[data-theme="andalus"] .ornament,
+:root[data-theme="terminal"] .ornament { display: block; }
+.orn-rect { fill: none; }
+:root[data-theme="arabic"]   .orn-rect { fill: url(#hex6); }
+:root[data-theme="japanese"] .orn-rect { fill: url(#ensoFaint); }
+:root[data-theme="indian"]   .orn-rect { fill: url(#jaali); }
+:root[data-theme="codex"]    .orn-rect { fill: url(#vine); }
+:root[data-theme="andalus"]  .orn-rect { fill: url(#star8); }
+:root[data-theme="terminal"] .orn-rect { fill: url(#scan); }
+/* one set of pattern defs, every theme recolors them through these two rules */
+.orn-g { stroke: var(--gold); stroke-opacity: var(--orn-opacity); stroke-width: 1; fill: none; }
+.orn-scan-a { fill: var(--gold); fill-opacity: calc(var(--orn-opacity) * .5); }
+.orn-scan-b { fill: var(--gold); fill-opacity: var(--orn-opacity); }
+
+/* legibility backstop for the four densest motifs (hex6/jaali/star8/scan): a tight
+   ground-colored halo on the prose that has no card behind it (everything inside
+   .role/.chan/.callout/.manifest/.laws-sec already sits on an opaque --ground-2 and
+   doesn't need this). Lower --orn-opacity above does most of the work; this covers
+   the residual edges right at the glyph boundary where density alone won't. */
+:root:is([data-theme="arabic"], [data-theme="indian"], [data-theme="andalus"], [data-theme="terminal"])
+  :is(.lede-h, h2, .section-lede, .inc .idx, .inc h3, .inc .refs, .inc p, .inc .law, .standdown .final, .sig, footer) {
+  text-shadow: 0 0 2px var(--ground), 0 0 4px var(--ground), 0 0 7px var(--ground);
+}
+
+/* ---------------------------------------------------------------- layout -- */
+
+.wrap { max-width: var(--shell); margin-inline: auto; padding-inline: var(--edge); }
+section { padding-block: var(--s6); }
+
+/* --------------------------------------------------------------- utility -- */
+
+.eyebrow {
+  font-family: var(--meta);
+  font-size: var(--fs-micro);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 600;
+}
+/* code identifiers stay mono in every world, tinted just enough to read as a
+   token rather than as emphasis. No nowrap: several of these are long enough
+   to overflow a narrow card. */
+.mono {
+  font-family: var(--mono);
+  font-size: .88em;
+  letter-spacing: -.01em;
+  color: var(--bone);
+  background: color-mix(in oklab, var(--gold) 7%, transparent);
+  border-radius: 4px;
+  padding: .06em .3em;
+  overflow-wrap: break-word;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ hero -- */
+
+.hero {
+  position: relative;
+  min-height: min(94svh, 840px);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  /* deliberately walnut in every page theme -- the fleet's title card is the
+     app's own dark surface, so it always pairs with gold, never brass */
+  background: #171109;
+  color: #F2E9D6;
+  border-bottom: 1px solid rgba(231,186,92,.24);
+}
+:root[data-theme="arabic"]   .hero { background: #0d1233; border-bottom-color: rgba(212,175,55,.30); }
+:root[data-theme="japanese"] .hero { background: #f4efe4; border-bottom-color: rgba(42,42,40,.16); }
+:root[data-theme="indian"]   .hero { background: #2a0f14; border-bottom-color: rgba(232,160,32,.32); }
+:root[data-theme="codex"]    .hero { background: #ece0c0; border-bottom-color: rgba(163,36,28,.30); }
+:root[data-theme="andalus"]  .hero { background: #062a28; border-bottom-color: rgba(201,150,60,.30); }
+:root[data-theme="terminal"] .hero { background: #080b0a; border-bottom-color: rgba(72,208,106,.28); }
+
+#board { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hero-scrim {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(23,17,9,.34) 55%, rgba(23,17,9,.9) 100%),
+    linear-gradient(to top, rgba(23,17,9,.97) 0%, rgba(23,17,9,.58) 34%, transparent 64%);
+  pointer-events: none;
+}
+:root[data-theme="arabic"] .hero-scrim {
+  background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(13,18,51,.34) 55%, rgba(13,18,51,.9) 100%),
+    linear-gradient(to top, rgba(13,18,51,.96) 0%, rgba(13,18,51,.55) 32%, transparent 62%);
+}
+:root[data-theme="japanese"] .hero-scrim {
+  background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(244,239,228,.4) 55%, rgba(244,239,228,.92) 100%),
+    linear-gradient(to top, rgba(244,239,228,.96) 0%, rgba(244,239,228,.6) 32%, transparent 62%);
+}
+:root[data-theme="indian"] .hero-scrim {
+  background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(42,15,20,.34) 55%, rgba(42,15,20,.9) 100%),
+    linear-gradient(to top, rgba(42,15,20,.96) 0%, rgba(42,15,20,.55) 32%, transparent 62%);
+}
+:root[data-theme="codex"] .hero-scrim {
+  background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(236,224,192,.4) 55%, rgba(236,224,192,.92) 100%),
+    linear-gradient(to top, rgba(236,224,192,.96) 0%, rgba(236,224,192,.6) 32%, transparent 62%);
+}
+:root[data-theme="andalus"] .hero-scrim {
+  background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(6,42,40,.34) 55%, rgba(6,42,40,.9) 100%),
+    linear-gradient(to top, rgba(6,42,40,.96) 0%, rgba(6,42,40,.55) 32%, transparent 62%);
+}
+:root[data-theme="terminal"] .hero-scrim {
+  background: radial-gradient(120% 90% at 78% 42%, transparent 0%, rgba(8,11,10,.34) 55%, rgba(8,11,10,.9) 100%),
+    linear-gradient(to top, rgba(8,11,10,.96) 0%, rgba(8,11,10,.55) 32%, transparent 62%);
+}
+
+.hero-inner {
+  position: relative;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding: var(--edge);
+  padding-bottom: clamp(2.75rem, 8vh, 5.5rem);
+  width: 100%;
+}
+.hero .eyebrow { color: #E7BA5C; }
+:root[data-theme="arabic"]   .hero .eyebrow { color: #d4af37; }
+:root[data-theme="japanese"] .hero .eyebrow { color: #9c8355; }
+:root[data-theme="indian"]   .hero .eyebrow { color: #e8a020; }
+:root[data-theme="codex"]    .hero .eyebrow { color: #8a6a1e; }
+:root[data-theme="andalus"]  .hero .eyebrow { color: #c9963c; }
+:root[data-theme="terminal"] .hero .eyebrow { color: #48d06a; }
+
+.kicker-row { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+.kicker-row .dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: #E7BA5C; box-shadow: 0 0 0 3px rgba(231,186,92,.16), 0 0 12px rgba(231,186,92,.7);
+}
+:root[data-theme="arabic"]   .kicker-row .dot { background: #4fb0c4; box-shadow: 0 0 0 3px rgba(79,176,196,.16), 0 0 12px #4fb0c4; }
+:root[data-theme="japanese"] .kicker-row .dot { background: #c94a35; box-shadow: 0 0 0 3px rgba(201,74,53,.14), 0 0 6px #c94a35; }
+:root[data-theme="indian"]   .kicker-row .dot { background: #2bb3ad; box-shadow: 0 0 0 3px rgba(43,179,173,.16), 0 0 12px #2bb3ad; }
+:root[data-theme="codex"]    .kicker-row .dot { background: #a3241c; box-shadow: 0 0 0 3px rgba(163,36,28,.16), 0 0 8px rgba(163,36,28,.5); }
+:root[data-theme="andalus"]  .kicker-row .dot { background: #2fb3a6; box-shadow: 0 0 0 3px rgba(47,179,166,.16), 0 0 12px #2fb3a6; }
+:root[data-theme="terminal"] .kicker-row .dot { background: #59d0c0; box-shadow: 0 0 0 3px rgba(89,208,192,.16), 0 0 12px #59d0c0; }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: var(--fs-h1);
+  line-height: .97;
+  letter-spacing: -.022em;
+  margin: 1.15rem 0 0;
+  text-wrap: balance;
+  color: #F7F0DE;
+}
+h1 em { font-style: italic; color: #E7BA5C; }
+:root[data-theme="arabic"]   h1 em { color: #e6c454; }
+:root[data-theme="japanese"] h1 em { color: #c94a35; font-style: normal; }
+:root[data-theme="indian"]   h1 em { color: #f0b840; }
+:root[data-theme="codex"]    h1 em { color: #a3241c; font-style: normal; }
+:root[data-theme="andalus"]  h1 em { color: #dcb15a; }
+:root[data-theme="terminal"] h1 em { color: #6ee08a; font-style: normal; }
+/* the two parchment/washi worlds run a light hero -- flip the hardcoded cream hero text to ink */
+:root[data-theme="japanese"] h1, :root[data-theme="codex"] h1 { color: #2a2018; }
+:root[data-theme="japanese"] .standfirst, :root[data-theme="codex"] .standfirst { color: #5b5346; }
+:root[data-theme="japanese"] .standfirst b, :root[data-theme="codex"] .standfirst b { color: #211c14; }
+
+.standfirst {
+  max-width: 33rem;
+  margin: 1.5rem 0 0;
+  color: #D9CBAE;
+  font-size: var(--fs-lede);
+  line-height: 1.52;
+  text-wrap: pretty;
+}
+.standfirst b { color: #F2E9D6; font-weight: 600; }
+
+/* ------------------------------------------------------- manifest / stats -- */
+
+.manifest {
+  background: var(--ground-2);
+  border-bottom: 1px solid var(--hair);
+}
+.manifest ul {
+  list-style: none; margin: 0 auto;
+  padding: clamp(1.75rem, 4vw, 2.6rem) var(--edge);
+  max-width: 76rem;
+  display: grid;
+  gap: clamp(1.4rem, 2.4vw, 2rem) clamp(1rem, 3vw, 2.4rem);
+  grid-template-columns: repeat(6, 1fr);
+}
+@media (max-width: 720px)  { .manifest ul { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 721px) and (max-width: 980px) { .manifest ul { grid-template-columns: repeat(3, 1fr); } }
+
+.stat {
+  position: relative;
+  padding-left: clamp(.85rem, 1.4vw, 1.15rem);
+  border-left: 1px solid var(--hair);
+}
+.stat .fig {
+  font-family: var(--display); font-weight: 600;
+  font-size: clamp(2.05rem, 3.4vw, 2.85rem);
+  line-height: 1; letter-spacing: -.03em;
+  color: var(--bone); font-variant-numeric: tabular-nums lining-nums;
+  display: flex; align-items: baseline; gap: .16em;
+}
+.stat .fig small {
+  font-family: var(--meta);
+  font-size: .34em; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--gold);
+}
+.stat .cap {
+  font-family: var(--meta); font-size: var(--fs-micro);
+  letter-spacing: .04em; color: var(--bone-dim);
+  margin-top: .6rem; line-height: 1.45;
+}
+/* the chapter badge ("Night One") sits in flow above its figure -- it used to be
+   absolutely positioned, which clipped against the strip's top padding */
+.stat .chapter {
+  font-family: var(--meta); font-size: .625rem; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--gold); line-height: 1; white-space: nowrap;
+  margin-bottom: .6rem;
+}
+
+/* -------------------------------------------------------- section heading -- */
+
+.lede-h {
+  font-family: var(--meta); font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 1.1rem;
+  display: flex; align-items: center; gap: .7rem;
+}
+.lede-h::after {
+  content: ""; flex: 1 1 auto; height: 1px; max-width: 5rem;
+  background: linear-gradient(to right, var(--hair), transparent);
+}
+:root[data-theme="arabic"]   .lede-h::before { content: "\2736"; }
+:root[data-theme="japanese"] .lede-h::before { content: "\25EF"; }
+:root[data-theme="indian"]   .lede-h::before { content: "\2740"; }
+:root[data-theme="codex"]    .lede-h::before { content: "\2766"; }
+:root[data-theme="andalus"]  .lede-h::before { content: "\2734"; }
+:root[data-theme="terminal"] .lede-h::before { content: "\276F"; }
+
+h2 {
+  font-family: var(--display); font-weight: 600;
+  font-size: var(--fs-h2);
+  line-height: 1.07; letter-spacing: var(--display-tracking);
+  margin: 0 0 1.15rem; text-wrap: balance;
+  max-width: 26ch;
+}
+h2 em { font-style: italic; color: var(--gold); }
+.section-lede {
+  color: var(--bone-dim);
+  max-width: 34rem;
+  margin: 0 0 var(--s5);
+  font-size: var(--fs-lede);
+  line-height: 1.56;
+  text-wrap: pretty;
+}
+
+/* ----------------------------------------------------------------- prose -- */
+
+p { max-width: var(--measure); text-wrap: pretty; }
+a {
+  color: var(--gold);
+  text-underline-offset: .18em;
+  text-decoration-thickness: from-font;
+  text-decoration-color: color-mix(in oklab, var(--gold) 45%, transparent);
+  transition: text-decoration-color .18s ease, color .18s ease;
+}
+a:hover { text-decoration-color: currentColor; }
+
+/* ------------------------------------------------------------ role cards -- */
+
+.roles { display: grid; gap: clamp(1rem, 1.8vw, 1.35rem); }
+@media (min-width: 800px) { .roles { grid-template-columns: repeat(3, 1fr); } }
+.role {
+  background: var(--ground-2);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius);
+  padding: clamp(1.5rem, 2.6vw, 1.95rem);
+  display: flex; flex-direction: column; gap: .4rem;
+  box-shadow: var(--shadow);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.role:hover { transform: translateY(-3px); border-color: color-mix(in oklab, var(--gold) 55%, var(--hair)); box-shadow: var(--shadow-lg); }
+.role .glyph { font-family: var(--serif); font-size: 2.1rem; line-height: 1; color: var(--gold); }
+.role .role-sub {
+  font-family: var(--meta); font-size: .66rem; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--jade);
+  margin-top: 1rem;
+}
+.role h3 {
+  font-family: var(--display); font-weight: 600; font-size: var(--fs-h3);
+  letter-spacing: var(--display-tracking); margin: .3rem 0 0; line-height: 1.15;
+}
+.role p { font-size: .98rem; line-height: 1.6; color: var(--bone-dim); margin: .55rem 0 0; max-width: none; }
+.role .spoke {
+  margin-top: auto; padding-top: 1.15rem;
+  font-family: var(--meta); font-size: .74rem; line-height: 1.5;
+  color: var(--bone-faint); border-top: 1px solid var(--hair-2);
+}
+.role .spoke b { color: var(--bone); font-weight: 600; }
+
+/* --------------------------------------------------------- channel cards -- */
+
+.channels { display: grid; gap: clamp(1rem, 1.8vw, 1.35rem); }
+@media (min-width: 800px) { .channels { grid-template-columns: 1fr 1fr; } }
+.chan {
+  border: 1px solid var(--hair);
+  border-radius: var(--radius);
+  padding: clamp(1.5rem, 2.6vw, 1.95rem);
+  background: var(--ground-2);
+  box-shadow: var(--shadow);
+  position: relative; overflow: hidden;
+}
+/* the accent edge reads as a spine rather than a border-left hack */
+.chan::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; }
+.chan.volatile::before { background: var(--jade); }
+.chan.durable::before  { background: var(--gold); }
+.chan h3 {
+  margin: 0; font-size: var(--fs-h3); font-family: var(--display); font-weight: 600;
+  letter-spacing: var(--display-tracking);
+  display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap;
+}
+.chan h3 span {
+  font-family: var(--meta); font-size: .64rem; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--bone-faint);
+}
+.chan > p { font-size: .98rem; line-height: 1.6; color: var(--bone-dim); margin: .7rem 0 1.15rem; max-width: none; }
+.chan ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+.chan li {
+  font-family: var(--meta); font-size: .88rem; color: var(--bone);
+  display: flex; gap: .6rem; align-items: baseline; line-height: 1.45;
+}
+.chan li::before { content: "\203A"; color: var(--gold); flex: none; font-weight: 700; }
+.chan.volatile li::before { color: var(--jade); }
+
+/* ------------------------------------------------------- incident ledger -- */
+
+.ledger { display: flex; flex-direction: column; border-top: 1px solid var(--hair); }
+.inc {
+  display: grid; grid-template-columns: 3.4rem 1fr;
+  gap: clamp(.85rem, 3vw, 2rem);
+  padding: clamp(1.6rem, 3.4vw, 2.3rem) 0;
+  border-bottom: 1px solid var(--hair);
+  align-items: start;
+}
+.inc .idx {
+  font-family: var(--meta); font-size: 1.15rem; font-weight: 700;
+  color: var(--flare); letter-spacing: -.02em; padding-top: .1rem;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.inc h3 {
+  font-family: var(--display); font-weight: 600; font-size: var(--fs-h3);
+  letter-spacing: var(--display-tracking); margin: 0 0 .35rem; line-height: 1.16;
+}
+.inc .refs {
+  font-family: var(--meta); font-size: .74rem; color: var(--bone-faint);
+  letter-spacing: .02em; margin-bottom: .7rem;
+}
+.inc p { font-size: 1rem; line-height: 1.62; color: var(--bone-dim); margin: 0; max-width: 44rem; }
+/* the rule an incident bought — an editorial consequence line, not a bullet */
+.inc .law {
+  margin-top: 1.05rem;
+  font-family: var(--serif); font-style: italic;
+  color: var(--bone); font-size: 1.04rem; line-height: 1.5;
+  display: flex; gap: .65rem; align-items: baseline;
+  border-left: 2px solid var(--gold);
+  padding: .1rem 0 .1rem .85rem;
+  max-width: 44rem;
+}
+.inc .law::before {
+  content: "\2192"; font-style: normal; color: var(--gold);
+  font-family: var(--meta); font-weight: 700; flex: none;
+}
+@media (max-width: 560px) {
+  .inc { grid-template-columns: 1fr; gap: .5rem; }
+  .inc .idx { padding-top: 0; }
+}
+
+/* ------------------------------------------------------------- callout --- */
+
+.callout {
+  border: 1px solid color-mix(in oklab, var(--gold) 42%, var(--hair));
+  border-radius: var(--radius);
+  padding: clamp(1.65rem, 3.6vw, 2.5rem);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--gold) 9%, var(--ground-2)), var(--ground-2));
+  margin-top: var(--s5);
+  box-shadow: var(--shadow);
+}
+.callout .eyebrow { color: var(--flare); }
+.callout h3 {
+  font-family: var(--display); font-weight: 600;
+  font-size: clamp(1.35rem, 2.4vw, 1.65rem); letter-spacing: var(--display-tracking);
+  margin: .8rem 0 .7rem; line-height: 1.16;
+}
+.callout p { color: var(--bone-dim); font-size: 1.02rem; line-height: 1.62; margin: 0 0 .9rem; max-width: 46rem; }
+.callout p:last-child { margin-bottom: 0; }
+.callout .law {
+  margin-top: 1.15rem; padding-top: 1.15rem;
+  border-top: 1px solid var(--hair);
+  font-family: var(--serif); font-style: italic;
+  color: var(--bone); font-size: 1.08rem; line-height: 1.5;
+}
+
+/* ------------------------------------------- the laws : editorial pull quotes -- */
+
+.laws-sec { background: var(--ground-2); border-block: 1px solid var(--hair); }
+.laws { list-style: none; margin: var(--s4) 0 0; padding: 0; counter-reset: law; }
+.law-item {
+  padding: clamp(1.5rem, 3vw, 2.1rem) 0;
+  border-top: 1px solid var(--hair);
+  display: grid; grid-template-columns: 3rem 1fr;
+  gap: clamp(.75rem, 3vw, 1.8rem);
+  align-items: baseline;
+}
+.law-item:last-child { border-bottom: 1px solid var(--hair); }
+.law-item .n {
+  counter-increment: law;
+  font-family: var(--meta); font-size: .82rem; font-weight: 700;
+  letter-spacing: .08em; color: var(--gold);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.law-item .n::before { content: counter(law, upper-roman); }
+.law-item blockquote {
+  margin: 0; position: relative;
+  font-family: var(--display); font-weight: 600;
+  font-size: var(--fs-quote); line-height: 1.14;
+  letter-spacing: var(--display-tracking);
+  color: var(--bone); text-wrap: balance;
+}
+.law-item .gloss {
+  margin: .75rem 0 0; font-size: .99rem; line-height: 1.6;
+  color: var(--bone-dim); max-width: 42rem;
+}
+@media (max-width: 560px) {
+  .law-item { grid-template-columns: 1fr; gap: .5rem; }
+}
+
+/* ------------------------------------------------------------ stand-down -- */
+
+.standdown { text-align: center; }
+.standdown .rule {
+  width: 46px; height: 1px; background: var(--gold);
+  margin: 0 auto var(--s4);
+}
+.standdown .lede-h { justify-content: center; }
+.standdown .lede-h::after { display: none; }
+.standdown h2 { text-align: center; margin-inline: auto; max-width: 18ch; }
+.standdown .final {
+  max-width: 37rem; margin: 1.5rem auto 0;
+  color: var(--bone-dim); font-size: var(--fs-lede); line-height: 1.62;
+  text-wrap: pretty;
+}
+.standdown .final b { color: var(--bone); font-weight: 600; }
+.sig {
+  margin-top: var(--s5);
+  font-family: var(--meta); font-size: .8rem; letter-spacing: .02em;
+  color: var(--bone-faint); line-height: 1.75;
+}
+.sig .name { color: var(--gold); }
+
+/* ---------------------------------------------------------------- footer -- */
+
+footer {
+  border-top: 1px solid var(--hair);
+  padding: var(--s5) var(--edge) calc(var(--s5) + 1rem);
+  text-align: center;
+  font-family: var(--meta); font-size: .74rem;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--bone-faint);
+}
+/* the chapter links become a proper continue-reading pair. The source markup is
+   inconsistent about <br> between them, so the break is neutralised and the
+   links are laid out as blocks — every chapter's footer now reads the same. */
+footer br { display: none; }
+footer a {
+  display: inline-block;
+  margin-top: 1.1rem;
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  color: var(--gold);
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  padding: .55rem 1.25rem;
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
+}
+footer a + a { margin-left: .5rem; }
+footer a:hover {
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--gold) 10%, transparent);
+  transform: translateY(-1px);
+}
+@media (max-width: 620px) {
+  footer a { display: block; width: fit-content; margin-inline: auto; }
+  footer a + a { margin-left: 0; }
+}
+
+/* h1 carries a hardcoded tracking value and .stat/.role/.chan/.inc/.callout headings
+   read --display-tracking, so Terminal's tight kerning only needs spelling out for h1
+   and the figures. */
+:root[data-theme="terminal"] h1,
+:root[data-theme="terminal"] .stat .fig { letter-spacing: -.02em; }
+
+/* ------------------------------------------------------- theme switcher --- */
+
+.theme-switcher { position: fixed; top: 1rem; right: 1rem; z-index: 20; }
+.toggle {
+  font-family: var(--meta); font-size: .68rem; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  /* token-driven so it follows the default skin: a walnut pill in dark, a cream
+     one in light. It floats over the dark hero at the top of the page and over
+     the page surface once scrolled, and has to stay legible on both. */
+  color: var(--bone); background: color-mix(in oklab, var(--ground) 80%, transparent);
+  border: 1px solid color-mix(in oklab, var(--gold) 40%, var(--hair)); border-radius: 999px;
+  padding: .52rem .9rem; cursor: pointer;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  min-width: 9.5rem; text-align: center; display: block;
+  transition: color .18s ease, border-color .18s ease;
+}
+.toggle:hover { color: var(--gold); border-color: var(--gold); }
+.toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+:root[data-theme="terminal"] .toggle { border-color: rgba(72,208,106,.4); color: #bfe8c8; background: rgba(8,11,10,.55); }
+:root[data-theme="terminal"] .toggle:hover { color: #6ee08a; border-color: #6ee08a; }
+:root[data-theme="arabic"] .toggle { border-color: rgba(212,175,55,.45); color: #cdd0ea; background: rgba(13,18,51,.55); border-radius: 3px; }
+:root[data-theme="arabic"] .toggle:hover { color: #d4af37; border-color: #d4af37; }
+:root[data-theme="japanese"] .toggle { background: rgba(244,239,228,.72); border-color: rgba(42,42,40,.22); color: #4a4842; border-radius: 0; }
+:root[data-theme="japanese"] .toggle:hover { color: #c94a35; border-color: #c94a35; }
+:root[data-theme="indian"] .toggle { border-color: rgba(232,160,32,.5); color: #e7cba4; background: rgba(42,15,20,.55); }
+:root[data-theme="indian"] .toggle:hover { color: #e8a020; border-color: #e8a020; }
+:root[data-theme="codex"] .toggle { background: rgba(236,224,192,.75); border: 1px double rgba(163,36,28,.55); color: #5a4a30; border-radius: 2px; }
+:root[data-theme="codex"] .toggle:hover { color: #a3241c; border-color: #a3241c; }
+:root[data-theme="andalus"] .toggle { border-color: rgba(201,150,60,.45); color: #cdeae4; background: rgba(6,42,40,.55); border-radius: 3px; }
+:root[data-theme="andalus"] .toggle:hover { color: #2fb3a6; border-color: #2fb3a6; }
+
+.theme-menu {
+  list-style: none; margin: 0; position: absolute; top: calc(100% + .55rem); right: 0; min-width: 11.5rem;
+  background: color-mix(in oklab, var(--ground-2) 94%, transparent);
+  border: 1px solid color-mix(in oklab, var(--gold) 35%, var(--hair));
+  border-radius: var(--radius);
+  padding: .4rem; display: flex; flex-direction: column; gap: .1rem;
+  box-shadow: var(--shadow-lg); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.theme-menu[hidden] { display: none; }
+.theme-opt {
+  all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: .6rem;
+  font-family: var(--meta); font-size: .74rem; font-weight: 500; letter-spacing: .04em;
+  color: var(--bone-dim); padding: .5rem .7rem; border-radius: var(--radius-sm); width: 100%;
+}
+.theme-opt .glyph { width: 1.1em; text-align: center; flex: none; }
+.theme-opt:hover, .theme-opt:focus-visible { background: color-mix(in oklab, var(--gold) 15%, transparent); color: var(--bone); outline: none; }
+.theme-opt[aria-checked="true"] { color: var(--gold); font-weight: 600; }
+:root[data-theme="terminal"] .theme-menu { background: rgba(8,11,10,.95); border-color: rgba(72,208,106,.35); border-radius: 2px; }
+:root[data-theme="terminal"] .theme-opt:hover, :root[data-theme="terminal"] .theme-opt:focus-visible { background: rgba(72,208,106,.14); color: #d8ffe0; }
+:root[data-theme="terminal"] .theme-opt[aria-checked="true"] { color: #6ee08a; }
+:root[data-theme="japanese"] .theme-menu { background: rgba(244,239,228,.96); border-color: rgba(42,42,40,.16); border-radius: 0; box-shadow: 0 12px 28px rgba(42,42,40,.18); }
+:root[data-theme="japanese"] .theme-opt { color: #6b675c; }
+:root[data-theme="japanese"] .theme-opt:hover, :root[data-theme="japanese"] .theme-opt:focus-visible { background: rgba(42,42,40,.06); color: #2a2a28; }
+:root[data-theme="japanese"] .theme-opt[aria-checked="true"] { color: #c94a35; }
+:root[data-theme="codex"] .theme-menu { background: rgba(236,224,192,.96); border: 1px double rgba(163,36,28,.5); border-radius: 2px; }
+:root[data-theme="codex"] .theme-opt { color: #5a4a30; }
+:root[data-theme="codex"] .theme-opt:hover, :root[data-theme="codex"] .theme-opt:focus-visible { background: rgba(163,36,28,.1); color: #2b2013; }
+:root[data-theme="codex"] .theme-opt[aria-checked="true"] { color: #a3241c; }
+:root[data-theme="arabic"] .theme-menu { border-radius: 3px; border-color: rgba(212,175,55,.35); background: rgba(13,18,51,.95); }
+:root[data-theme="arabic"] .theme-opt[aria-checked="true"] { color: #d4af37; }
+:root[data-theme="indian"] .theme-menu { border-color: rgba(232,160,32,.4); background: rgba(42,15,20,.95); }
+:root[data-theme="indian"] .theme-opt[aria-checked="true"] { color: #e8a020; }
+:root[data-theme="andalus"] .theme-menu { border-radius: 3px; border-color: rgba(201,150,60,.35); background: rgba(6,42,40,.95); }
+:root[data-theme="andalus"] .theme-opt[aria-checked="true"] { color: #2fb3a6; }
+
+/* In the default light skin the switcher sits over the walnut hero at the top of
+   the page but over cream once scrolled — the dark chrome above stays correct
+   because the hero is dark in both, and the menu only opens on click. */
+
+/* palette crossfade between themes -- enabled by JS after first paint so load doesn't flash */
+@media (prefers-reduced-motion: no-preference) {
+  .skin-anim body, .skin-anim body *:not(.era-toast):not(.read-progress) {
+    transition: background-color .45s ease, color .45s ease, border-color .45s ease, fill .45s ease;
+  }
+}
+
+/* theme caption that fades in under the switcher on each change */
+.era-toast {
+  position: fixed; top: 3.6rem; right: 1rem; z-index: 19;
+  font-family: var(--meta); font-size: .64rem; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--bone-dim); background: color-mix(in oklab, var(--ground) 82%, transparent);
+  border: 1px solid var(--hair); border-radius: 999px; padding: .4rem .8rem;
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity .4s ease, transform .4s ease;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.era-toast.show { opacity: 1; transform: translateY(0); }
+
+/* --------------------------------------------------------- reading progress -- */
+
+.read-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 100%;
+  transform: scaleX(0); transform-origin: 0 50%;
+  background: linear-gradient(to right, var(--gold-deep), var(--gold));
+  z-index: 30; pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ a11y -- */
+
+a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .read-progress { display: none; }
+}
+
+/* ---------- Codex flourish : a rubricated illuminated drop cap on the standfirst, opt-in only ---------- */
+:root[data-theme="codex"] .standfirst::first-letter {
+  float: left; font-family: var(--display); font-size: 3.4em; line-height: .78; font-weight: 600;
+  color: #a3241c; padding: .04em .08em 0 0; margin-top: .04em;
+}
+
+/* ---------- Terminal flourish : a blinking cursor block after the kicker text ---------- */
+:root[data-theme="terminal"] .eyebrow::after { content: "\2588"; margin-left: .4em; animation: mm-blink 1.05s steps(1) infinite; }
+@keyframes mm-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="terminal"] .eyebrow::after { animation: none; }
+}
+
+/* ----------------------------------------------------------------- print -- */
+
+@media print {
+  .theme-switcher, .era-toast, .ornament, .read-progress, #board, .hero-scrim { display: none !important; }
+  html, body { background: #fff; color: #000; }
+  .hero { min-height: 0; background: #fff; color: #000; border-bottom: 1px solid #999; }
+  h1, .standfirst, .standfirst b { color: #000; }
+  .role, .chan, .callout { break-inside: avoid; box-shadow: none; }
+  .inc, .law-item { break-inside: avoid; }
+  a { color: #000; }
+}
