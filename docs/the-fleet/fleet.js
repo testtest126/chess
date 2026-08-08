@@ -59,6 +59,16 @@
       gate: "rgba(232,160,32,0.9)", gateOuter: "rgba(232,160,32,0.32)", gateCore: "rgba(240,190,80,0.95)",
       pulseGold: "232,160,32", pulseFlare: "200,29,58"
     },
+    russian: {
+      label: "Russian", glyph: "\u2735", motif: null, group: "palette", i18n: "themeRussian",
+      bg: "#0B1A2A", fade: "rgba(11,26,42,0.20)",
+      boardTile: "rgba(243,236,220,0.016)", boardLine: "rgba(243,236,220,0.042)", filament: "rgba(227,180,74,0.08)",
+      packet: "#7FBCA4", packetTrail: "rgba(127,188,164,0.5)", packetGlow: "rgba(127,188,164,0.26)",
+      node: "rgba(127,188,164,0.55)", nodeCore: "rgba(180,225,208,0.9)",
+      reviewer: "rgba(227,180,74,0.5)",
+      gate: "rgba(227,180,74,0.9)", gateOuter: "rgba(227,180,74,0.32)", gateCore: "rgba(245,212,130,0.95)",
+      pulseGold: "227,180,74", pulseFlare: "228,134,107"
+    },
     codex: {
       label: "Codex", glyph: "\u2766", motif: null, group: "palette",
       bg: "#ece0c0", fade: "rgba(236,224,192,0.20)",
@@ -186,7 +196,7 @@
   };
   // the dial starts at the untouched default -- everything else is opt-in
   var order = ["", "contrast", "colorblind", "dyslexia",
-               "arabic", "japanese", "indian", "codex", "andalus", "terminal",
+               "arabic", "japanese", "indian", "russian", "codex", "andalus", "terminal",
                "steppe", "pounamu", "altiplano", "indigo", "aurora", "amber"];
   var skinIdx = 0;
 
@@ -506,6 +516,7 @@
     codex:    "Codex \u00b7 illuminated manuscript",
     andalus:  "El-Andalus \u00b7 azulejo + horseshoe geometry",
     terminal: "Terminal \u00b7 CRT phosphor",
+    russian:   "Russian \u00b7 icon lapis, gold leaf, cinnabar",
     steppe:    "Steppe \u00b7 wheat and open sky",
     pounamu:   "Pounamu \u00b7 greenstone and deep bush",
     altiplano: "Altiplano \u00b7 ochre and thin high air",

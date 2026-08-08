@@ -38,6 +38,7 @@
       themeContrast: "High contrast",
       themeColorblind: "Colour-blind safe",
       themeDyslexia: "Dyslexia-friendly",
+      themeRussian: "Russian",
       readingProgress: "Reading progress",
       proseNote: "Chapter prose: English (translation in progress)",
       uiNote: "Interface translated"
@@ -52,6 +53,7 @@
       themeContrast: "Високий контраст",
       themeColorblind: "Безпечна для дальтоніків",
       themeDyslexia: "Зручна для дислексії",
+      themeRussian: "Російська",
       readingProgress: "Прогрес читання",
       proseNote: "Текст розділу — англійською (переклад триває)",
       uiNote: "Інтерфейс перекладено"
@@ -66,6 +68,7 @@
       themeContrast: "Alto contraste",
       themeColorblind: "Apto para daltonismo",
       themeDyslexia: "Apto para dislexia",
+      themeRussian: "Ruso",
       readingProgress: "Progreso de lectura",
       proseNote: "Texto del capítulo: en inglés (traducción en curso)",
       uiNote: "Interfaz traducida"
@@ -80,6 +83,7 @@
       themeContrast: "高对比度",
       themeColorblind: "色盲友好",
       themeDyslexia: "阅读障碍友好",
+      themeRussian: "俄罗斯",
       readingProgress: "阅读进度",
       proseNote: "章节正文：英文（翻译进行中）",
       uiNote: "界面已翻译"
@@ -94,6 +98,7 @@
       themeContrast: "उच्च कंट्रास्ट",
       themeColorblind: "वर्णांधता-अनुकूल",
       themeDyslexia: "डिस्लेक्सिया-अनुकूल",
+      themeRussian: "रूसी",
       readingProgress: "पढ़ने की प्रगति",
       proseNote: "अध्याय का पाठ: अंग्रेज़ी में (अनुवाद जारी है)",
       uiNote: "इंटरफ़ेस अनूदित"
@@ -108,6 +113,7 @@
       themeContrast: "تباين عالٍ",
       themeColorblind: "مناسب لعمى الألوان",
       themeDyslexia: "مناسب لعسر القراءة",
+      themeRussian: "روسي",
       readingProgress: "تقدّم القراءة",
       proseNote: "نص الفصل: بالإنجليزية (الترجمة قيد العمل)",
       uiNote: "تمت ترجمة الواجهة"
@@ -122,6 +128,7 @@
       themeContrast: "ניגודיות גבוהה",
       themeColorblind: "ידידותי לעיוורון צבעים",
       themeDyslexia: "ידידותי לדיסלקציה",
+      themeRussian: "רוסית",
       readingProgress: "התקדמות קריאה",
       proseNote: "טקסט הפרק: באנגלית (התרגום בעבודה)",
       uiNote: "הממשק תורגם"
@@ -136,6 +143,7 @@
       themeContrast: "کنتراست بالا",
       themeColorblind: "مناسب کوررنگی",
       themeDyslexia: "مناسب نارساخوانی",
+      themeRussian: "روسی",
       readingProgress: "پیشرفت مطالعه",
       proseNote: "متن فصل: به انگلیسی (ترجمه در حال انجام)",
       uiNote: "رابط کاربری ترجمه شد"
@@ -150,6 +158,7 @@
       themeContrast: "Contraste élevé",
       themeColorblind: "Adapté au daltonisme",
       themeDyslexia: "Adapté à la dyslexie",
+      themeRussian: "Russe",
       readingProgress: "Progression de lecture",
       proseNote: "Texte du chapitre : en anglais (traduction en cours)",
       uiNote: "Interface traduite"
@@ -164,6 +173,7 @@
       themeContrast: "Alto contraste",
       themeColorblind: "Seguro para daltonismo",
       themeDyslexia: "Amigável à dislexia",
+      themeRussian: "Russo",
       readingProgress: "Progresso de leitura",
       proseNote: "Texto do capítulo: em inglês (tradução em andamento)",
       uiNote: "Interface traduzida"
@@ -178,6 +188,7 @@
       themeContrast: "Высокая контрастность",
       themeColorblind: "Для дальтоников",
       themeDyslexia: "Для дислексии",
+      themeRussian: "Русский",
       readingProgress: "Прогресс чтения",
       proseNote: "Текст главы — на английском (перевод в работе)",
       uiNote: "Интерфейс переведён"
@@ -192,6 +203,7 @@
       themeContrast: "উচ্চ কনট্রাস্ট",
       themeColorblind: "বর্ণান্ধতা-বান্ধব",
       themeDyslexia: "ডিসলেক্সিয়া-বান্ধব",
+      themeRussian: "রুশ",
       readingProgress: "পড়ার অগ্রগতি",
       proseNote: "অধ্যায়ের লেখা: ইংরেজিতে (অনুবাদ চলছে)",
       uiNote: "ইন্টারফেস অনূদিত"
@@ -206,6 +218,7 @@
       themeContrast: "ハイコントラスト",
       themeColorblind: "色覚サポート",
       themeDyslexia: "ディスレクシア対応",
+      themeRussian: "ロシア",
       readingProgress: "読書の進捗",
       proseNote: "本文は英語のままです（翻訳作業中）",
       uiNote: "インターフェース翻訳済み"
@@ -220,6 +233,7 @@
       themeContrast: "Hoher Kontrast",
       themeColorblind: "Farbenblind-sicher",
       themeDyslexia: "Legasthenie-freundlich",
+      themeRussian: "Russisch",
       readingProgress: "Lesefortschritt",
       proseNote: "Kapiteltext: auf Englisch (Übersetzung in Arbeit)",
       uiNote: "Oberfläche übersetzt"
@@ -234,6 +248,7 @@
       themeContrast: "Utofautishaji mkubwa",
       themeColorblind: "Rafiki kwa upofu wa rangi",
       themeDyslexia: "Rafiki kwa dyslexia",
+      themeRussian: "Kirusi",
       readingProgress: "Maendeleo ya kusoma",
       proseNote: "Maandishi ya sura: kwa Kiingereza (tafsiri inaendelea)",
       uiNote: "Kiolesura kimetafsiriwa"
@@ -251,6 +266,7 @@
       themeContrast: "Pūrangiaho nui",
       themeColorblind: "Haumaru karekare tae",
       themeDyslexia: "Pai ki te pānui uaua",
+      themeRussian: "Ruhia",
       readingProgress: "Ahunga pānui",
       proseNote: "Te tuhinga o te upoko: kei te reo Ingarihi (kei te whakamāoritia tonu)",
       uiNote: "Kua whakamāoritia te atanga"
@@ -265,6 +281,7 @@
       themeContrast: "Sinchi rikuy",
       themeColorblind: "Llimp'i mana rikuqpaq",
       themeDyslexia: "Ñawinchay sasachaypaq",
+      themeRussian: "Rusu",
       readingProgress: "Ñawinchay puriynin",
       proseNote: "Yachana qillqa: inlis simipi (t'ikray ruwakuchkan)",
       uiNote: "Antawa t'ikrasqa"

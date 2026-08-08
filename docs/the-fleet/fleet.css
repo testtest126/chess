@@ -148,6 +148,21 @@
   --orn-opacity: .12;
   --texture: radial-gradient(ellipse at 12% 15%, rgba(138,106,30,.07), transparent 50%), radial-gradient(ellipse at 88% 85%, rgba(138,106,30,.06), transparent 55%), radial-gradient(ellipse at 60% 40%, rgba(43,32,19,.03), transparent 60%);
 }
+/* Russian — the register of an icon panel and a Cyrillic manuscript hand:
+   lapis and azurite ground, gold leaf, cinnabar rubrication, olive verdigris.
+   Abstract on purpose — a palette and a typeface, no emblems, no flag, no
+   politics. The display face is PT Serif, drawn for Cyrillic, falling back
+   to the same old-style serifs the rest of the site uses. */
+:root[data-theme="russian"] {
+  --ground:#0B1A2A; --ground-2:#12253A; --ground-3:#183048;
+  --hair:rgba(227,180,74,.18); --hair-2:rgba(227,180,74,.09);
+  --bone:#F3ECDC; --bone-dim:#C6BEAA; --bone-faint:#A79E86;
+  --gold:#E3B44A; --gold-deep:#BE9330; --jade:#7FBCA4; --flare:#E4866B; --merged:#8FBF8A;
+  --display: "PT Serif", "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+  --display-tracking: 0;
+  --orn-opacity: .06;
+}
+
 /* El-Andalus (Moorish) -- azulejo tilework, horseshoe-arch geometry, turquoise + terracotta + gold */
 :root[data-theme="andalus"] {
   --ground:#062a28; --ground-2:#0a3532; --ground-3:#0e403c;
@@ -987,6 +1002,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-
 }
 
 /* the new palettes reuse the default's hero treatment, keyed to their ground */
+:root[data-theme="russian"]   .hero { background:#0B1A2A; border-bottom-color: rgba(227,180,74,.30); }
 :root[data-theme="steppe"]    .hero { background:#10161F; border-bottom-color: rgba(240,194,75,.28); }
 :root[data-theme="pounamu"]   .hero { background:#0B1310; border-bottom-color: rgba(111,201,164,.28); }
 :root[data-theme="altiplano"] .hero { background:#1A1210; border-bottom-color: rgba(229,172,92,.28); }
@@ -994,6 +1010,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-
 :root[data-theme="aurora"]    .hero { background:#070C18; border-bottom-color: rgba(104,219,174,.28); }
 :root[data-theme="amber"]     .hero { background:#14100A; border-bottom-color: rgba(227,173,68,.28); }
 :root[data-theme="colorblind"] .hero { background:#0E1620; border-bottom-color: rgba(240,168,26,.30); }
+:root[data-theme="russian"]   .hero-scrim,
 :root[data-theme="steppe"]    .hero-scrim,
 :root[data-theme="pounamu"]   .hero-scrim,
 :root[data-theme="altiplano"] .hero-scrim,
