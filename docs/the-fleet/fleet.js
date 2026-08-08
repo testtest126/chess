@@ -677,13 +677,68 @@
         document.querySelectorAll(".hero-inner, .manifest, body > section, body > footer"));
     }
 
+
+    /* ------------------------------------------------------------------
+       Prose translation.
+
+       The chapters keep their English in the markup; a translation is an
+       ordered list of innerHTML strings in PROSE[lang][pageId].nodes, lined
+       up with the elements translatableNodes() returns in document order.
+
+       Index-keyed lists are brittle if the markup moves under them, so the
+       table also carries the element count it was written against. If the
+       page no longer matches, we restore English and show the notice rather
+       than render half a translation — a wrong-language paragraph in the
+       middle of a chapter is worse than an honest "not translated yet".
+       ------------------------------------------------------------------ */
+    var PROSE_SEL = [
+      ".hero .eyebrow", ".hero h1", ".standfirst",
+      ".stat .chapter", ".stat .fig", ".stat .cap",
+      ".lede-h", "section h2", ".section-lede",
+      ".role .role-sub", ".role h3", ".role p", ".role .spoke",
+      ".chan h3", ".chan > p", ".chan li",
+      ".inc h3", ".inc .refs", ".inc p", ".inc .law",
+      ".callout .eyebrow", ".callout h3", ".callout p", ".callout .law",
+      ".law-item blockquote", ".law-item .gloss",
+      ".standdown .final", ".sig",
+      ".wrap > p[style]", "footer"
+    ].join(", ");
+
+    function translatableNodes() {
+      var all = Array.prototype.slice.call(document.querySelectorAll(PROSE_SEL));
+      /* keep only the outermost match, so a <footer> carries its own links
+         and a .chan h3 carries its inline <span> instead of being clobbered
+         by a nested entry */
+      return all.filter(function (el) {
+        return !all.some(function (other) { return other !== el && other.contains(el); });
+      });
+    }
+
+    var englishProse = null;   /* captured once, so switching back is lossless */
+
+    function applyProse(code) {
+      var nodes = translatableNodes();
+      if (englishProse === null) {
+        englishProse = nodes.map(function (el) { return el.innerHTML; });
+      }
+      var table = I18N.prose[code] && I18N.prose[code][pageId];
+      if (!table || !table.nodes || table.nodes.length !== nodes.length ||
+          (typeof table.count === "number" && table.count !== nodes.length)) {
+        nodes.forEach(function (el, i) { el.innerHTML = englishProse[i]; });
+        return false;
+      }
+      nodes.forEach(function (el, i) { el.innerHTML = table.nodes[i]; });
+      return true;
+    }
+
     function applyLang(code, save) {
       var def = I18N.get(code);
       lang = code;
       root.setAttribute("lang", code);
       root.setAttribute("dir", def.dir);
 
-      var translated = I18N.hasProse(code, pageId);
+      /* attempt the swap first — "translated" means it really happened */
+      var translated = applyProse(code);
       proseNodes().forEach(function (el) {
         if (code === "en" || translated) {
           el.removeAttribute("lang");
