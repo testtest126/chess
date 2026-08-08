@@ -169,6 +169,20 @@
       uiNote: "Interface traduzida"
     },
 
+    ru: {
+      name: "Русский", dir: "ltr",
+      langLabel: "Язык", langMenu: "Выбрать язык",
+      themeLabel: "Тема", themeMenu: "Визуальная тема",
+      groupAccess: "Доступность", groupPalette: "Палитры",
+      themeDefault: "По умолчанию",
+      themeContrast: "Высокая контрастность",
+      themeColorblind: "Для дальтоников",
+      themeDyslexia: "Для дислексии",
+      readingProgress: "Прогресс чтения",
+      proseNote: "Текст главы — на английском (перевод в работе)",
+      uiNote: "Интерфейс переведён"
+    },
+
     bn: {
       name: "বাংলা", dir: "ltr",
       langLabel: "ভাষা", langMenu: "ভাষা নির্বাচন করুন",
@@ -260,7 +274,7 @@
   /* Menu order: English first, then by number of speakers, with the two
      smaller languages last so they read as a deliberate inclusion rather
      than as an afterthought buried mid-list. */
-  var ORDER = ["en", "zh-Hans", "hi", "es", "fr", "ar", "bn", "pt", "uk",
+  var ORDER = ["en", "zh-Hans", "hi", "es", "fr", "ar", "bn", "pt", "ru", "uk",
                "ja", "de", "sw", "fa", "he", "mi", "qu"];
 
   /* Chapter prose translations, keyed by language then page id.
