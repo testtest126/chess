@@ -25,7 +25,7 @@
   --hair-2:    rgba(231,186,92,.075);
   --bone:      #F2E9D6;
   --bone-dim:  #B7A88C;
-  --bone-faint:#8D7E64;
+  --bone-faint:#96876B;
   --gold:      #E7BA5C;
   --gold-deep: #C99A3C;
   --jade:      #74B7A3;
@@ -84,11 +84,11 @@
     --hair-2:    #ECE1C8;
     --bone:      #241C12;
     --bone-dim:  #6B5A42;
-    --bone-faint:#877455;
-    --gold:      #8A6216;
+    --bone-faint:#746349;
+    --gold:      #855F15;
     --gold-deep: #6E4E11;
-    --jade:      #2E7A66;
-    --flare:     #B4502F;
+    --jade:      #2D7965;
+    --flare:     #B14F2E;
     --merged:    #47713F;
     --shadow:    0 14px 40px -24px rgba(60,42,16,.35);
     --shadow-lg: 0 22px 60px -28px rgba(60,42,16,.42);
@@ -104,8 +104,8 @@
   --bone:#ece7d6; --bone-dim:#b9b8cb;
   /* lifted from #7d7f9c: at .07 orn-opacity that still only cleared 4.24:1 worst-case
      against the pattern's own color -- short of AA on the math alone, halo notwithstanding. */
-  --bone-faint:#8688a3;
-  --gold:#d4af37; --gold-deep:#a8862a; --jade:#4fb0c4; --flare:#c1523f; --merged:#6bab7d;
+  --bone-faint:#888AA4;
+  --gold:#d4af37; --gold-deep:#a8862a; --jade:#4fb0c4; --flare:#CA6B5A; --merged:#6bab7d;
   --display: "Futura", "Century Gothic", "Avenir Next", "Segoe UI", sans-serif;
   --display-tracking: .02em;
   /* .16 read as noise directly behind small prose (66px hex6 tile, high edge density);
@@ -116,8 +116,8 @@
 :root[data-theme="japanese"] {
   --ground:#f4efe4; --ground-2:#efe8d8; --ground-3:#e9e0cc;
   --hair:rgba(42,42,40,.10); --hair-2:rgba(42,42,40,.05);
-  --bone:#2a2a28; --bone-dim:#5c5a52; --bone-faint:#8b887c;
-  --gold:#9c8355; --gold-deep:#7c6740; --jade:#6b8f87; --flare:#c94a35; --merged:#6f8f6a;
+  --bone:#2a2a28; --bone-dim:#5c5a52; --bone-faint:#66635A;
+  --gold:#73613F; --gold-deep:#7c6740; --jade:#526D67; --flare:#B44230; --merged:#6f8f6a;
   --display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", "Songti SC", Georgia, "Times New Roman", serif;
   --display-tracking: .01em;
   --orn-opacity: .05;
@@ -129,8 +129,8 @@
   --hair:rgba(232,160,32,.20); --hair-2:rgba(232,160,32,.1);
   --bone:#f7ead0; --bone-dim:#d2b48c;
   /* lifted from #96806a: 4.25:1 worst-case pre-fix, short of AA on the math alone. */
-  --bone-faint:#a0886f;
-  --gold:#e8a020; --gold-deep:#c07f14; --jade:#2bb3ad; --flare:#c81d3a; --merged:#5a9d5f;
+  --bone-faint:#A18A71;
+  --gold:#e8a020; --gold-deep:#c07f14; --jade:#2bb3ad; --flare:#E6546C; --merged:#5a9d5f;
   --display: "Didot", "Bodoni MT", "Playfair Display", Georgia, "Times New Roman", serif;
   --display-tracking: 0;
   /* .17 was the densest overlap of any theme (64px tile, six large overlapping
@@ -141,8 +141,8 @@
 :root[data-theme="codex"] {
   --ground:#ece0c0; --ground-2:#e4d5ad; --ground-3:#dccb9c;
   --hair:rgba(43,32,19,.14); --hair-2:rgba(43,32,19,.07);
-  --bone:#2b2013; --bone-dim:#5a4a30; --bone-faint:#8a7852;
-  --gold:#af8a2e; --gold-deep:#8a6a1e; --jade:#3f7a6e; --flare:#a3241c; --merged:#5c7a4a;
+  --bone:#2b2013; --bone-dim:#5a4a30; --bone-faint:#61553A;
+  --gold:#6A531C; --gold-deep:#8a6a1e; --jade:#34655C; --flare:#a3241c; --merged:#5c7a4a;
   --display: "Old English Text MT", "Cloister Black", "Blackmoor LET", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --display-tracking: 0;
   --orn-opacity: .12;
@@ -154,8 +154,8 @@
   --hair:rgba(201,150,60,.18); --hair-2:rgba(201,150,60,.09);
   --bone:#f0e6d2; --bone-dim:#c2b294;
   /* lifted from #8d8267: only 3.66:1 worst-case pre-fix -- the biggest gap of the four. */
-  --bone-faint:#a3967a;
-  --gold:#c9963c; --gold-deep:#a2761f; --jade:#2fb3a6; --flare:#c1633f; --merged:#5f9d6e;
+  --bone-faint:#ADA289;
+  --gold:#CB9B44; --gold-deep:#a2761f; --jade:#2fb3a6; --flare:#CE8568; --merged:#5f9d6e;
   --display: "Avenir Next", "Century Gothic", "Futura", sans-serif;
   --display-tracking: .01em;
   /* .17 on a 72px tile of bold rotated squares -- straight edges at many angles
@@ -399,8 +399,8 @@ h1 em { font-style: italic; color: #E7BA5C; }
 
 .stat {
   position: relative;
-  padding-left: clamp(.85rem, 1.4vw, 1.15rem);
-  border-left: 1px solid var(--hair);
+  padding-inline-start: clamp(.85rem, 1.4vw, 1.15rem);
+  border-inline-start: 1px solid var(--hair);
 }
 .stat .fig {
   font-family: var(--display); font-weight: 600;
@@ -521,7 +521,7 @@ a:hover { text-decoration-color: currentColor; }
   position: relative; overflow: hidden;
 }
 /* the accent edge reads as a spine rather than a border-left hack */
-.chan::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; }
+.chan::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: 3px; }
 .chan.volatile::before { background: var(--jade); }
 .chan.durable::before  { background: var(--gold); }
 .chan h3 {
@@ -572,8 +572,8 @@ a:hover { text-decoration-color: currentColor; }
   font-family: var(--serif); font-style: italic;
   color: var(--bone); font-size: 1.04rem; line-height: 1.5;
   display: flex; gap: .65rem; align-items: baseline;
-  border-left: 2px solid var(--gold);
-  padding: .1rem 0 .1rem .85rem;
+  border-inline-start: 2px solid var(--gold);
+  padding-block: .1rem; padding-inline-start: .85rem;
   max-width: 44rem;
 }
 .inc .law::before {
@@ -696,7 +696,7 @@ footer a {
   padding: .55rem 1.25rem;
   transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
 }
-footer a + a { margin-left: .5rem; }
+footer a + a { margin-inline-start: .5rem; }
 footer a:hover {
   border-color: var(--gold);
   background: color-mix(in oklab, var(--gold) 10%, transparent);
@@ -704,7 +704,7 @@ footer a:hover {
 }
 @media (max-width: 620px) {
   footer a { display: block; width: fit-content; margin-inline: auto; }
-  footer a + a { margin-left: 0; }
+  footer a + a { margin-inline-start: 0; }
 }
 
 /* h1 carries a hardcoded tracking value and .stat/.role/.chan/.inc/.callout headings
@@ -715,7 +715,7 @@ footer a:hover {
 
 /* ------------------------------------------------------- theme switcher --- */
 
-.theme-switcher { position: fixed; top: 1rem; right: 1rem; z-index: 20; }
+.theme-switcher { position: fixed; top: 1rem; inset-inline-end: 1rem; z-index: 20; }
 .toggle {
   font-family: var(--meta); font-size: .68rem; font-weight: 600;
   letter-spacing: .1em; text-transform: uppercase;
@@ -745,7 +745,7 @@ footer a:hover {
 :root[data-theme="andalus"] .toggle:hover { color: #2fb3a6; border-color: #2fb3a6; }
 
 .theme-menu {
-  list-style: none; margin: 0; position: absolute; top: calc(100% + .55rem); right: 0; min-width: 11.5rem;
+  list-style: none; margin: 0; position: absolute; top: calc(100% + .55rem); inset-inline-end: 0; min-width: 11.5rem;
   background: color-mix(in oklab, var(--ground-2) 94%, transparent);
   border: 1px solid color-mix(in oklab, var(--gold) 35%, var(--hair));
   border-radius: var(--radius);
@@ -792,7 +792,7 @@ footer a:hover {
 
 /* theme caption that fades in under the switcher on each change */
 .era-toast {
-  position: fixed; top: 3.6rem; right: 1rem; z-index: 19;
+  position: fixed; top: 3.6rem; inset-inline-end: 1rem; z-index: 19;
   font-family: var(--meta); font-size: .64rem; font-weight: 600;
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--bone-dim); background: color-mix(in oklab, var(--ground) 82%, transparent);
@@ -828,7 +828,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-
 
 /* ---------- Codex flourish : a rubricated illuminated drop cap on the standfirst, opt-in only ---------- */
 :root[data-theme="codex"] .standfirst::first-letter {
-  float: left; font-family: var(--display); font-size: 3.4em; line-height: .78; font-weight: 600;
+  float: inline-start; font-family: var(--display); font-size: 3.4em; line-height: .78; font-weight: 600;
   color: #a3241c; padding: .04em .08em 0 0; margin-top: .04em;
 }
 
@@ -850,3 +850,229 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-
   .inc, .law-item { break-inside: avoid; }
   a { color: #000; }
 }
+
+/* ==========================================================================
+   PHASE 2 — inclusive theme pack, RTL, and the i18n chrome
+   --------------------------------------------------------------------------
+   Three accessibility themes that change how the page works, not just how it
+   looks, and six palettes drawn from places the default walnut does not
+   speak for. Every palette below is verified against WCAG AA by
+   tools/check-contrast.py — the token pairs that carry text (bone, bone-dim,
+   bone-faint, gold, jade and flare over both grounds) all clear 4.5:1.
+
+   The palettes are colour and typography only. No motifs, no flags, no
+   costume: a palette can honour a place without dressing up as it.
+   ========================================================================== */
+
+/* ---------------------------------------------- accessibility : contrast -- */
+/* Pure black ground, pure white text — 21:1. Hairlines are raised to visible
+   strength because 15%-alpha borders disappear for low-vision readers. */
+:root[data-theme="contrast"] {
+  --ground:#000000; --ground-2:#0B0B0B; --ground-3:#161616;
+  --hair:rgba(255,255,255,.55); --hair-2:rgba(255,255,255,.32);
+  --bone:#FFFFFF; --bone-dim:#F2F2F2; --bone-faint:#DCDCDC;
+  --gold:#FFD24A; --gold-deep:#FFC107; --jade:#7FE9FF; --flare:#FFB088; --merged:#8CFFA8;
+  --orn-opacity: 0;
+  --shadow: none; --shadow-lg: none;
+}
+:root[data-theme="contrast"] .role,
+:root[data-theme="contrast"] .chan,
+:root[data-theme="contrast"] .callout { border-width: 2px; }
+:root[data-theme="contrast"] a { text-decoration-thickness: 2px; }
+:root[data-theme="contrast"] .hero { background: #000; border-bottom-color: rgba(255,255,255,.55); }
+
+/* ------------------------------------------- accessibility : colour-blind -- */
+/* Okabe–Ito, the palette designed to stay distinguishable under deuteranopia
+   and protanopia. Nothing in the page encodes meaning in a red/green pair:
+   the volatile/durable channels separate as sky blue vs orange, and the
+   incident index is reddish-purple rather than red. */
+:root[data-theme="colorblind"] {
+  --ground:#0E1620; --ground-2:#17212D; --ground-3:#1F2C3A;
+  --hair:rgba(230,159,0,.26); --hair-2:rgba(230,159,0,.13);
+  --bone:#F3F6F9; --bone-dim:#C7D2DE; --bone-faint:#A7B4C2;
+  --gold:#F0A81A; --gold-deep:#D18F00; --jade:#69BEF0; --flare:#EE9BC4; --merged:#69BEF0;
+  --orn-opacity: .06;
+}
+
+/* ------------------------------------------- accessibility : dyslexia ----- */
+/* An off-white ground rather than white (glare), ink that stops short of pure
+   black, a hyperlegible face with disambiguated letterforms, and the spacing
+   the BDA guidance asks for: looser tracking, generous word spacing, taller
+   lines, no italics and no justification. */
+:root[data-theme="dyslexia"] {
+  --ground:#F4EDE1; --ground-2:#FCF8F1; --ground-3:#EBE2D2;
+  --hair:#CFC1A9; --hair-2:#DFD4C0;
+  --bone:#22201D; --bone-dim:#403C36; --bone-faint:#514C44;
+  --gold:#7A4A00; --gold-deep:#5E3900; --jade:#0F5E4C; --flare:#93301A; --merged:#3A5C2C;
+  --serif: "Atkinson Hyperlegible", "OpenDyslexic", "Lexend", Verdana, Tahoma, "Trebuchet MS", sans-serif;
+  --sans:  "Atkinson Hyperlegible", "OpenDyslexic", "Lexend", Verdana, Tahoma, "Trebuchet MS", sans-serif;
+  --display: var(--serif);
+  --meta: var(--sans);
+  --display-tracking: .01em;
+  --orn-opacity: 0;
+  --measure: 34rem;   /* shorter lines are easier to track back to */
+}
+:root[data-theme="dyslexia"] body {
+  letter-spacing: .035em;
+  word-spacing: .16em;
+  line-height: 1.85;
+}
+:root[data-theme="dyslexia"] p,
+:root[data-theme="dyslexia"] .gloss,
+:root[data-theme="dyslexia"] .section-lede { text-align: start; }
+/* italics are the single most-reported problem face — swap every one of them
+   for weight instead */
+:root[data-theme="dyslexia"] em,
+:root[data-theme="dyslexia"] .inc .law,
+:root[data-theme="dyslexia"] .callout .law,
+:root[data-theme="dyslexia"] h1 em,
+:root[data-theme="dyslexia"] h2 em { font-style: normal; font-weight: 700; }
+:root[data-theme="dyslexia"] .hero { background: #2B2620; }
+:root[data-theme="dyslexia"] h1 { color: #FBF8F2; letter-spacing: 0; }
+:root[data-theme="dyslexia"] .standfirst { color: #E4DDD1; }
+:root[data-theme="dyslexia"] .standfirst b { color: #FFFFFF; }
+:root[data-theme="dyslexia"] .hero-scrim {
+  background: linear-gradient(to top, rgba(43,38,32,.96) 0%, rgba(43,38,32,.6) 34%, transparent 64%);
+}
+
+/* ------------------------------------------------------------- palettes -- */
+
+/* Steppe — wheat and open sky over a night ground. */
+:root[data-theme="steppe"] {
+  --ground:#10161F; --ground-2:#18202C; --ground-3:#202A38;
+  --hair:rgba(240,194,75,.18); --hair-2:rgba(240,194,75,.09);
+  --bone:#F1EBDD; --bone-dim:#C4BCA8; --bone-faint:#A69E8B;
+  --gold:#F0C24B; --gold-deep:#CB9F2C; --jade:#7BBCE8; --flare:#E89A6B; --merged:#94C47E;
+  --orn-opacity: .06;
+}
+/* Pounamu — greenstone, bone and deep bush. */
+:root[data-theme="pounamu"] {
+  --ground:#0B1310; --ground-2:#131D19; --ground-3:#1A2721;
+  --hair:rgba(122,199,168,.18); --hair-2:rgba(122,199,168,.09);
+  --bone:#F0EDE4; --bone-dim:#BFC7BB; --bone-faint:#9EA89C;
+  --gold:#DCC792; --gold-deep:#BBA36A; --jade:#6FC9A4; --flare:#DE9878; --merged:#7AC79E;
+  --orn-opacity: .06;
+}
+/* Altiplano — ochre, terracotta and thin high-altitude sky. */
+:root[data-theme="altiplano"] {
+  --ground:#1A1210; --ground-2:#241A17; --ground-3:#2E2320;
+  --hair:rgba(226,168,87,.18); --hair-2:rgba(226,168,87,.09);
+  --bone:#F5EBDF; --bone-dim:#CDBAA9; --bone-faint:#AE9885;
+  --gold:#E5AC5C; --gold-deep:#C08A38; --jade:#6EBECB; --flare:#DE7B5C; --merged:#9CBA74;
+  --orn-opacity: .06;
+}
+/* Indigo — resist-dyed cloth: deep indigo, undyed cotton, brass. */
+:root[data-theme="indigo"] {
+  --ground:#0D1226; --ground-2:#151C33; --ground-3:#1D2541;
+  --hair:rgba(217,164,65,.18); --hair-2:rgba(217,164,65,.09);
+  --bone:#EDEDF5; --bone-dim:#BEC2D6; --bone-faint:#9EA3BA;
+  --gold:#DFAB4A; --gold-deep:#BA8C2E; --jade:#6AC6D0; --flare:#E29372; --merged:#87C692;
+  --orn-opacity: .06;
+}
+/* Aurora — polar night, with the green and the low red of the light itself. */
+:root[data-theme="aurora"] {
+  --ground:#070C18; --ground-2:#0E1626; --ground-3:#151F33;
+  --hair:rgba(232,193,90,.16); --hair-2:rgba(232,193,90,.08);
+  --bone:#EFF2F7; --bone-dim:#BCC5D4; --bone-faint:#9BA6B9;
+  --gold:#EAC463; --gold-deep:#C49F3C; --jade:#68DBAE; --flare:#E97D88; --merged:#68DBAE;
+  --orn-opacity: .06;
+}
+/* Amber Coast — fossil amber, birch and a cold sea. */
+:root[data-theme="amber"] {
+  --ground:#14100A; --ground-2:#1E1811; --ground-3:#272017;
+  --hair:rgba(224,169,62,.18); --hair-2:rgba(224,169,62,.09);
+  --bone:#F3ECDF; --bone-dim:#C8BAA4; --bone-faint:#AA9B83;
+  --gold:#E3AD44; --gold-deep:#BE8C28; --jade:#7FB8C8; --flare:#D89468; --merged:#98BF86;
+  --orn-opacity: .06;
+}
+
+/* the new palettes reuse the default's hero treatment, keyed to their ground */
+:root[data-theme="steppe"]    .hero { background:#10161F; border-bottom-color: rgba(240,194,75,.28); }
+:root[data-theme="pounamu"]   .hero { background:#0B1310; border-bottom-color: rgba(111,201,164,.28); }
+:root[data-theme="altiplano"] .hero { background:#1A1210; border-bottom-color: rgba(229,172,92,.28); }
+:root[data-theme="indigo"]    .hero { background:#0D1226; border-bottom-color: rgba(223,171,74,.28); }
+:root[data-theme="aurora"]    .hero { background:#070C18; border-bottom-color: rgba(104,219,174,.28); }
+:root[data-theme="amber"]     .hero { background:#14100A; border-bottom-color: rgba(227,173,68,.28); }
+:root[data-theme="colorblind"] .hero { background:#0E1620; border-bottom-color: rgba(240,168,26,.30); }
+:root[data-theme="steppe"]    .hero-scrim,
+:root[data-theme="pounamu"]   .hero-scrim,
+:root[data-theme="altiplano"] .hero-scrim,
+:root[data-theme="indigo"]    .hero-scrim,
+:root[data-theme="aurora"]    .hero-scrim,
+:root[data-theme="amber"]     .hero-scrim,
+:root[data-theme="colorblind"] .hero-scrim,
+:root[data-theme="contrast"]  .hero-scrim {
+  background: linear-gradient(to top, color-mix(in srgb, var(--ground) 96%, transparent) 0%,
+              color-mix(in srgb, var(--ground) 58%, transparent) 34%, transparent 64%);
+}
+
+/* ------------------------------------------------------ right-to-left ----- */
+/* Arabic, Hebrew and Persian mirror the whole interface. The chapters whose
+   prose is still English keep dir="ltr" on the prose itself (set by
+   fleet.js) so English sentences are not reordered — only the furniture
+   around them flips. */
+[dir="rtl"] .read-progress { transform-origin: 100% 50%; }
+[dir="rtl"] .lede-h::after { background: linear-gradient(to left, var(--hair), transparent); }
+[dir="rtl"] .inc .law::before,
+[dir="rtl"] .role .spoke b { transform: scaleX(-1); display: inline-block; }
+[dir="rtl"] .chan li::before { content: "\2039"; }
+/* the hero canvas light falls from the reading side in both directions */
+[dir="rtl"] .hero-scrim { transform: scaleX(-1); }
+/* NB: never set the `direction` property on the containers here. The CSS
+   property beats the dir attribute, which would drag the English prose
+   islands back into RTL and strand their sentence-final punctuation at the
+   wrong end of the line. The dir attributes fleet.js writes do this job. */
+[dir="rtl"] [lang="en"][dir="ltr"] { text-align: left; }
+
+/* RTL scripts have no italic tradition — the display italics become weight */
+[dir="rtl"] h1 em, [dir="rtl"] h2 em,
+[dir="rtl"] .inc .law, [dir="rtl"] .callout .law { font-style: normal; font-weight: 700; }
+
+/* scripts that need more vertical room than a latin serif assumes */
+:root:is([lang="hi"], [lang="bn"], [lang="ar"], [lang="fa"], [lang="he"]) .toggle,
+:root:is([lang="hi"], [lang="bn"], [lang="ar"], [lang="fa"], [lang="he"]) .theme-opt { line-height: 1.9; }
+
+/* -------------------------------------------------- the switcher dock ----- */
+/* fleet.js moves the existing .theme-switcher in here and adds the language
+   control beside it, so no page markup had to change. Without JS the theme
+   switcher keeps its own fixed position and simply sits alone. */
+.fleet-dock {
+  position: fixed; top: 1rem; inset-inline-end: 1rem; z-index: 20;
+  display: flex; gap: .5rem; align-items: flex-start; flex-wrap: wrap;
+  justify-content: flex-end; max-width: calc(100vw - 2rem);
+}
+.fleet-dock .theme-switcher { position: relative; top: auto; inset-inline-end: auto; z-index: auto; }
+.lang-switcher { position: relative; }
+.lang-switcher .toggle { min-width: 0; }
+.lang-switcher .theme-menu { max-height: min(70vh, 32rem); overflow-y: auto; }
+
+/* a group heading inside either menu */
+.menu-group {
+  font-family: var(--meta); font-size: .6rem; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--bone-faint); padding: .7rem .7rem .35rem;
+}
+.menu-group + .menu-group,
+li:first-child > .menu-group { padding-top: .35rem; }
+.theme-opt .tick { margin-inline-start: auto; opacity: 0; flex: none; }
+.theme-opt[aria-checked="true"] .tick { opacity: 1; }
+
+/* ------------------------------------------------- honest prose notice ---- */
+/* Shown only when the interface language is not English and this chapter has
+   no human translation yet. It is deliberately plain: a badge, not an
+   apology, and never styled to look like part of the story. */
+.prose-note {
+  max-width: var(--shell); margin-inline: auto;
+  padding: .85rem var(--edge);
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  font-family: var(--meta); font-size: .78rem; line-height: 1.5;
+  color: var(--bone-dim);
+  background: var(--ground-3);
+  border-bottom: 1px solid var(--hair);
+}
+.prose-note[hidden] { display: none; }   /* display:flex above would otherwise beat the hidden attribute */
+.prose-note::before {
+  content: "\24D8"; color: var(--gold); font-size: 1rem; flex: none;
+}
+.prose-note .ui-ok { color: var(--bone-faint); }
+.prose-note .ui-ok::before { content: "\00B7"; margin-inline: .5rem; }

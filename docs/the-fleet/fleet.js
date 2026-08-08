@@ -4,7 +4,11 @@
   var root = document.documentElement;
   var themeBtn = document.getElementById("themeBtn");
   var themeMenu = document.getElementById("themeMenu");
-  var themeOpts = Array.prototype.slice.call(themeMenu.querySelectorAll(".theme-opt"));
+  /* Populated by buildThemeMenu() once the registry exists. The markup in the
+     twelve pages still carries a hand-written menu; it is the no-JS fallback
+     and gets replaced here so that adding a theme means adding one SKINS
+     entry and nothing else. */
+  var themeOpts = [];
   var eraToast = document.getElementById("eraToast");
   var canvas = document.getElementById("board");
   var ctx = canvas.getContext("2d");
@@ -26,7 +30,7 @@
       pulseGold: "231,186,92", pulseFlare: "222,138,98"
     },
     arabic: {
-      label: "Arabic", glyph: "\u2736", motif: "hex6",
+      label: "Arabic", glyph: "\u2736", motif: "hex6", group: "palette",
       bg: "#0d1233", fade: "rgba(13,18,51,0.20)",
       boardTile: "rgba(212,175,55,0.02)", boardLine: "rgba(212,175,55,0.05)", filament: "rgba(212,175,55,0.08)",
       packet: "#6bc0d4", packetTrail: "rgba(79,176,196,0.5)", packetGlow: "rgba(79,176,196,0.28)",
@@ -36,7 +40,7 @@
       pulseGold: "212,175,55", pulseFlare: "193,82,63"
     },
     japanese: {
-      label: "Japanese", glyph: "\u25EF", motif: "enso",
+      label: "Japanese", glyph: "\u25EF", motif: "enso", group: "palette",
       bg: "#f4efe4", fade: "rgba(244,239,228,0.20)",
       boardTile: "rgba(42,42,40,0.02)", boardLine: "rgba(42,42,40,0.05)", filament: "rgba(42,42,40,0.05)",
       packet: "#c94a35", packetTrail: "rgba(201,74,53,0.5)", packetGlow: "rgba(201,74,53,0.22)",
@@ -46,7 +50,7 @@
       pulseGold: "156,131,85", pulseFlare: "201,74,53"
     },
     indian: {
-      label: "Indian", glyph: "\u2740", motif: "lotus",
+      label: "Indian", glyph: "\u2740", motif: "lotus", group: "palette",
       bg: "#2a0f14", fade: "rgba(42,15,20,0.20)",
       boardTile: "rgba(232,160,32,0.02)", boardLine: "rgba(232,160,32,0.05)", filament: "rgba(232,160,32,0.09)",
       packet: "#3ecad0", packetTrail: "rgba(43,179,173,0.5)", packetGlow: "rgba(43,179,173,0.28)",
@@ -56,7 +60,7 @@
       pulseGold: "232,160,32", pulseFlare: "200,29,58"
     },
     codex: {
-      label: "Codex", glyph: "\u2766", motif: null,
+      label: "Codex", glyph: "\u2766", motif: null, group: "palette",
       bg: "#ece0c0", fade: "rgba(236,224,192,0.20)",
       boardTile: "rgba(43,32,19,0.02)", boardLine: "rgba(43,32,19,0.05)", filament: "rgba(175,138,46,0.08)",
       packet: "#a3241c", packetTrail: "rgba(163,36,28,0.5)", packetGlow: "rgba(163,36,28,0.22)",
@@ -66,7 +70,7 @@
       pulseGold: "175,138,46", pulseFlare: "163,36,28"
     },
     andalus: {
-      label: "El-Andalus", glyph: "\u2734", motif: "star8",
+      label: "El-Andalus", glyph: "\u2734", motif: "star8", group: "palette",
       bg: "#062a28", fade: "rgba(6,42,40,0.20)",
       boardTile: "rgba(201,150,60,0.02)", boardLine: "rgba(201,150,60,0.06)", filament: "rgba(201,150,60,0.09)",
       packet: "#4fd4c2", packetTrail: "rgba(47,179,166,0.5)", packetGlow: "rgba(47,179,166,0.28)",
@@ -76,7 +80,7 @@
       pulseGold: "201,150,60", pulseFlare: "193,99,63"
     },
     terminal: {
-      label: "Terminal", glyph: "\u276F", motif: "plus",
+      label: "Terminal", glyph: "\u276F", motif: "plus", group: "palette",
       bg: "#080b0a", fade: "rgba(8,11,10,0.22)",
       boardTile: "rgba(72,208,106,0.015)", boardLine: "rgba(72,208,106,0.05)", filament: "rgba(72,208,106,0.08)",
       packet: "#6ee08a", packetTrail: "rgba(72,208,106,0.5)", packetGlow: "rgba(72,208,106,0.26)",
@@ -84,11 +88,163 @@
       reviewer: "rgba(72,208,106,0.5)",
       gate: "rgba(72,208,106,0.9)", gateOuter: "rgba(72,208,106,0.3)", gateCore: "rgba(140,240,170,0.95)",
       pulseGold: "72,208,106", pulseFlare: "224,87,74"
+    },
+
+    /* ---- accessibility themes ---- */
+    contrast: {
+      label: "High contrast", glyph: "\u25D1", motif: null, group: "access", i18n: "themeContrast",
+      bg: "#000000", fade: "rgba(0,0,0,0.22)",
+      boardTile: "rgba(255,255,255,0.03)", boardLine: "rgba(255,255,255,0.16)", filament: "rgba(255,210,74,0.22)",
+      packet: "#7FE9FF", packetTrail: "rgba(127,233,255,0.7)", packetGlow: "rgba(127,233,255,0.4)",
+      node: "rgba(127,233,255,0.85)", nodeCore: "rgba(255,255,255,1)",
+      reviewer: "rgba(255,210,74,0.85)",
+      gate: "rgba(255,210,74,1)", gateOuter: "rgba(255,210,74,0.5)", gateCore: "rgba(255,255,255,1)",
+      pulseGold: "255,210,74", pulseFlare: "255,176,136"
+    },
+    colorblind: {
+      label: "Colour-blind safe", glyph: "\u25D4", motif: null, group: "access", i18n: "themeColorblind",
+      bg: "#0E1620", fade: "rgba(14,22,32,0.20)",
+      boardTile: "rgba(243,246,249,0.018)", boardLine: "rgba(243,246,249,0.05)", filament: "rgba(240,168,26,0.10)",
+      packet: "#69BEF0", packetTrail: "rgba(105,190,240,0.55)", packetGlow: "rgba(105,190,240,0.3)",
+      node: "rgba(105,190,240,0.6)", nodeCore: "rgba(170,220,250,0.95)",
+      reviewer: "rgba(240,168,26,0.6)",
+      gate: "rgba(240,168,26,0.9)", gateOuter: "rgba(240,168,26,0.32)", gateCore: "rgba(255,205,110,0.95)",
+      pulseGold: "240,168,26", pulseFlare: "238,155,196"
+    },
+    dyslexia: {
+      label: "Dyslexia-friendly", glyph: "\u25A9", motif: null, group: "access", i18n: "themeDyslexia",
+      bg: "#2B2620", fade: "rgba(43,38,32,0.22)",
+      boardTile: "rgba(251,248,242,0.02)", boardLine: "rgba(251,248,242,0.05)", filament: "rgba(122,74,0,0.10)",
+      packet: "#8FD0BD", packetTrail: "rgba(143,208,189,0.45)", packetGlow: "rgba(143,208,189,0.22)",
+      node: "rgba(143,208,189,0.5)", nodeCore: "rgba(200,235,225,0.9)",
+      reviewer: "rgba(226,180,110,0.5)",
+      gate: "rgba(226,180,110,0.85)", gateOuter: "rgba(226,180,110,0.3)", gateCore: "rgba(245,215,165,0.95)",
+      pulseGold: "226,180,110", pulseFlare: "214,140,110"
+    },
+
+    /* ---- palettes : colour and type only, never costume ---- */
+    steppe: {
+      label: "Steppe", glyph: "\u2726", motif: null, group: "palette",
+      bg: "#10161F", fade: "rgba(16,22,31,0.20)",
+      boardTile: "rgba(241,235,221,0.016)", boardLine: "rgba(241,235,221,0.04)", filament: "rgba(240,194,75,0.08)",
+      packet: "#7BBCE8", packetTrail: "rgba(123,188,232,0.5)", packetGlow: "rgba(123,188,232,0.26)",
+      node: "rgba(123,188,232,0.55)", nodeCore: "rgba(180,215,245,0.9)",
+      reviewer: "rgba(240,194,75,0.5)",
+      gate: "rgba(240,194,75,0.88)", gateOuter: "rgba(240,194,75,0.3)", gateCore: "rgba(250,220,130,0.95)",
+      pulseGold: "240,194,75", pulseFlare: "232,154,107"
+    },
+    pounamu: {
+      label: "Pounamu", glyph: "\u2727", motif: null, group: "palette",
+      bg: "#0B1310", fade: "rgba(11,19,16,0.20)",
+      boardTile: "rgba(240,237,228,0.016)", boardLine: "rgba(240,237,228,0.04)", filament: "rgba(220,199,146,0.07)",
+      packet: "#6FC9A4", packetTrail: "rgba(111,201,164,0.5)", packetGlow: "rgba(111,201,164,0.26)",
+      node: "rgba(111,201,164,0.55)", nodeCore: "rgba(170,225,205,0.9)",
+      reviewer: "rgba(220,199,146,0.5)",
+      gate: "rgba(220,199,146,0.85)", gateOuter: "rgba(220,199,146,0.3)", gateCore: "rgba(240,225,185,0.95)",
+      pulseGold: "220,199,146", pulseFlare: "222,152,120"
+    },
+    altiplano: {
+      label: "Altiplano", glyph: "\u25B3", motif: null, group: "palette",
+      bg: "#1A1210", fade: "rgba(26,18,16,0.20)",
+      boardTile: "rgba(245,235,223,0.016)", boardLine: "rgba(245,235,223,0.04)", filament: "rgba(229,172,92,0.08)",
+      packet: "#6EBECB", packetTrail: "rgba(110,190,203,0.5)", packetGlow: "rgba(110,190,203,0.26)",
+      node: "rgba(110,190,203,0.55)", nodeCore: "rgba(175,220,230,0.9)",
+      reviewer: "rgba(229,172,92,0.5)",
+      gate: "rgba(229,172,92,0.88)", gateOuter: "rgba(229,172,92,0.3)", gateCore: "rgba(245,205,145,0.95)",
+      pulseGold: "229,172,92", pulseFlare: "222,123,92"
+    },
+    indigo: {
+      label: "Indigo", glyph: "\u25C7", motif: null, group: "palette",
+      bg: "#0D1226", fade: "rgba(13,18,38,0.20)",
+      boardTile: "rgba(237,237,245,0.016)", boardLine: "rgba(237,237,245,0.04)", filament: "rgba(223,171,74,0.08)",
+      packet: "#6AC6D0", packetTrail: "rgba(106,198,208,0.5)", packetGlow: "rgba(106,198,208,0.26)",
+      node: "rgba(106,198,208,0.55)", nodeCore: "rgba(170,225,232,0.9)",
+      reviewer: "rgba(223,171,74,0.5)",
+      gate: "rgba(223,171,74,0.88)", gateOuter: "rgba(223,171,74,0.3)", gateCore: "rgba(243,205,130,0.95)",
+      pulseGold: "223,171,74", pulseFlare: "226,147,114"
+    },
+    aurora: {
+      label: "Aurora", glyph: "\u2739", motif: null, group: "palette",
+      bg: "#070C18", fade: "rgba(7,12,24,0.20)",
+      boardTile: "rgba(239,242,247,0.016)", boardLine: "rgba(239,242,247,0.04)", filament: "rgba(234,196,99,0.07)",
+      packet: "#68DBAE", packetTrail: "rgba(104,219,174,0.5)", packetGlow: "rgba(104,219,174,0.28)",
+      node: "rgba(104,219,174,0.55)", nodeCore: "rgba(170,240,215,0.9)",
+      reviewer: "rgba(234,196,99,0.5)",
+      gate: "rgba(234,196,99,0.88)", gateOuter: "rgba(234,196,99,0.3)", gateCore: "rgba(248,220,150,0.95)",
+      pulseGold: "234,196,99", pulseFlare: "233,125,136"
+    },
+    amber: {
+      label: "Amber Coast", glyph: "\u25CB", motif: null, group: "palette",
+      bg: "#14100A", fade: "rgba(20,16,10,0.20)",
+      boardTile: "rgba(243,236,223,0.016)", boardLine: "rgba(243,236,223,0.04)", filament: "rgba(227,173,68,0.08)",
+      packet: "#7FB8C8", packetTrail: "rgba(127,184,200,0.5)", packetGlow: "rgba(127,184,200,0.26)",
+      node: "rgba(127,184,200,0.55)", nodeCore: "rgba(185,220,232,0.9)",
+      reviewer: "rgba(227,173,68,0.5)",
+      gate: "rgba(227,173,68,0.88)", gateOuter: "rgba(227,173,68,0.3)", gateCore: "rgba(245,208,130,0.95)",
+      pulseGold: "227,173,68", pulseFlare: "216,148,104"
     }
   };
   // the dial starts at the untouched default -- everything else is opt-in
-  var order = ["", "arabic", "japanese", "indian", "codex", "andalus", "terminal"];
+  var order = ["", "contrast", "colorblind", "dyslexia",
+               "arabic", "japanese", "indian", "codex", "andalus", "terminal",
+               "steppe", "pounamu", "altiplano", "indigo", "aurora", "amber"];
   var skinIdx = 0;
+
+  /* ---------- i18n plumbing ---------- */
+  var I18N = window.FleetI18n;
+  var lang = "en";
+  function t(key) { return I18N ? I18N.get(lang)[key] : key; }
+  /* a theme's name is translated only when it names a function ("High
+     contrast"); the palettes are proper nouns and stay as they are, the way
+     you would not translate a colour's name on a paint chart. */
+  function skinLabel(id) {
+    var sk = SKINS[id];
+    if (id === "") return t("themeDefault");
+    return sk && sk.i18n ? t(sk.i18n) : (sk ? sk.label : id);
+  }
+
+  function buildThemeMenu() {
+    themeMenu.innerHTML = "";
+    var groups = [
+      { key: "access",  label: "groupAccess"  },
+      { key: "palette", label: "groupPalette" }
+    ];
+    function addOpt(id) {
+      var sk = SKINS[id];
+      var li = document.createElement("li");
+      li.setAttribute("role", "none");
+      var b = document.createElement("button");
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", "false");
+      b.className = "theme-opt";
+      b.setAttribute("data-theme", id);
+      b.innerHTML = '<span class="glyph" aria-hidden="true"></span>' +
+                    '<span class="label"></span>' +
+                    '<span class="tick" aria-hidden="true">\u2713</span>';
+      b.querySelector(".glyph").textContent = sk.glyph;
+      b.querySelector(".label").textContent = skinLabel(id);
+      li.appendChild(b);
+      themeMenu.appendChild(li);
+    }
+    addOpt("");
+    groups.forEach(function (g) {
+      var members = order.filter(function (id) {
+        return id !== "" && SKINS[id] && SKINS[id].group === g.key;
+      });
+      if (!members.length) return;
+      var li = document.createElement("li");
+      li.setAttribute("role", "presentation");
+      var h = document.createElement("div");
+      h.className = "menu-group";
+      h.setAttribute("data-i18n", g.label);
+      h.textContent = t(g.label);
+      li.appendChild(h);
+      themeMenu.appendChild(li);
+      members.forEach(addOpt);
+    });
+    themeOpts = Array.prototype.slice.call(themeMenu.querySelectorAll(".theme-opt"));
+  }
+  buildThemeMenu();
   var S = SKINS[""];
 
   var W = 0, H = 0, DPR = 1, board = null;
@@ -349,12 +505,18 @@
     indian:   "Indian \u00b7 ornamental jewel tones",
     codex:    "Codex \u00b7 illuminated manuscript",
     andalus:  "El-Andalus \u00b7 azulejo + horseshoe geometry",
-    terminal: "Terminal \u00b7 CRT phosphor"
+    terminal: "Terminal \u00b7 CRT phosphor",
+    steppe:    "Steppe \u00b7 wheat and open sky",
+    pounamu:   "Pounamu \u00b7 greenstone and deep bush",
+    altiplano: "Altiplano \u00b7 ochre and thin high air",
+    indigo:    "Indigo \u00b7 resist-dyed cloth and brass",
+    aurora:    "Aurora \u00b7 polar night and its light",
+    amber:     "Amber Coast \u00b7 fossil amber and cold sea"
   };
   var toastTimer;
   function showEra(id) {
     if (!eraToast) return;
-    eraToast.textContent = BLURB[id];
+    eraToast.textContent = BLURB[id] || skinLabel(id);
     eraToast.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { eraToast.classList.remove("show"); }, 2600);
@@ -374,7 +536,7 @@
     skinIdx = order.indexOf(id);
     if (id === "") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", id);
-    themeBtn.textContent = S.glyph + "  " + S.label;
+    themeBtn.textContent = S.glyph + "  " + skinLabel(id);
     themeOpts.forEach(function (opt) {
       opt.setAttribute("aria-checked", opt.getAttribute("data-theme") === id ? "true" : "false");
     });
@@ -427,8 +589,186 @@
   } else {
     paintFirst();
     if (!reduce) start();
-    themeBtn.textContent = S.glyph + "  " + S.label;
+    themeBtn.textContent = S.glyph + "  " + skinLabel(initialTheme || "");
   }
+
+
+  /* ======================================================================
+     LANGUAGE
+     ----------------------------------------------------------------------
+     The interface is translated; the chapters are not, and the page says so
+     rather than pretending otherwise. Because the chapter prose stays
+     English, it is explicitly marked lang="en" dir="ltr" — announcing
+     English sentences as Arabic or Hindi to a screen reader would be worse
+     than leaving the page in English altogether.
+     ====================================================================== */
+  (function () {
+    if (!I18N) return;
+
+    var pageId = (function () {
+      var parts = location.pathname.replace(/\/index\.html?$/, "").split("/").filter(Boolean);
+      var last = parts[parts.length - 1] || "";
+      return /^night-/.test(last) ? last : "night-one";
+    })();
+
+    /* dock: the existing theme switcher moves in, the language control joins it */
+    var dock = document.createElement("div");
+    dock.className = "fleet-dock";
+    var switcher = document.querySelector(".theme-switcher");
+    switcher.parentNode.insertBefore(dock, switcher);
+    dock.appendChild(switcher);
+
+    var langWrap = document.createElement("div");
+    langWrap.className = "lang-switcher";
+    var langBtn = document.createElement("button");
+    langBtn.className = "toggle";
+    langBtn.id = "langBtn";
+    langBtn.setAttribute("aria-haspopup", "menu");
+    langBtn.setAttribute("aria-expanded", "false");
+    langBtn.setAttribute("aria-controls", "langMenu");
+    var langMenu = document.createElement("ul");
+    langMenu.className = "theme-menu";
+    langMenu.id = "langMenu";
+    langMenu.setAttribute("role", "menu");
+    langMenu.hidden = true;
+    langWrap.appendChild(langBtn);
+    langWrap.appendChild(langMenu);
+    dock.appendChild(langWrap);
+
+    var langOpts = [];
+    I18N.order.forEach(function (code) {
+      var li = document.createElement("li");
+      li.setAttribute("role", "none");
+      var b = document.createElement("button");
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", "false");
+      b.className = "theme-opt";
+      b.setAttribute("data-lang", code);
+      b.setAttribute("lang", code);
+      b.innerHTML = '<span class="label"></span><span class="tick" aria-hidden="true">\u2713</span>';
+      /* each language is listed in its own script, never transliterated */
+      b.querySelector(".label").textContent = I18N.get(code).name;
+      li.appendChild(b);
+      langMenu.appendChild(li);
+      langOpts.push(b);
+    });
+
+    /* the honest notice, inserted once and re-worded on every switch */
+    var note = document.createElement("div");
+    note.className = "prose-note";
+    note.hidden = true;
+    var anchor = document.querySelector(".manifest") || document.querySelector(".hero");
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(note, anchor.nextSibling);
+
+    /* containers whose text is the chapter itself, not the interface */
+    function proseNodes() {
+      return Array.prototype.slice.call(
+        document.querySelectorAll(".hero-inner, .manifest, body > section, body > footer"));
+    }
+
+    function applyLang(code, save) {
+      var def = I18N.get(code);
+      lang = code;
+      root.setAttribute("lang", code);
+      root.setAttribute("dir", def.dir);
+
+      var translated = I18N.hasProse(code, pageId);
+      proseNodes().forEach(function (el) {
+        if (code === "en" || translated) {
+          el.removeAttribute("lang");
+          el.removeAttribute("dir");
+        } else {
+          /* English prose inside a non-English (possibly RTL) page */
+          el.setAttribute("lang", "en");
+          el.setAttribute("dir", "ltr");
+        }
+      });
+
+      if (code === "en" || translated) {
+        note.hidden = true;
+        note.textContent = "";
+      } else {
+        note.hidden = false;
+        note.setAttribute("lang", code);
+        note.setAttribute("dir", def.dir);
+        note.innerHTML = '<span class="msg"></span><span class="ui-ok"></span>';
+        note.querySelector(".msg").textContent = def.proseNote;
+        note.querySelector(".ui-ok").textContent = def.uiNote;
+      }
+
+      /* relabel every piece of chrome */
+      langBtn.textContent = "\u2725  " + def.name;
+      langBtn.setAttribute("aria-label", def.langMenu);
+      langBtn.setAttribute("title", def.langLabel);
+      langMenu.setAttribute("aria-label", def.langMenu);
+      themeMenu.setAttribute("aria-label", def.themeMenu);
+      themeBtn.setAttribute("aria-label", def.themeMenu);
+      themeBtn.setAttribute("title", def.themeLabel);
+      themeBtn.textContent = S.glyph + "  " + skinLabel(root.getAttribute("data-theme") || "");
+      Array.prototype.forEach.call(themeMenu.querySelectorAll(".theme-opt"), function (b) {
+        b.querySelector(".label").textContent = skinLabel(b.getAttribute("data-theme"));
+      });
+      Array.prototype.forEach.call(themeMenu.querySelectorAll("[data-i18n]"), function (h) {
+        h.textContent = def[h.getAttribute("data-i18n")];
+      });
+      langOpts.forEach(function (b) {
+        b.setAttribute("aria-checked", b.getAttribute("data-lang") === code ? "true" : "false");
+      });
+      var bar = document.querySelector(".read-progress");
+      if (bar) bar.setAttribute("aria-label", def.readingProgress);
+
+      if (save) { try { localStorage.setItem("mm-lang", code); } catch (e) {} }
+    }
+
+    function closeLang(refocus) {
+      langMenu.hidden = true;
+      langBtn.setAttribute("aria-expanded", "false");
+      if (refocus) langBtn.focus();
+    }
+    langBtn.addEventListener("click", function () {
+      if (langMenu.hidden) {
+        langMenu.hidden = false;
+        langBtn.setAttribute("aria-expanded", "true");
+        var cur = langMenu.querySelector('[aria-checked="true"]') || langOpts[0];
+        cur.focus();
+      } else { closeLang(false); }
+    });
+    langBtn.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); langBtn.click(); }
+      else if (e.key === "Escape") { closeLang(false); }
+    });
+    langOpts.forEach(function (b, i) {
+      b.addEventListener("click", function () {
+        applyLang(b.getAttribute("data-lang"), true);
+        closeLang(true);
+      });
+      b.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowDown") { e.preventDefault(); langOpts[(i + 1) % langOpts.length].focus(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); langOpts[(i - 1 + langOpts.length) % langOpts.length].focus(); }
+        else if (e.key === "Home") { e.preventDefault(); langOpts[0].focus(); }
+        else if (e.key === "End") { e.preventDefault(); langOpts[langOpts.length - 1].focus(); }
+        else if (e.key === "Escape") { e.preventDefault(); closeLang(true); }
+      });
+    });
+    langMenu.addEventListener("focusout", function (e) {
+      var next = e.relatedTarget;
+      if (!next || (!langMenu.contains(next) && next !== langBtn)) closeLang(false);
+    });
+    document.addEventListener("click", function (e) {
+      if (!langMenu.hidden && !langMenu.contains(e.target) && e.target !== langBtn) closeLang(false);
+    });
+
+    /* #lang=<code> wins, then the stored choice, then the browser's own
+       preference, then English. */
+    var m = /(?:^|[#&])lang=([A-Za-z-]+)/.exec(location.hash);
+    var initial = m && I18N.resolve(m[1]);
+    if (!initial) { try { initial = I18N.resolve(localStorage.getItem("mm-lang")); } catch (e) {} }
+    if (!initial) {
+      var navLangs = navigator.languages || [navigator.language];
+      for (var i = 0; i < navLangs.length && !initial; i++) initial = I18N.resolve(navLangs[i]);
+    }
+    applyLang(initial || I18N.fallback, false);
+  })();
 
   window.addEventListener("load", function () {
     paintFirst();
