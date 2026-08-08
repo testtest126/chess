@@ -156,13 +156,16 @@ public struct OpeningBook: Sendable {
         "c2c4 c7c5 g1f3 g8f6 d2d4 c5d4 f3d4 e7e6 g2g3",
     ])
 
-    /// A larger book built from real game data: the top ~4000 (position,
-    /// move) pairs by frequency, up to 10 plies deep, extracted from
-    /// testtest126/books' `bjbraams_chessdb_198350_lines.pgn` (198,350 real
-    /// database games). See `tools/opening-book/README.md` for provenance
-    /// and how to regenerate it. Falls back to an empty book if the bundled
-    /// resource is missing so a packaging problem degrades to "no book move,
-    /// fall through to search" rather than crashing.
+    /// A larger book built from real game data: the top 50,000 (position,
+    /// move) pairs by a result-weighted score, up to 14 plies deep,
+    /// extracted by streaming a Lichess monthly standard-rated database dump
+    /// through `tools/opening-book/generate_opening_book.py --source
+    /// lichess-dump` and keeping only games where both players were rated
+    /// >= 1800. See `tools/opening-book/README.md` for provenance, the
+    /// weighting formula, and how to regenerate it. Falls back to an empty
+    /// book if the bundled resource is missing so a packaging problem
+    /// degrades to "no book move, fall through to search" rather than
+    /// crashing.
     public static let large: OpeningBook = {
         guard let url = Bundle.module.url(forResource: "opening_book_large", withExtension: "txt"),
               let text = try? String(contentsOf: url, encoding: .utf8) else {

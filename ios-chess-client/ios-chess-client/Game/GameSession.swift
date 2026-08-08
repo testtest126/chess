@@ -74,9 +74,13 @@ final class GameSession: Identifiable {
     private(set) var isFindingHint = false
 
     /// Book-backed (on levels that use it) so games open with variety instead
-    /// of one deterministic line. The persistent transposition table keeps
-    /// search work from earlier moves (and from pondering on the player's
-    /// time) so later searches start warm.
+    /// of one deterministic line. `.large` (a 50,000-row, 14-ply book built
+    /// from real 1800+-rated Lichess games, see
+    /// `ChessKit/Sources/ChessProtocol/OpeningBook.swift`) gives much deeper
+    /// and broader coverage than the hand-authored `.standard` it replaced
+    /// here. The persistent transposition table keeps search work from
+    /// earlier moves (and from pondering on the player's time) so later
+    /// searches start warm.
     private let engine: PersistentNegamaxEngine
     /// Speculative search of the expected reply, running while the player
     /// thinks. Results are discarded; the warm table is the payoff.
@@ -86,7 +90,7 @@ final class GameSession: Identifiable {
         self.playerColor = playerColor
         self.difficulty = difficulty
         self.game = Game()
-        self.engine = PersistentNegamaxEngine(book: difficulty.usesBook ? .standard : nil)
+        self.engine = PersistentNegamaxEngine(book: difficulty.usesBook ? .large : nil)
     }
 
     var board: Board { game.board }

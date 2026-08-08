@@ -176,4 +176,21 @@ final class OpeningBookTests: XCTestCase {
             XCTAssertGreaterThan(weighted.weight, 0)
         }
     }
+
+    func testLargeBookCoversDeeperThanTheOldTenPlyCap() {
+        // The Ruy Lopez main line through 12 plies (1.e4 e5 2.Nf3 Nc6 3.Bb5
+        // a6 4.Ba4 Nf6 5.O-O Be7 6.Re1 b5) -- one ply past OpeningBook
+        // .standard's own scope and beyond the previous 10-ply-deep
+        // generated book, still resolving to a real book move confirms the
+        // Lichess-sourced book's 14-ply depth, not just its row count.
+        let book = OpeningBook.large
+        var deep = Board()
+        for uci in ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6",
+                    "e1g1", "f8e7", "f1e1", "b7b5"] {
+            deep.apply(Move(uci: uci)!)
+        }
+        let replies = book.weightedMoves(for: deep)
+        XCTAssertFalse(replies.isEmpty, "book should still have a reply 12 plies deep")
+        XCTAssertTrue(replies.contains { $0.move.uci == "a4b3" }, "a4b3 is the well-known main line retreat here")
+    }
 }

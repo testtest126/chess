@@ -150,7 +150,7 @@ final class EngineTests: XCTestCase {
 
     func testLargeBookOutOfBookFallsBackToSearch() {
         let bookEngine = NegamaxEngine(book: .large, bookSeed: 1)
-        // The generated book only covers the first 10 plies (see
+        // The generated book only covers the first 14 plies (see
         // tools/opening-book/); a much deeper, unusual position falls
         // through to a real search.
         let board = Board(fen: "r1bqk2r/pp1n1ppp/2p1pn2/3p4/2PP4/2N1PN2/PP2BPPP/R1BQ1RK1 w kq - 0 8")!
