@@ -160,6 +160,38 @@ final class PersistentEngineTests: XCTestCase {
         XCTAssertLessThanOrEqual(engine.tableEntryCount, cap)
     }
 
+    // MARK: - Opening book
+
+    func testLargeBookPlaysBookedMovesForKnownMainLines() throws {
+        // The same class and book GameSession wires up for book-using
+        // difficulty tiers: from the start position and after two of the
+        // most common openings, it should play instantly from the book
+        // rather than search.
+        let engine = PersistentNegamaxEngine(book: .large, bookSeed: 1)
+
+        let start = Board()
+        let opening = engine.search(start, limit: .default)
+        XCTAssertEqual(opening.nodes, 0, "book hit shouldn't search")
+        let firstMove = try XCTUnwrap(opening.bestMove)
+        XCTAssertTrue(start.isLegal(firstMove))
+
+        // 1.e4 e5 2.Nf3 -- book should suggest a legal, sensible reply.
+        var afterNf3 = Board()
+        for uci in ["e2e4", "e7e5", "g1f3"] { afterNf3 = try XCTUnwrap(afterNf3.making(Move(uci: uci)!)) }
+        let sicilianReply = engine.search(afterNf3, limit: .default)
+        XCTAssertEqual(sicilianReply.nodes, 0, "book hit shouldn't search")
+        let secondMove = try XCTUnwrap(sicilianReply.bestMove)
+        XCTAssertTrue(afterNf3.isLegal(secondMove))
+
+        // 1.d4 d5 2.c4 -- Queen's Gambit; book should still have a reply.
+        var afterQGD = Board()
+        for uci in ["d2d4", "d7d5", "c2c4"] { afterQGD = try XCTUnwrap(afterQGD.making(Move(uci: uci)!)) }
+        let qgdReply = engine.search(afterQGD, limit: .default)
+        XCTAssertEqual(qgdReply.nodes, 0, "book hit shouldn't search")
+        let thirdMove = try XCTUnwrap(qgdReply.bestMove)
+        XCTAssertTrue(afterQGD.isLegal(thirdMove))
+    }
+
     // MARK: - Pondering
 
     func testPonderReturnsLegalPredictionAndWarmsTable() throws {
