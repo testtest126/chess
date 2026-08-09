@@ -21,6 +21,17 @@ to nine.
   done/fixed/passing/merged/safe against primary evidence before that claim
   reaches the human, and returns UNVERIFIED or REFUTED rather than let an
   unproven claim pass as fact. Full charter: `docs/the-fleet/THE-ASSAYER.md`.
+- **The Oracle** — acts before code exists. Owns ADRs, pre-mortems, the risk
+  register (`docs/RISKS.md`), and the incident ledger (`docs/LEDGER.md`).
+  A soft gate only — it can post a non-blocking "this PR contradicts ADR-N"
+  status but cannot block a merge, and every prediction is falsifiable and
+  scored ✅/❌ once the outcome is known. Full charter:
+  `docs/the-fleet/THE-ORACLE.md`.
+- **The Agent** — the offensive twin of the root agent session: fuzzes,
+  red-teams, and chaos-tests the fleet's own system before an outside
+  attacker does. Files issues with a reproducing regression test attached; it
+  does not gate merges and does not write the fix. Full charter:
+  `docs/the-fleet/THE-AGENT.md`.
 
 A claim only reaches Yakiv after it clears both gates in order: the worker
 reports it, the Assayer tests it, and the orchestrator relays it onward —
@@ -29,7 +40,10 @@ explicitly and logged-ly overridden, ever gets called fact. This adds a gate
 in front of the human; it doesn't move any of the others. Merge authority
 still sits with the orchestrator alone, `orchestrator-approval` still means
 exactly what CLAUDE.md rule 4 says it means, and security-sensitive review
-under rule 5 is untouched.
+under rule 5 is untouched. The Oracle and the Agent sit outside this claim
+pipeline entirely — one advises before work starts, the other attacks
+independently of any single claim — and neither one holds a hard gate; those
+stay exactly where CLAUDE.md rule 5 and the Assayer already put them.
 
 ## Starting work
 
