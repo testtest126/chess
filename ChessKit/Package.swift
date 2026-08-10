@@ -14,7 +14,10 @@ let package = Package(
         .target(
             name: "ChessProtocol",
             dependencies: ["ChessKit"],
-            resources: [.copy("Resources/opening_book_large.txt")]
+            resources: [
+                .copy("Resources/opening_book_large.txt"),
+                .copy("Resources/opening_book_large_keyed.txt"),
+            ]
         ),
         .target(name: "ChessOnline"),
         // Engine measurement harness (bench + self-play). Deliberately NOT a

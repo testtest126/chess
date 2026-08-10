@@ -9,13 +9,15 @@ public enum CLI {
     engine-lab — ChessKit-Negamax measurement harness
 
     USAGE:
-      engine-lab bench   [--nodes N | --depth D]
-      engine-lab match   [--depth-a D] [--depth-b D] [--nodes-a N] [--nodes-b N]
-                         [--games G] [--max-plies P]
-      engine-lab abtest  [--depth D] [--baseline-depth D] [--candidate-depth D]
-                         [--elo0 E0] [--elo1 E1] [--alpha A] [--beta B]
-                         [--draw-prob P] [--games G] [--max-plies P]
-                         [--epd PATH [--sample N [--seed S]]]
+      engine-lab bench        [--nodes N | --depth D]
+      engine-lab match        [--depth-a D] [--depth-b D] [--nodes-a N] [--nodes-b N]
+                              [--games G] [--max-plies P]
+      engine-lab abtest       [--depth D] [--baseline-depth D] [--candidate-depth D]
+                              [--elo0 E0] [--elo1 E1] [--alpha A] [--beta B]
+                              [--draw-prob P] [--games G] [--max-plies P]
+                              [--epd PATH [--sample N [--seed S]]]
+      engine-lab convert-book <input-compact.txt> <output-keyed.txt>
+      engine-lab bench-book   old|new
 
     bench   Search the fixed 20-position suite under one reproducible limit and
             print total nodes, nodes/sec, and a behavioral signature. Default
@@ -34,6 +36,23 @@ public enum CLI {
             EPD opening suite (e.g. from testtest126/books) instead of the
             built-in set; `--sample N` (with `--seed S`) deterministically
             samples N positions from it.
+
+    convert-book
+            Converts an OpeningBook `compactRows` file (UCI-prefix rows, see
+            OpeningBook.init(compactRows:)) into the precomputed `keyedRows`
+            format OpeningBook.large actually loads (OpeningBook.init(keyedRows:)) —
+            no board replay at load time, just a position-key lookup. Run this
+            after regenerating opening_book_large.txt to refresh
+            opening_book_large_keyed.txt; see tools/opening-book/README.md.
+
+    bench-book old|new
+            Times constructing the large opening book once and exits — meant
+            to be invoked as a fresh process per sample (a static `let` only
+            pays its cost once per process, so this isn't meaningful to call
+            twice in one run). `old` times OpeningBook(compactRows:) against
+            the bundled opening_book_large.txt (the pre-fast-path cost).
+            `new` times OpeningBook.large (the bundled, precomputed keyed
+            resource).
     """
 
     /// Entry point. `arguments` is the full `CommandLine.arguments` (with the
@@ -53,6 +72,10 @@ public enum CLI {
             return runMatch(args)
         case "abtest":
             return runABTest(args)
+        case "convert-book":
+            return runConvertBook(args)
+        case "bench-book":
+            return runBenchBook(args)
         case "-h", "--help", "help":
             print(usage)
             return 0
@@ -235,6 +258,74 @@ public enum CLI {
                 + " -> \(result.sprt.decision.rawValue)"
         )
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - convert-book
+
+    static func runConvertBook(_ args: [String]) -> Int32 {
+        guard args.count == 2 else {
+            print("usage: engine-lab convert-book <input-compact.txt> <output-keyed.txt>")
+            return 2
+        }
+        let inputPath = args[0]
+        let outputPath = args[1]
+        guard let text = try? String(contentsOfFile: inputPath, encoding: .utf8) else {
+            print("engine-lab: could not read '\(inputPath)'")
+            return 1
+        }
+        let rows = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        let keyedRows = BookConvert.convert(compactRows: rows)
+        guard !keyedRows.isEmpty else {
+            print("engine-lab: conversion produced 0 rows from '\(inputPath)' — refusing to write an empty book")
+            return 1
+        }
+        let output = keyedRows.joined(separator: "\n") + "\n"
+        do {
+            try output.write(toFile: outputPath, atomically: true, encoding: .utf8)
+        } catch {
+            print("engine-lab: could not write '\(outputPath)': \(error)")
+            return 1
+        }
+        print("engine-lab: \(inputPath) (\(rows.count) rows) -> \(outputPath) (\(keyedRows.count) keyed rows)")
+        return 0
+    }
+
+    // MARK: - bench-book
+
+    static func runBenchBook(_ args: [String]) -> Int32 {
+        guard let mode = args.first else {
+            print("usage: engine-lab bench-book old <path-to-opening_book_large.txt> | bench-book new")
+            return 2
+        }
+        switch mode {
+        case "old":
+            guard args.count == 2 else {
+                print("usage: engine-lab bench-book old <path-to-opening_book_large.txt>")
+                return 2
+            }
+            // Times file read + parse together, matching what `new` measures
+            // for OpeningBook.large below (its static initializer does both
+            // internally) — an apples-to-apples cold-start comparison.
+            let start = Date()
+            guard let text = try? String(contentsOfFile: args[1], encoding: .utf8) else {
+                print("engine-lab: could not read '\(args[1])'")
+                return 1
+            }
+            let rows = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+            let book = OpeningBook(compactRows: rows)
+            let elapsedMs = Date().timeIntervalSince(start) * 1000
+            print("bench-book old: positions=\(book.positionCount) elapsed_ms=\(String(format: "%.1f", elapsedMs))")
+            return 0
+        case "new":
+            let start = Date()
+            let book = OpeningBook.large
+            let elapsedMs = Date().timeIntervalSince(start) * 1000
+            print("bench-book new: positions=\(book.positionCount) elapsed_ms=\(String(format: "%.1f", elapsedMs))")
+            return 0
+        default:
+            print("engine-lab: unknown bench-book mode '\(mode)' (want 'old' or 'new')")
+            return 2
+        }
     }
 
     // MARK: - Option parsing & formatting helpers
