@@ -16,6 +16,8 @@ public enum CLI {
                          [--elo0 E0] [--elo1 E1] [--alpha A] [--beta B]
                          [--draw-prob P] [--games G] [--max-plies P]
                          [--epd PATH [--sample N [--seed S]]]
+                         [--candidate-evaluator default|material-only]
+                         [--baseline-lmr on|off] [--candidate-lmr on|off]
 
     bench   Search the fixed 20-position suite under one reproducible limit and
             print total nodes, nodes/sec, and a behavioral signature. Default
@@ -26,14 +28,22 @@ public enum CLI {
             and B default to depth 4. All limits are fixed nodes/depth, so runs
             are reproducible.
 
-    abtest  Play a candidate evaluator (MaterialOnlyEvaluator, by default)
-            against a fixed baseline (DefaultEvaluator) across many openings,
-            both colors, checking an SPRT after every game so a confident
-            result can stop before the full schedule. Reports W/D/L, score %,
-            Elo with a 95% margin, and the SPRT verdict. `--epd` points at an
-            EPD opening suite (e.g. from testtest126/books) instead of the
-            built-in set; `--sample N` (with `--seed S`) deterministically
-            samples N positions from it.
+    abtest  Play a candidate against a fixed baseline (DefaultEvaluator, LMR
+            on) across many openings, both colors, checking an SPRT after
+            every game so a confident result can stop before the full
+            schedule. Reports W/D/L, score %, Elo with a 95% margin, and the
+            SPRT verdict. `--epd` points at an EPD opening suite (e.g. from
+            testtest126/books) instead of the built-in set; `--sample N`
+            (with `--seed S`) deterministically samples N positions from it.
+
+            The candidate defaults to MaterialOnlyEvaluator (this tool's
+            original purpose: does the shipping evaluator's PST scoring
+            help?). `--candidate-evaluator default` instead holds the
+            evaluator fixed at DefaultEvaluator, so `--baseline-lmr`/
+            `--candidate-lmr` (both default `on`) can isolate a search-only
+            change — e.g. `--candidate-evaluator default --baseline-lmr off`
+            measures late-move reductions alone against a baseline that
+            otherwise matches shipping behavior exactly.
     """
 
     /// Entry point. `arguments` is the full `CommandLine.arguments` (with the
@@ -133,13 +143,27 @@ public enum CLI {
 
     static func config(
         depthKey: String, nodesKey: String, defaultDepth: Int, options: [String: String],
-        label: String? = nil, evaluator: any PositionEvaluator = DefaultEvaluator()
+        label: String? = nil, evaluator: any PositionEvaluator = DefaultEvaluator(),
+        lateMoveReductions: Bool = true
     ) -> EngineConfig {
         if let nodes = options[nodesKey].flatMap(Int.init) {
-            return EngineConfig(label: label ?? "nodes-\(nodes)", limit: Bench.nodeLimit(nodes), evaluator: evaluator)
+            return EngineConfig(
+                label: label ?? "nodes-\(nodes)", limit: Bench.nodeLimit(nodes),
+                evaluator: evaluator, lateMoveReductions: lateMoveReductions
+            )
         }
         let depth = options[depthKey].flatMap(Int.init) ?? defaultDepth
-        return EngineConfig(label: label ?? "depth-\(depth)", limit: SearchLimit(depth: depth), evaluator: evaluator)
+        return EngineConfig(
+            label: label ?? "depth-\(depth)", limit: SearchLimit(depth: depth),
+            evaluator: evaluator, lateMoveReductions: lateMoveReductions
+        )
+    }
+
+    /// Parses an on/off CLI flag (`"off"`/`"false"` disable, anything else —
+    /// including the flag being absent — leaves the default in effect).
+    static func flag(_ options: [String: String], _ key: String, default defaultValue: Bool) -> Bool {
+        guard let raw = options[key] else { return defaultValue }
+        return raw != "off" && raw != "false"
     }
 
     static func format(_ result: MatchResult, openings: Int) -> String {
@@ -163,13 +187,26 @@ public enum CLI {
     static func runABTest(_ args: [String]) -> Int32 {
         let options = parseOptions(args)
         let sharedDepth = options["depth"].flatMap(Int.init) ?? 3
+        let baselineLMR = flag(options, "baseline-lmr", default: true)
+        let candidateLMR = flag(options, "candidate-lmr", default: true)
+        // Defaults to MaterialOnlyEvaluator, matching this tool's original
+        // (and only, until now) purpose of A/B-testing evaluators; pass
+        // `--candidate-evaluator default` to hold the evaluator fixed at
+        // DefaultEvaluator instead — e.g. to isolate a search-only change
+        // like `--candidate-lmr`/`--baseline-lmr` from any evaluator delta.
+        let candidateEvaluator: any PositionEvaluator =
+            options["candidate-evaluator"] == "default" ? DefaultEvaluator() : MaterialOnlyEvaluator()
+        let candidateEvaluatorName = options["candidate-evaluator"] == "default" ? "DefaultEvaluator" : "MaterialOnlyEvaluator"
+        let baselineLabel = options["baseline-label"] ?? "baseline (DefaultEvaluator\(baselineLMR ? "" : ", LMR off"))"
+        let candidateLabel = options["candidate-label"]
+            ?? "candidate (\(candidateEvaluatorName)\(candidateLMR ? "" : ", LMR off"))"
         let baseline = config(
             depthKey: "baseline-depth", nodesKey: "baseline-nodes", defaultDepth: sharedDepth, options: options,
-            label: "baseline (DefaultEvaluator)", evaluator: DefaultEvaluator()
+            label: baselineLabel, evaluator: DefaultEvaluator(), lateMoveReductions: baselineLMR
         )
         let candidate = config(
             depthKey: "candidate-depth", nodesKey: "candidate-nodes", defaultDepth: sharedDepth, options: options,
-            label: "candidate (MaterialOnlyEvaluator)", evaluator: MaterialOnlyEvaluator()
+            label: candidateLabel, evaluator: candidateEvaluator, lateMoveReductions: candidateLMR
         )
         let maxPlies = options["max-plies"].flatMap(Int.init) ?? SelfPlay.defaultMaxPlies
         let maxGames = options["games"].flatMap(Int.init)
