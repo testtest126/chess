@@ -3,9 +3,10 @@ import ChessKit
 
 /// An alpha-beta negamax search over ChessKit's evaluation, with iterative
 /// deepening, aspiration windows, a transposition table, null-move pruning,
-/// MVV-LVA + killer + history move ordering, check extensions, and quiescence
-/// search. Deterministic when no node or time limit cuts the search short —
-/// including when an opening book is attached, given the same `bookSeed`.
+/// MVV-LVA + killer + history move ordering, check extensions, late-move
+/// reductions, and quiescence search. Deterministic when no node or time
+/// limit cuts the search short — including when an opening book is
+/// attached, given the same `bookSeed`.
 public struct NegamaxEngine: ChessEngine {
     public let name: String
     public let author: String
@@ -22,6 +23,13 @@ public struct NegamaxEngine: ChessEngine {
     /// different one to compare evaluation functions without any shared
     /// mutable state (see ``PositionEvaluator``).
     public let evaluator: any PositionEvaluator
+    /// Whether the search reduces late, quiet moves (see the LMR block in
+    /// `Search.negamax`). Defaults to `true` (shipping behavior); a
+    /// measurement harness can set this `false` to reconstruct pre-LMR
+    /// search behavior from the same binary, so the heuristic's own Elo
+    /// effect can be isolated and SPRT-measured against a config that's
+    /// otherwise identical.
+    public let lateMoveReductions: Bool
 
     /// Score assigned to a checkmate at the root. Mates found deeper are worth
     /// slightly less so the search prefers the fastest one.
@@ -34,17 +42,22 @@ public struct NegamaxEngine: ChessEngine {
         author: String = "ChessKit",
         book: OpeningBook? = nil,
         bookSeed: UInt64 = .random(in: .min ... .max),
-        evaluator: any PositionEvaluator = DefaultEvaluator()
+        evaluator: any PositionEvaluator = DefaultEvaluator(),
+        lateMoveReductions: Bool = true
     ) {
         self.name = name
         self.author = author
         self.book = book
         self.bookSeed = bookSeed
         self.evaluator = evaluator
+        self.lateMoveReductions = lateMoveReductions
     }
 
     public func search(_ board: Board, limit: SearchLimit) -> SearchResult {
-        search(board, limit: limit, session: Search(limit: limit, evaluator: evaluator))
+        search(
+            board, limit: limit,
+            session: Search(limit: limit, evaluator: evaluator, lateMoveReductions: lateMoveReductions)
+        )
     }
 
     /// The full search driver, parameterized on the mutable session so
@@ -187,6 +200,35 @@ final class Search {
     private static let nullMoveReduction = 2
     /// Deepest ply tracked for repetition detection.
     private static let maxPathPly = 256
+    /// Minimum remaining depth before a move becomes an LMR candidate —
+    /// shallow windows aren't worth the extra re-search risk.
+    private static let lmrMinDepth = 3
+    /// Moves before this index in a node's ordering — the TT/PV move plus
+    /// the next couple of candidates, already the strongest by MVV-LVA/
+    /// killer/history ordering — are always searched at full depth. Only
+    /// moves ordered later than this are reduction candidates.
+    private static let lmrFullDepthMoves = 3
+    /// Depth × move-number reduction table (the standard log-based formula
+    /// used by e.g. Ethereal/CPW-derived engines), precomputed once and
+    /// capped at a depth/move-count no real search here will exceed.
+    private static let lmrTable: [[Int]] = {
+        let maxDepth = 64
+        let maxMoveNumber = 128
+        var table = [[Int]](repeating: [Int](repeating: 0, count: maxMoveNumber), count: maxDepth)
+        for d in 1..<maxDepth {
+            for m in 1..<maxMoveNumber {
+                let r = 0.75 + log(Double(d)) * log(Double(m)) / 2.25
+                table[d][m] = max(0, Int(r))
+            }
+        }
+        return table
+    }()
+
+    /// Looks up the LMR reduction for a move at `moveNumber` (1-based) in a
+    /// node searched to `depth`. Clamped into the precomputed table's range.
+    private static func lmrReduction(depth: Int, moveNumber: Int) -> Int {
+        lmrTable[min(depth, lmrTable.count - 1)][min(moveNumber, lmrTable[0].count - 1)]
+    }
 
     enum Bound {
         case exact, lower, upper
@@ -231,13 +273,16 @@ final class Search {
     private let generation: UInt32
     /// Consulted once per quiescence leaf; see ``PositionEvaluator``.
     private let evaluator: any PositionEvaluator
+    /// See ``NegamaxEngine/lateMoveReductions``.
+    private let lateMoveReductions: Bool
 
     init(
         limit: SearchLimit,
         table: [UInt64: TTEntry] = [:],
         stop: SearchStopSignal? = nil,
         generation: UInt32 = 0,
-        evaluator: any PositionEvaluator = DefaultEvaluator()
+        evaluator: any PositionEvaluator = DefaultEvaluator(),
+        lateMoveReductions: Bool = true
     ) {
         self.table = table
         self.stop = stop
@@ -245,6 +290,7 @@ final class Search {
         self.maxNodes = limit.maxNodes
         self.deadline = limit.moveTime.map { ContinuousClock.now + .seconds($0) }
         self.evaluator = evaluator
+        self.lateMoveReductions = lateMoveReductions
     }
 
     /// Records the root position at ply 0 of the repetition path, so a line
@@ -431,12 +477,44 @@ final class Search {
         var best = Int.min + 1
         var bestMove: Move?
         var a = alpha
+        var moveNumber = 0
         for move in ordered(moves, in: b, first: ttMove, ply: ply) {
             guard let next = b.making(move) else { continue }
-            let score = -negamax(
-                next, depth: depth - 1, alpha: -beta, beta: -a,
-                ply: ply + 1, extensions: extensions
-            )
+            moveNumber += 1
+
+            // Late-move reductions: a quiet move ordered late in a node that
+            // isn't itself in check, doesn't give check, and is deep enough
+            // to afford it gets a cheaper, reduced-depth look first. Only a
+            // reduced search that raises alpha is untrustworthy enough to
+            // warrant a full-depth re-search — most late quiet moves don't,
+            // so this buys the extra depth those re-searches need elsewhere.
+            let reduction: Int
+            if lateMoveReductions, !inCheck, depth >= Self.lmrMinDepth, moveNumber > Self.lmrFullDepthMoves,
+               isQuiet(move, in: b), !next.isInCheck(next.sideToMove) {
+                reduction = Self.lmrReduction(depth: depth, moveNumber: moveNumber)
+            } else {
+                reduction = 0
+            }
+
+            var score: Int
+            if reduction > 0 {
+                let reducedDepth = max(0, depth - 1 - reduction)
+                score = -negamax(
+                    next, depth: reducedDepth, alpha: -beta, beta: -a,
+                    ply: ply + 1, extensions: extensions
+                )
+                if !aborted, score > a {
+                    score = -negamax(
+                        next, depth: depth - 1, alpha: -beta, beta: -a,
+                        ply: ply + 1, extensions: extensions
+                    )
+                }
+            } else {
+                score = -negamax(
+                    next, depth: depth - 1, alpha: -beta, beta: -a,
+                    ply: ply + 1, extensions: extensions
+                )
+            }
             if aborted { return 0 }
             if score > best {
                 best = score

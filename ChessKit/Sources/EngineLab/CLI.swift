@@ -156,13 +156,27 @@ public enum CLI {
 
     static func config(
         depthKey: String, nodesKey: String, defaultDepth: Int, options: [String: String],
-        label: String? = nil, evaluator: any PositionEvaluator = DefaultEvaluator()
+        label: String? = nil, evaluator: any PositionEvaluator = DefaultEvaluator(),
+        lateMoveReductions: Bool = true
     ) -> EngineConfig {
         if let nodes = options[nodesKey].flatMap(Int.init) {
-            return EngineConfig(label: label ?? "nodes-\(nodes)", limit: Bench.nodeLimit(nodes), evaluator: evaluator)
+            return EngineConfig(
+                label: label ?? "nodes-\(nodes)", limit: Bench.nodeLimit(nodes),
+                evaluator: evaluator, lateMoveReductions: lateMoveReductions
+            )
         }
         let depth = options[depthKey].flatMap(Int.init) ?? defaultDepth
-        return EngineConfig(label: label ?? "depth-\(depth)", limit: SearchLimit(depth: depth), evaluator: evaluator)
+        return EngineConfig(
+            label: label ?? "depth-\(depth)", limit: SearchLimit(depth: depth),
+            evaluator: evaluator, lateMoveReductions: lateMoveReductions
+        )
+    }
+
+    /// Parses an on/off CLI flag (`"off"`/`"false"` disable, anything else —
+    /// including the flag being absent — leaves the default in effect).
+    static func flag(_ options: [String: String], _ key: String, default defaultValue: Bool) -> Bool {
+        guard let raw = options[key] else { return defaultValue }
+        return raw != "off" && raw != "false"
     }
 
     static func format(_ result: MatchResult, openings: Int) -> String {
@@ -186,13 +200,26 @@ public enum CLI {
     static func runABTest(_ args: [String]) -> Int32 {
         let options = parseOptions(args)
         let sharedDepth = options["depth"].flatMap(Int.init) ?? 3
+        let baselineLMR = flag(options, "baseline-lmr", default: true)
+        let candidateLMR = flag(options, "candidate-lmr", default: true)
+        // Defaults to MaterialOnlyEvaluator, matching this tool's original
+        // (and only, until now) purpose of A/B-testing evaluators; pass
+        // `--candidate-evaluator default` to hold the evaluator fixed at
+        // DefaultEvaluator instead — e.g. to isolate a search-only change
+        // like `--candidate-lmr`/`--baseline-lmr` from any evaluator delta.
+        let candidateEvaluator: any PositionEvaluator =
+            options["candidate-evaluator"] == "default" ? DefaultEvaluator() : MaterialOnlyEvaluator()
+        let candidateEvaluatorName = options["candidate-evaluator"] == "default" ? "DefaultEvaluator" : "MaterialOnlyEvaluator"
+        let baselineLabel = options["baseline-label"] ?? "baseline (DefaultEvaluator\(baselineLMR ? "" : ", LMR off"))"
+        let candidateLabel = options["candidate-label"]
+            ?? "candidate (\(candidateEvaluatorName)\(candidateLMR ? "" : ", LMR off"))"
         let baseline = config(
             depthKey: "baseline-depth", nodesKey: "baseline-nodes", defaultDepth: sharedDepth, options: options,
-            label: "baseline (DefaultEvaluator)", evaluator: DefaultEvaluator()
+            label: baselineLabel, evaluator: DefaultEvaluator(), lateMoveReductions: baselineLMR
         )
         let candidate = config(
             depthKey: "candidate-depth", nodesKey: "candidate-nodes", defaultDepth: sharedDepth, options: options,
-            label: "candidate (MaterialOnlyEvaluator)", evaluator: MaterialOnlyEvaluator()
+            label: candidateLabel, evaluator: candidateEvaluator, lateMoveReductions: candidateLMR
         )
         let maxPlies = options["max-plies"].flatMap(Int.init) ?? SelfPlay.defaultMaxPlies
         let maxGames = options["games"].flatMap(Int.init)
