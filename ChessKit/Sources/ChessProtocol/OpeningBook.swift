@@ -68,6 +68,43 @@ public struct OpeningBook: Sendable {
         self.entries = entries
     }
 
+    /// Builds a book from precomputed *keyed* rows, one per line:
+    /// `"<repetitionKey>|<UCI move>|<weight>"` — the exact ``Board/repetitionKey``
+    /// a position hashes to, rather than a UCI prefix to replay. Unlike
+    /// ``init(compactRows:)``, this does **no** board simulation or legality
+    /// checking at all: `Move(uci:)` is a pure string parse, so loading is
+    /// just splitting lines and inserting into a dictionary. That's the
+    /// entire point of this initializer — ``init(compactRows:)`` on 50,000
+    /// rows means up to ~14 plies of full legal-move generation replayed
+    /// *per row*, which is the dominant cost (measured several seconds) of
+    /// constructing ``large``. Keyed rows are meant to be machine-generated
+    /// from already-validated data (see `engine-lab convert-book`, and
+    /// ``exportKeyedRows()`` which produces them from a book already built
+    /// the slow, validated way) — not hand-written, since a bad key here
+    /// just silently never matches any real position rather than being
+    /// caught the way an illegal move in ``init(compactRows:)`` is.
+    public init(keyedRows: [String]) {
+        var entries: [String: [WeightedMove]] = [:]
+        for row in keyedRows {
+            let parts = row.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 3, let weight = Int(parts[2]), weight > 0,
+                  let move = Move(uci: parts[1]) else { continue }
+            entries[parts[0], default: []].append(WeightedMove(move: move, weight: weight))
+        }
+        self.entries = entries
+    }
+
+    /// Exports every entry as keyed rows (see ``init(keyedRows:)``), sorted
+    /// by key for a deterministic, diffable file. Within a key, moves stay
+    /// in this book's existing order (first-seen order from however it was
+    /// built), so reloading the export via ``init(keyedRows:)`` reproduces
+    /// identical ``weightedMoves(for:)`` results to this book.
+    public func exportKeyedRows() -> [String] {
+        entries.keys.sorted().flatMap { key in
+            entries[key]!.map { "\(key)|\($0.move.uci)|\($0.weight)" }
+        }
+    }
+
     private static func bump(
         _ move: Move, weight: Int = 1, at key: String, in entries: inout [String: [WeightedMove]]
     ) {
@@ -166,13 +203,20 @@ public struct OpeningBook: Sendable {
     /// book if the bundled resource is missing so a packaging problem
     /// degrades to "no book move, fall through to search" rather than
     /// crashing.
+    ///
+    /// Loads `opening_book_large_keyed.txt` (see ``init(keyedRows:)``), a
+    /// derived artifact generated from `opening_book_large.txt` via
+    /// `engine-lab convert-book` — not the raw prefix rows directly, which
+    /// took several seconds to validate-and-replay through a fresh `Game()`
+    /// at every process launch. The two files are regenerated together; see
+    /// `tools/opening-book/README.md`.
     public static let large: OpeningBook = {
-        guard let url = Bundle.module.url(forResource: "opening_book_large", withExtension: "txt"),
+        guard let url = Bundle.module.url(forResource: "opening_book_large_keyed", withExtension: "txt"),
               let text = try? String(contentsOf: url, encoding: .utf8) else {
             return OpeningBook(lines: [])
         }
         let rows = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
-        return OpeningBook(compactRows: rows)
+        return OpeningBook(keyedRows: rows)
     }()
 }
 

@@ -1,10 +1,16 @@
 # Opening book generation
 
 `OpeningBook.large` (`ChessKit/Sources/ChessProtocol/OpeningBook.swift`) is
-built from `ChessKit/Sources/ChessProtocol/Resources/opening_book_large.txt`,
-a compact, frequency-weighted table generated offline by
-`generate_opening_book.py` in this directory. `generate_opening_book.py
---source` supports three ways to build that table; see below.
+built from two committed resources:
+
+- `opening_book_large.txt` — a compact, frequency-weighted table generated
+  offline by `generate_opening_book.py` in this directory (`--source` below
+  supports three ways to build it). Human-auditable, and the actual source
+  of truth: this is what you edit/regenerate.
+- `opening_book_large_keyed.txt` — a **derived** file, precomputed from the
+  above via `engine-lab convert-book` (see "Fast-load derived file" below).
+  This is what `OpeningBook.large` actually loads at runtime; regenerate it
+  any time `opening_book_large.txt` changes.
 
 ## Current book: Lichess monthly dump (`lichess-dump`)
 
@@ -112,3 +118,31 @@ replays each row's own prefix through `ChessKit`'s `Game` to find the
 position (reusing the exact same legality checks and `repetitionKey` hashing
 `OpeningBook.standard` already relies on), so a malformed or illegal row is
 just skipped rather than corrupting the book.
+
+## Fast-load derived file
+
+Replaying every row's prefix (`OpeningBook.init(compactRows:)`, above) means
+up to 14 plies of full legal-move generation *per row* — at 50,000 rows,
+this is a multi-second cost (~9s in a release build, much worse in debug)
+paid on every process launch, which is a real problem for anything that
+starts fresh often (a Lichess bot process, in particular — see #216, #220).
+
+`opening_book_large_keyed.txt` avoids this: it's `opening_book_large.txt`
+already fully replayed and validated *once*, offline, with each row
+rewritten from a UCI-prefix to the actual `Board.repetitionKey` string it
+resolves to (`OpeningBook.init(keyedRows:)`, `OpeningBook.exportKeyedRows()`
+in `OpeningBook.swift`). Loading it at runtime is then just splitting lines
+into a dictionary — no board simulation at all, ~80x faster in practice.
+
+**After any change to `opening_book_large.txt`, regenerate the keyed file:**
+
+```
+swift run -c release engine-lab convert-book \
+  ChessKit/Sources/ChessProtocol/Resources/opening_book_large.txt \
+  ChessKit/Sources/ChessProtocol/Resources/opening_book_large_keyed.txt
+```
+
+This is deterministic (same input always produces the same output byte for
+byte), so verifying the committed keyed file is up to date is just
+re-running the command above and diffing — no need to replay it inside the
+test suite on every `swift test`.

@@ -63,6 +63,14 @@ public final class UCIEngine {
         while !shouldQuit, let line = readLine(strippingNewline: true) {
             for response in process(line) {
                 print(response)
+                // Stdout is only line-buffered by default when it's a TTY;
+                // piped to a GUI/bridge (the normal case for a UCI engine)
+                // it's fully buffered, so lines like `uciok`/`bestmove` sit
+                // unflushed until the process exits and the other end hangs
+                // waiting for them. `setvbuf` alone proved unreliable here
+                // (still buffered under a real pipe in testing), so flush
+                // explicitly after every line instead.
+                fflush(stdout)
             }
         }
     }
@@ -98,12 +106,14 @@ public final class UCIEngine {
         board = position
     }
 
-    /// Parses the subset of `go` we support (`depth`, `nodes`, `movetime`),
-    /// searches, and returns an `info` line followed by `bestmove`.
+    /// Parses the subset of `go` we support (`depth`, `nodes`, `movetime`,
+    /// `wtime`/`btime`/`winc`/`binc`), searches, and returns an `info` line
+    /// followed by `bestmove`.
     private func runGo(_ args: [String]) -> [String] {
         var depth = defaultDepth
         var maxNodes: Int?
         var moveTime: TimeInterval?
+        var wtimeMs, btimeMs, wincMs, bincMs: Int?
 
         var i = 0
         while i < args.count {
@@ -121,10 +131,28 @@ public final class UCIEngine {
                     if !args.contains("depth") { depth = 64 }
                     i += 1
                 }
+            case "wtime":
+                if i + 1 < args.count, let ms = Int(args[i + 1]) { wtimeMs = ms; i += 1 }
+            case "btime":
+                if i + 1 < args.count, let ms = Int(args[i + 1]) { btimeMs = ms; i += 1 }
+            case "winc":
+                if i + 1 < args.count, let ms = Int(args[i + 1]) { wincMs = ms; i += 1 }
+            case "binc":
+                if i + 1 < args.count, let ms = Int(args[i + 1]) { bincMs = ms; i += 1 }
             default:
                 break
             }
             i += 1
+        }
+
+        // `movetime` is an explicit per-move budget and wins if both are
+        // sent (shouldn't happen per UCI, but movetime is the more specific
+        // request). Otherwise fall back to a clock-derived budget.
+        if moveTime == nil {
+            moveTime = Self.clockBudget(
+                sideToMove: board.sideToMove, wtimeMs: wtimeMs, btimeMs: btimeMs, wincMs: wincMs, bincMs: bincMs
+            )
+            if moveTime != nil, !args.contains("depth") { depth = 64 }
         }
 
         let result = engine.search(board, limit: SearchLimit(depth: depth, maxNodes: maxNodes, moveTime: moveTime))
@@ -133,6 +161,35 @@ public final class UCIEngine {
         lines.append(infoLine(for: result))
         lines.append("bestmove \(result.bestMove?.uci ?? "(none)")")
         return lines
+    }
+
+    /// Turns UCI clock fields into a per-move time budget (seconds) for
+    /// `sideToMove`. Returns `nil` when that side's remaining time wasn't
+    /// sent at all — the caller then falls back to `defaultDepth` (e.g. a
+    /// bare `go`, or a GUI that only ever sends `depth`/`nodes`).
+    ///
+    /// Allocates roughly 1/20th of the remaining time plus 80% of the
+    /// increment, capped at half the clock so one move can't spend it all.
+    /// A fixed slice (up to 200ms, less if the clock is nearly out) is held
+    /// back as safety margin: `SearchLimit.moveTime` is a *soft* cap — the
+    /// search always finishes the iterative-deepening pass it's mid-way
+    /// through, so real think time can run a bit past the budget. When the
+    /// clock is effectively at zero, this still returns a small nonzero
+    /// budget (never `0`) rather than falling back to a possibly-slower
+    /// fixed-depth search, which is the more dangerous failure mode with an
+    /// almost-flagged clock.
+    static func clockBudget(
+        sideToMove: PieceColor, wtimeMs: Int?, btimeMs: Int?, wincMs: Int?, bincMs: Int?
+    ) -> TimeInterval? {
+        guard let rawTimeLeft = sideToMove == .white ? wtimeMs : btimeMs else { return nil }
+        let timeLeftMs = max(rawTimeLeft, 0)
+        let incMs = max((sideToMove == .white ? wincMs : bincMs) ?? 0, 0)
+
+        let safetyMs = min(200, timeLeftMs / 10)
+        let usableMs = max(timeLeftMs - safetyMs, 0)
+        let allocatedMs = min(usableMs / 20 + incMs * 4 / 5, max(usableMs / 2, 1))
+
+        return TimeInterval(max(allocatedMs, 10)) / 1000
     }
 
     /// Formats a UCI `info` line from a search result.
