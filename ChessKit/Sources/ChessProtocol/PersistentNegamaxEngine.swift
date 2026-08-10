@@ -74,10 +74,14 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
         book: OpeningBook? = nil,
         bookSeed: UInt64 = .random(in: .min ... .max),
         evaluator: any PositionEvaluator = DefaultEvaluator(),
+        seePruning: Bool = true,
         maxTableEntries: Int = PersistentNegamaxEngine.defaultMaxTableEntries
     ) {
         precondition(maxTableEntries > 0, "maxTableEntries must be positive")
-        self.core = NegamaxEngine(name: name, author: author, book: book, bookSeed: bookSeed, evaluator: evaluator)
+        self.core = NegamaxEngine(
+            name: name, author: author, book: book, bookSeed: bookSeed,
+            evaluator: evaluator, seePruning: seePruning
+        )
         self.maxTableEntries = maxTableEntries
     }
 
@@ -148,7 +152,8 @@ public final class PersistentNegamaxEngine: ChessEngine, @unchecked Sendable {
     /// sole reference in place instead of triggering a copy-on-write clone.
     private func searchHoldingLock(_ board: Board, limit: SearchLimit) -> SearchResult {
         let session = Search(
-            limit: limit, table: table, stop: stopSignal, generation: generation, evaluator: core.evaluator
+            limit: limit, table: table, stop: stopSignal, generation: generation,
+            evaluator: core.evaluator, seePruning: core.seePruning
         )
         table = [:]
         let result = core.search(board, limit: limit, session: session)

@@ -14,7 +14,7 @@ final class BenchTests: XCTestCase {
     /// engine — that diff is the review signal. Engine evaluation is pure
     /// integer, so the value is byte-identical across machines and across
     /// debug/release builds (verified).
-    static let signatureAtCIBudget: UInt64 = 0x55b1_10b1_c3c9_c16a
+    static let signatureAtCIBudget: UInt64 = 0xa46b_0499_4c3c_ba4f
 
     /// Every suite FEN must parse and be a real, non-terminal position — a
     /// typo'd or already-checkmated FEN would silently search nothing.

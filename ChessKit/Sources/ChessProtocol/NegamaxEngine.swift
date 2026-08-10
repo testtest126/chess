@@ -3,9 +3,10 @@ import ChessKit
 
 /// An alpha-beta negamax search over ChessKit's evaluation, with iterative
 /// deepening, aspiration windows, a transposition table, null-move pruning,
-/// MVV-LVA + killer + history move ordering, check extensions, and quiescence
-/// search. Deterministic when no node or time limit cuts the search short —
-/// including when an opening book is attached, given the same `bookSeed`.
+/// MVV-LVA + killer + history move ordering, check extensions, and an
+/// SEE-pruned quiescence search. Deterministic when no node or time limit
+/// cuts the search short — including when an opening book is attached,
+/// given the same `bookSeed`.
 public struct NegamaxEngine: ChessEngine {
     public let name: String
     public let author: String
@@ -22,6 +23,12 @@ public struct NegamaxEngine: ChessEngine {
     /// different one to compare evaluation functions without any shared
     /// mutable state (see ``PositionEvaluator``).
     public let evaluator: any PositionEvaluator
+    /// Whether quiescence skips captures with a negative Static Exchange
+    /// Evaluation (see `Board.see`) instead of searching them. Defaults to
+    /// `true`; a measurement harness can set this `false` to reconstruct
+    /// pre-SEE quiescence from the same binary, so the heuristic's own Elo
+    /// effect can be isolated and SPRT-measured.
+    public let seePruning: Bool
 
     /// Score assigned to a checkmate at the root. Mates found deeper are worth
     /// slightly less so the search prefers the fastest one.
@@ -34,17 +41,19 @@ public struct NegamaxEngine: ChessEngine {
         author: String = "ChessKit",
         book: OpeningBook? = nil,
         bookSeed: UInt64 = .random(in: .min ... .max),
-        evaluator: any PositionEvaluator = DefaultEvaluator()
+        evaluator: any PositionEvaluator = DefaultEvaluator(),
+        seePruning: Bool = true
     ) {
         self.name = name
         self.author = author
         self.book = book
         self.bookSeed = bookSeed
         self.evaluator = evaluator
+        self.seePruning = seePruning
     }
 
     public func search(_ board: Board, limit: SearchLimit) -> SearchResult {
-        search(board, limit: limit, session: Search(limit: limit, evaluator: evaluator))
+        search(board, limit: limit, session: Search(limit: limit, evaluator: evaluator, seePruning: seePruning))
     }
 
     /// The full search driver, parameterized on the mutable session so
@@ -231,13 +240,16 @@ final class Search {
     private let generation: UInt32
     /// Consulted once per quiescence leaf; see ``PositionEvaluator``.
     private let evaluator: any PositionEvaluator
+    /// See ``NegamaxEngine/seePruning``.
+    private let seePruning: Bool
 
     init(
         limit: SearchLimit,
         table: [UInt64: TTEntry] = [:],
         stop: SearchStopSignal? = nil,
         generation: UInt32 = 0,
-        evaluator: any PositionEvaluator = DefaultEvaluator()
+        evaluator: any PositionEvaluator = DefaultEvaluator(),
+        seePruning: Bool = true
     ) {
         self.table = table
         self.stop = stop
@@ -245,6 +257,7 @@ final class Search {
         self.maxNodes = limit.maxNodes
         self.deadline = limit.moveTime.map { ContinuousClock.now + .seconds($0) }
         self.evaluator = evaluator
+        self.seePruning = seePruning
     }
 
     /// Records the root position at ply 0 of the repetition path, so a line
@@ -479,7 +492,12 @@ final class Search {
 
     /// Quiescence: at the horizon, keep resolving captures and promotions so
     /// the static evaluation is never taken in the middle of an exchange.
-    /// In check there is no standing pat — every evasion is searched.
+    /// In check there is no standing pat — every evasion is searched. Out of
+    /// check, a losing capture (negative `Board.see`) is skipped rather than
+    /// searched — losing the exchange can't beat standing pat, so spending
+    /// nodes to confirm that is wasted work. Never applied to promotions:
+    /// SEE only prices the material exchange on the destination square, and
+    /// a promotion's value comes from the new queen, not that square.
     private func quiesce(_ b: Board, alpha: Int, beta: Int, ply: Int, moves: [Move]) -> Int {
         nodes += 1
         if checkAbort() { return 0 }
@@ -504,7 +522,11 @@ final class Search {
             if standPat >= beta { return standPat }
             a = max(a, standPat)
             best = standPat
-            candidates = moves.filter { !isQuiet($0, in: b) }
+            candidates = moves.filter { move in
+                guard !isQuiet(move, in: b) else { return false }
+                guard seePruning, move.promotion == nil else { return true }
+                return b.see(move) >= 0
+            }
         }
 
         for move in ordered(candidates, in: b, first: nil, ply: ply) {
