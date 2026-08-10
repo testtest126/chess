@@ -193,4 +193,64 @@ final class OpeningBookTests: XCTestCase {
         XCTAssertFalse(replies.isEmpty, "book should still have a reply 12 plies deep")
         XCTAssertTrue(replies.contains { $0.move.uci == "a4b3" }, "a4b3 is the well-known main line retreat here")
     }
+
+    // MARK: - Keyed rows (fast-load path)
+
+    func testKeyedRowsBuildsWeightedBookAndSkipsMalformedRows() {
+        let book = OpeningBook(keyedRows: [
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -|e2e4|100",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -|d2d4|80",
+            "not a valid row",
+            "somekey|zz99|5", // unparseable move, skipped
+            "somekey|e2e4|0", // non-positive weight, skipped
+        ])
+        let root = Dictionary(
+            uniqueKeysWithValues: book.weightedMoves(for: Board()).map { ($0.move.uci, $0.weight) }
+        )
+        XCTAssertEqual(root["e2e4"], 100)
+        XCTAssertEqual(root["d2d4"], 80)
+        XCTAssertTrue(book.weightedMoves(for: Board()).allSatisfy { $0.move.uci != "zz99" })
+    }
+
+    func testKeyedRowsDoesNoLegalityChecking() {
+        // Unlike compactRows, keyedRows trusts the move is legal at that key
+        // (the whole point: no board replay at load time) — a bogus move
+        // still loads as long as it parses syntactically as UCI.
+        let book = OpeningBook(keyedRows: ["bogus-key-not-a-real-fen|a1a8|10"])
+        XCTAssertEqual(book.positionCount, 1)
+    }
+
+    func testExportKeyedRowsRoundTripsThroughCompactBuild() {
+        let source = OpeningBook(compactRows: [
+            "|e2e4|100",
+            "|d2d4|80",
+            "e2e4|e7e5|60",
+            "e2e4|c7c5|40",
+            "d2d4 g8f6|c2c4|40",
+        ])
+        let roundTripped = OpeningBook(keyedRows: source.exportKeyedRows())
+
+        // Every position the source book knows about must resolve to
+        // exactly the same weighted moves after an export/reimport cycle.
+        for uciPrefix in ["", "e2e4", "d2d4 g8f6"] {
+            var board = Board()
+            for uci in uciPrefix.split(separator: " ") {
+                board = board.making(Move(uci: String(uci))!)!
+            }
+            XCTAssertEqual(
+                source.weightedMoves(for: board), roundTripped.weightedMoves(for: board),
+                "mismatch after export/reimport for prefix '\(uciPrefix)'"
+            )
+        }
+    }
+
+    // Note: verifying opening_book_large_keyed.txt is an exact re-export of
+    // opening_book_large.txt would mean replaying all 50,000 compact rows
+    // through the slow, fully-validated path — the exact cost this whole
+    // change removes from every process launch. That's the wrong thing to
+    // pay on every `swift test` (minutes, in a debug build). Instead this
+    // is verified once, offline, when the keyed file is (re)generated: `engine-lab
+    // convert-book` is deterministic, so re-running it and diffing the
+    // output against the committed file is the check — see
+    // tools/opening-book/README.md.
 }
