@@ -557,7 +557,12 @@ final class Search {
 
     /// Quiescence: at the horizon, keep resolving captures and promotions so
     /// the static evaluation is never taken in the middle of an exchange.
-    /// In check there is no standing pat — every evasion is searched.
+    /// In check there is no standing pat — every evasion is searched. Out of
+    /// check, a losing capture (negative `Board.see`) is skipped rather than
+    /// searched — losing the exchange can't beat standing pat, so spending
+    /// nodes to confirm that is wasted work. Never applied to promotions:
+    /// SEE only prices the material exchange on the destination square, and
+    /// a promotion's value comes from the new queen, not that square.
     private func quiesce(_ b: Board, alpha: Int, beta: Int, ply: Int, moves: [Move]) -> Int {
         nodes += 1
         if checkAbort() { return 0 }
@@ -582,7 +587,11 @@ final class Search {
             if standPat >= beta { return standPat }
             a = max(a, standPat)
             best = standPat
-            candidates = moves.filter { !isQuiet($0, in: b) }
+            candidates = moves.filter { move in
+                guard !isQuiet(move, in: b) else { return false }
+                guard seePruning, move.promotion == nil else { return true }
+                return b.see(move) >= 0
+            }
         }
 
         for move in ordered(candidates, in: b, first: nil, ply: ply) {

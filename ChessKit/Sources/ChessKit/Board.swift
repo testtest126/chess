@@ -173,6 +173,146 @@ public struct Board: Equatable, Hashable, Sendable {
         return isAttacked(king, by: color.opposite)
     }
 
+    // MARK: - Static Exchange Evaluation
+
+    /// Every piece of `color` currently attacking `square`, ignoring pieces
+    /// on `excluded` squares (treated as removed from the board). Sliding
+    /// attacks are recomputed from scratch against this reduced occupancy
+    /// each call, so an excluded square is transparent to a ray passing
+    /// through it — the standard way a mailbox board picks up x-ray/battery
+    /// attackers revealed as blockers are removed, with no separate
+    /// bookkeeping needed. Used only by `see`; `isAttacked` above stays the
+    /// cheap boolean check for the (non-excluding) common case.
+    private func attackers(
+        to square: Int, by color: PieceColor, excluding excluded: Set<Int>
+    ) -> [(square: Int, kind: PieceKind)] {
+        var result: [(Int, PieceKind)] = []
+        let f = Sq.file(square), r = Sq.rank(square)
+
+        let pawnDir = color == .white ? 1 : -1
+        for df in [-1, 1] {
+            let pf = f + df, pr = r - pawnDir
+            guard Sq.isValid(file: pf, rank: pr) else { continue }
+            let sq = Sq.index(file: pf, rank: pr)
+            if !excluded.contains(sq), squares[sq] == Piece(color: color, kind: .pawn) {
+                result.append((sq, .pawn))
+            }
+        }
+
+        for (df, dr) in Board.knightOffsets {
+            let nf = f + df, nr = r + dr
+            guard Sq.isValid(file: nf, rank: nr) else { continue }
+            let sq = Sq.index(file: nf, rank: nr)
+            if !excluded.contains(sq), squares[sq] == Piece(color: color, kind: .knight) {
+                result.append((sq, .knight))
+            }
+        }
+
+        for (df, dr) in Board.kingOffsets {
+            let nf = f + df, nr = r + dr
+            guard Sq.isValid(file: nf, rank: nr) else { continue }
+            let sq = Sq.index(file: nf, rank: nr)
+            if !excluded.contains(sq), squares[sq] == Piece(color: color, kind: .king) {
+                result.append((sq, .king))
+            }
+        }
+
+        for (df, dr) in Board.bishopDirs {
+            var nf = f + df, nr = r + dr
+            while Sq.isValid(file: nf, rank: nr) {
+                let sq = Sq.index(file: nf, rank: nr)
+                if excluded.contains(sq) { nf += df; nr += dr; continue }
+                if let p = squares[sq] {
+                    if p.color == color, p.kind == .bishop || p.kind == .queen {
+                        result.append((sq, p.kind))
+                    }
+                    break
+                }
+                nf += df; nr += dr
+            }
+        }
+
+        for (df, dr) in Board.rookDirs {
+            var nf = f + df, nr = r + dr
+            while Sq.isValid(file: nf, rank: nr) {
+                let sq = Sq.index(file: nf, rank: nr)
+                if excluded.contains(sq) { nf += df; nr += dr; continue }
+                if let p = squares[sq] {
+                    if p.color == color, p.kind == .rook || p.kind == .queen {
+                        result.append((sq, p.kind))
+                    }
+                    break
+                }
+                nf += df; nr += dr
+            }
+        }
+
+        return result
+    }
+
+    /// Static Exchange Evaluation: the net material result, in centipawns
+    /// from `move`'s mover's perspective, of the full capture/recapture
+    /// sequence on `move.to` that follows if both sides only ever recapture
+    /// when doing so is profitable — the standard "swap algorithm" (each
+    /// side always recaptures with its least valuable attacker; x-ray
+    /// attackers behind a captured piece are picked up automatically, see
+    /// `attackers(to:by:excluding:)`).
+    ///
+    /// `move` must be a legal capture or en passant capture; callers are
+    /// responsible for that (mirrors `evaluateFast()`'s "caller handles
+    /// terminal positions" contract elsewhere in this file). Two
+    /// simplifications, both standard for a first-pass SEE and shared by
+    /// most engines that implement one: it doesn't check that an
+    /// intermediate recapture is itself legal (e.g. a pinned piece
+    /// "recapturing" when it actually can't, or a king recapturing into
+    /// check) — exact legality at every ply of a hypothetical exchange is
+    /// expensive for a rarely-decisive difference; and pieces are ordered
+    /// purely by material value, not exchange-specific nuance.
+    public func see(_ move: Move) -> Int {
+        guard let firstAttacker = squares[move.from] else { return 0 }
+
+        // En passant's victim isn't on `move.to` — it's the just-doubled
+        // pawn, on the capturing pawn's rank and the destination's file.
+        let isEnPassant = firstAttacker.kind == .pawn
+            && move.to == enPassantSquare && squares[move.to] == nil
+        var excluded: Set<Int> = [move.from]
+        let firstVictimValue: Int
+        if isEnPassant {
+            let capturedSquare = Sq.index(file: Sq.file(move.to), rank: Sq.rank(move.from))
+            excluded.insert(capturedSquare)
+            firstVictimValue = PieceKind.pawn.centipawnValue
+        } else {
+            firstVictimValue = squares[move.to]?.kind.centipawnValue ?? 0
+        }
+
+        var gain: [Int] = [firstVictimValue]
+        var attackingPieceValue = firstAttacker.kind.centipawnValue
+        var side = firstAttacker.color.opposite
+
+        while true {
+            let candidates = attackers(to: move.to, by: side, excluding: excluded)
+            guard let least = candidates.min(by: { $0.kind.centipawnValue < $1.kind.centipawnValue }) else {
+                break
+            }
+            gain.append(attackingPieceValue - gain[gain.count - 1])
+            excluded.insert(least.square)
+            attackingPieceValue = least.kind.centipawnValue
+            side = side.opposite
+        }
+
+        // Negamax the gain sequence backward: at each step, the side to
+        // recapture takes the better of "recapture" (locking in that ply's
+        // gain) or "stand pat" (declining, worth 0 relative to the previous
+        // ply) — exactly mirroring quiescence's own stand-pat choice, one
+        // material exchange at a time instead of one search ply at a time.
+        var d = gain.count - 1
+        while d > 0 {
+            gain[d - 1] = -max(-gain[d - 1], gain[d])
+            d -= 1
+        }
+        return gain[0]
+    }
+
     // MARK: - Move generation
 
     /// All pseudo-legal moves for the side to move (may leave own king in check).
