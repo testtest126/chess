@@ -157,18 +157,18 @@ public enum CLI {
     static func config(
         depthKey: String, nodesKey: String, defaultDepth: Int, options: [String: String],
         label: String? = nil, evaluator: any PositionEvaluator = DefaultEvaluator(),
-        seePruning: Bool = true
+        lateMoveReductions: Bool = true
     ) -> EngineConfig {
         if let nodes = options[nodesKey].flatMap(Int.init) {
             return EngineConfig(
                 label: label ?? "nodes-\(nodes)", limit: Bench.nodeLimit(nodes),
-                evaluator: evaluator, seePruning: seePruning
+                evaluator: evaluator, lateMoveReductions: lateMoveReductions
             )
         }
         let depth = options[depthKey].flatMap(Int.init) ?? defaultDepth
         return EngineConfig(
             label: label ?? "depth-\(depth)", limit: SearchLimit(depth: depth),
-            evaluator: evaluator, seePruning: seePruning
+            evaluator: evaluator, lateMoveReductions: lateMoveReductions
         )
     }
 
@@ -200,26 +200,26 @@ public enum CLI {
     static func runABTest(_ args: [String]) -> Int32 {
         let options = parseOptions(args)
         let sharedDepth = options["depth"].flatMap(Int.init) ?? 3
-        let baselineSEE = flag(options, "baseline-see", default: true)
-        let candidateSEE = flag(options, "candidate-see", default: true)
+        let baselineLMR = flag(options, "baseline-lmr", default: true)
+        let candidateLMR = flag(options, "candidate-lmr", default: true)
         // Defaults to MaterialOnlyEvaluator, matching this tool's original
         // (and only, until now) purpose of A/B-testing evaluators; pass
         // `--candidate-evaluator default` to hold the evaluator fixed at
         // DefaultEvaluator instead — e.g. to isolate a search-only change
-        // like `--candidate-see`/`--baseline-see` from any evaluator delta.
+        // like `--candidate-lmr`/`--baseline-lmr` from any evaluator delta.
         let candidateEvaluator: any PositionEvaluator =
             options["candidate-evaluator"] == "default" ? DefaultEvaluator() : MaterialOnlyEvaluator()
         let candidateEvaluatorName = options["candidate-evaluator"] == "default" ? "DefaultEvaluator" : "MaterialOnlyEvaluator"
-        let baselineLabel = options["baseline-label"] ?? "baseline (DefaultEvaluator\(baselineSEE ? "" : ", SEE off"))"
+        let baselineLabel = options["baseline-label"] ?? "baseline (DefaultEvaluator\(baselineLMR ? "" : ", LMR off"))"
         let candidateLabel = options["candidate-label"]
-            ?? "candidate (\(candidateEvaluatorName)\(candidateSEE ? "" : ", SEE off"))"
+            ?? "candidate (\(candidateEvaluatorName)\(candidateLMR ? "" : ", LMR off"))"
         let baseline = config(
             depthKey: "baseline-depth", nodesKey: "baseline-nodes", defaultDepth: sharedDepth, options: options,
-            label: baselineLabel, evaluator: DefaultEvaluator(), seePruning: baselineSEE
+            label: baselineLabel, evaluator: DefaultEvaluator(), lateMoveReductions: baselineLMR
         )
         let candidate = config(
             depthKey: "candidate-depth", nodesKey: "candidate-nodes", defaultDepth: sharedDepth, options: options,
-            label: candidateLabel, evaluator: candidateEvaluator, seePruning: candidateSEE
+            label: candidateLabel, evaluator: candidateEvaluator, lateMoveReductions: candidateLMR
         )
         let maxPlies = options["max-plies"].flatMap(Int.init) ?? SelfPlay.defaultMaxPlies
         let maxGames = options["games"].flatMap(Int.init)

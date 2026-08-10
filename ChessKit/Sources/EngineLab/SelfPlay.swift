@@ -45,26 +45,27 @@ public struct EngineConfig: Sendable {
     /// shipping evaluation; the A/B harness (`ABTest.swift`) is the intended
     /// way to plug in a candidate — see ``PositionEvaluator``.
     public let evaluator: any PositionEvaluator
-    /// Whether this config's engine SEE-prunes losing captures in
-    /// quiescence. Defaults to the shipping `true`; set `false` to
-    /// reconstruct pre-SEE quiescence from the same binary, so a harness
-    /// can A/B the heuristic itself (see ``NegamaxEngine/seePruning``).
-    public let seePruning: Bool
+    /// Whether this config's engine applies late-move reductions. Defaults to
+    /// the shipping `true`; set `false` to reconstruct pre-LMR search
+    /// behavior from the same binary, so a harness can A/B the heuristic
+    /// itself (see ``NegamaxEngine/lateMoveReductions``) the same way
+    /// `evaluator` lets it A/B evaluation changes.
+    public let lateMoveReductions: Bool
 
     public init(
         label: String, limit: SearchLimit, book: OpeningBook? = nil,
         evaluator: any PositionEvaluator = DefaultEvaluator(),
-        seePruning: Bool = true
+        lateMoveReductions: Bool = true
     ) {
         self.label = label
         self.limit = limit
         self.book = book
         self.evaluator = evaluator
-        self.seePruning = seePruning
+        self.lateMoveReductions = lateMoveReductions
     }
 
     func makeEngine() -> NegamaxEngine {
-        NegamaxEngine(book: book, evaluator: evaluator, seePruning: seePruning)
+        NegamaxEngine(book: book, evaluator: evaluator, lateMoveReductions: lateMoveReductions)
     }
 }
 
