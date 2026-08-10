@@ -31,6 +31,11 @@ let package = Package(
             exclude: ["README.md"]
         ),
         .executableTarget(name: "engine-lab", dependencies: ["EngineLab"]),
+        // UCI executable driving the engine over stdin/stdout, for use with
+        // any UCI-speaking bridge (e.g. lichess-bot). All logic lives in
+        // `ChessProtocol.UCIEngine` and is unit-tested there; this is a
+        // thin shim, same shape as `engine-lab`.
+        .executableTarget(name: "mate-uci", dependencies: ["ChessProtocol", "ChessKit"], exclude: ["README.md"]),
         .testTarget(name: "ChessKitTests", dependencies: ["ChessKit"]),
         .testTarget(name: "ChessProtocolTests", dependencies: ["ChessProtocol", "ChessKit"]),
         .testTarget(name: "ChessOnlineTests", dependencies: ["ChessOnline"]),
